@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --vodium-black: #0A0A0A;
+  --vodium-gold: #C9A961;
+  --vodium-gold-soft: #E5C97D;
+  --vodium-cream: #FAFAF7;
+  --vodium-charcoal: #1F1F1F;
+}
+
+html, body {
+  background: var(--vodium-cream);
+  color: var(--vodium-black);
+  font-family: var(--font-inter), Inter, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, .font-serif {
+  font-family: var(--font-playfair), "Playfair Display", serif;
+  letter-spacing: -0.01em;
+}
+
+.brand-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--vodium-gold), transparent);
+}
+
+.btn-gold {
+  background: var(--vodium-gold);
+  color: var(--vodium-black);
+  font-weight: 600;
+  transition: filter 120ms ease;
+}
+.btn-gold:hover { filter: brightness(0.95); }
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--vodium-black);
+  color: var(--vodium-black);
+}
