@@ -95,13 +95,39 @@ export default function RegisterPage() {
     setLoading(true);
     setError(null);
     try {
-      // Verify OTP
+      // 1. Verify OTP → sets vodium_phone cookie
       const verRes = await fetch("/api/auth/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: form.phone, otp: form.otp }),
       });
-      if (!verRes.ok) throw new Error("Wrong code. Please try again.");
+      if (!verRes.ok) {
+        const d = await verRes.json();
+        throw new Error(d.error ?? "Wrong code. Please try again.");
+      }
+
+      // 2. Create vendor account
+      const regRes = await fetch("/api/vendor/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          businessName: form.businessName,
+          vendorType: form.vendorType,
+          campusLocation: form.campusLocation,
+          university: form.university,
+          ownerName: form.ownerName,
+          email: form.email || undefined,
+        }),
+      });
+      const regData = await regRes.json();
+      if (!regRes.ok) throw new Error(regData.error ?? "Could not create account");
+
+      // Already registered → go to dashboard
+      if (regData.alreadyExists) {
+        window.location.href = "/dashboard";
+        return;
+      }
+
       setStep(5);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong");

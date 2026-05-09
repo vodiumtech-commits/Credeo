@@ -17,6 +17,7 @@ type Step = "form" | "confirm" | "done";
 export default function NewCreditPage() {
   const [step, setStep] = useState<Step>("form");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     studentName: "",
     matricNumber: "",
@@ -46,9 +47,34 @@ export default function NewCreditPage() {
 
   async function handleSubmit() {
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 1200));
-    setLoading(false);
-    setStep("done");
+    setError(null);
+    try {
+      const days = form.dueDays === "custom" ? parseInt(form.customDue || "0") : parseInt(form.dueDays || "0");
+      const dueDateTime = new Date();
+      dueDateTime.setDate(dueDateTime.getDate() + days);
+
+      const res = await fetch("/api/credits", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studentName: form.studentName,
+          matricNumber: form.matricNumber || undefined,
+          studentPhone: form.phone || undefined,
+          amount: parseFloat(form.amount),
+          description: form.description || undefined,
+          dueDate: dueDateTime.toISOString(),
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error ?? "Could not save credit");
+      }
+      setStep("done");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
   }
 
   if (step === "done") {
@@ -121,6 +147,11 @@ export default function NewCreditPage() {
           <div className="bg-muted/40 rounded-xl p-4 mb-6 text-xs text-muted-foreground leading-relaxed">
             A polite reminder will be sent to <strong>{form.studentName}</strong> 2 days before the due date. Their Vodium score will be updated when they pay.
           </div>
+          {error && (
+            <p className="text-sm text-danger bg-danger/10 border border-danger/20 rounded-xl px-4 py-2.5 mb-2">
+              {error}
+            </p>
+          )}
           <button
             onClick={handleSubmit}
             disabled={loading}

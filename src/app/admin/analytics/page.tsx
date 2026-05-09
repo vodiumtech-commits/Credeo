@@ -1,51 +1,110 @@
-import {
-  TrendingUp, Users, CreditCard, ArrowUpRight, CheckCircle2,
-  AlertCircle, BarChart3, PieChart
-} from "lucide-react";
-import {
-  ADMIN_PLATFORM_STATS, ADMIN_MRR_HISTORY, ADMIN_UNIVERSITY_BREAKDOWN,
-  ADMIN_VENDORS
-} from "@/lib/data/demo-data";
+import { CreditCard } from "lucide-react";
+import { prisma } from "@/lib/prisma";
 import { formatNaira } from "@/lib/utils";
 
-// Extended mock data for analytics
-const REPAYMENT_HISTORY = [
-  { month: "Nov '25", rate: 68.2, credits: 234 },
-  { month: "Dec '25", rate: 70.1, credits: 891 },
-  { month: "Jan '26", rate: 71.5, credits: 1543 },
-  { month: "Feb '26", rate: 72.8, credits: 2210 },
-  { month: "Mar '26", rate: 72.9, credits: 3107 },
-  { month: "Apr '26", rate: 73.4, credits: 3987 },
-];
+export default async function AdminAnalyticsPage() {
+  const [
+    creditAmounts,
+    totalRepaid,
+    activeSubs,
+    totalCredits,
+    paidCredits,
+    writtenOffCredits,
+    partialCredits,
+    overdueCredits,
+    monthlyCredits,
+    scoreDistribution,
+    topVendors,
+    vendorTypeBreakdown,
+  ] = await Promise.all([
+    prisma.credit.aggregate({ _sum: { amount: true } }),
+    prisma.repayment.aggregate({ _sum: { amount: true } }),
 
-const SCORE_DISTRIBUTION = [
-  { tier: "Excellent (750–1000)", count: 892,  pct: 22.8, color: "#16A34A" },
-  { tier: "Good (650–749)",       count: 1234, pct: 31.6, color: "#C9A961" },
-  { tier: "Fair (450–649)",       count: 1103, pct: 28.2, color: "#D97706" },
-  { tier: "Poor (0–449)",         count: 685,  pct: 17.5, color: "#DC2626" },
-];
+    prisma.vendorSubscription.findMany({
+      where: { status: "ACTIVE" },
+      select: { monthlyAmount: true },
+    }),
 
-const TOP_VENDORS = [
-  { name: "Oga Emeka's Mini Mart", university: "UNILAG", students: 102, collected: 512_000, rate: 91 },
-  { name: "Baba Wale's Food Canteen", university: "UNILAG", students: 89, collected: 780_000, rate: 88 },
-  { name: "Mama Taiwo's Provisions", university: "UNILAG", students: 63, collected: 324_500, rate: 82 },
-  { name: "Campus Bites Canteen", university: "UI", students: 45, collected: 256_000, rate: 79 },
-  { name: "Ibadan Student Supplies", university: "UI", students: 41, collected: 245_000, rate: 77 },
-];
+    prisma.credit.count(),
+    prisma.credit.count({ where: { status: "PAID" } }),
+    prisma.credit.count({ where: { status: "WRITTEN_OFF" } }),
+    prisma.credit.count({ where: { status: "PARTIALLY_PAID" } }),
+    prisma.credit.count({ where: { status: "OVERDUE" } }),
 
-const VENDOR_TYPE_BREAKDOWN = [
-  { type: "Food Canteen",    count: 38, pct: 30 },
-  { type: "Provision Shop",  count: 29, pct: 23 },
-  { type: "Mini Mart",       count: 22, pct: 17 },
-  { type: "Print Shop",      count: 16, pct: 13 },
-  { type: "Laundry",         count: 12, pct: 9 },
-  { type: "Other",           count: 10, pct: 8 },
-];
+    prisma.$queryRaw<Array<{ month: string; extended: number; recovered: number }>>`
+      SELECT
+        TO_CHAR(DATE_TRUNC('month', c."createdAt"), 'Mon ''YY') AS month,
+        COALESCE(SUM(c.amount), 0)::float AS extended,
+        COALESCE(SUM(r_agg.total), 0)::float AS recovered
+      FROM "Credit" c
+      LEFT JOIN LATERAL (
+        SELECT COALESCE(SUM(r.amount), 0) AS total
+        FROM "Repayment" r
+        WHERE r."creditId" = c.id
+      ) r_agg ON TRUE
+      WHERE c."createdAt" >= NOW() - INTERVAL '6 months'
+      GROUP BY DATE_TRUNC('month', c."createdAt")
+      ORDER BY DATE_TRUNC('month', c."createdAt") ASC
+    `,
 
-export default function AdminAnalyticsPage() {
-  const s = ADMIN_PLATFORM_STATS;
-  const mrrMax = Math.max(...ADMIN_MRR_HISTORY.map((m) => m.mrr));
-  const rateMax = Math.max(...REPAYMENT_HISTORY.map((m) => m.rate));
+    prisma.$queryRaw<Array<{ tier: string; count: bigint }>>`
+      SELECT
+        CASE
+          WHEN "vodiumScore" >= 750 THEN 'excellent'
+          WHEN "vodiumScore" >= 650 THEN 'good'
+          WHEN "vodiumScore" >= 450 THEN 'fair'
+          ELSE 'poor'
+        END AS tier,
+        COUNT(*) AS count
+      FROM "Student"
+      GROUP BY tier
+    `,
+
+    prisma.vendor.findMany({
+      take: 5,
+      orderBy: { credits: { _count: "desc" } },
+      include: {
+        university: { select: { shortName: true, name: true } },
+        _count: { select: { credits: true } },
+      },
+    }),
+
+    prisma.vendor.groupBy({
+      by: ["vendorType"],
+      _count: { _all: true },
+      orderBy: { _count: { vendorType: "desc" } },
+    }),
+  ]);
+
+  const mrr = activeSubs.reduce((s, sub) => s + Number(sub.monthlyAmount), 0);
+  const arr = mrr * 12;
+  const totalTracked = Number(creditAmounts._sum.amount ?? 0);
+  const totalRecovered = Number(totalRepaid._sum.amount ?? 0);
+  const repaymentRate = totalCredits > 0 ? Math.round((paidCredits / totalCredits) * 100) : 0;
+  const defaultRate = totalCredits > 0 ? Math.round((writtenOffCredits / totalCredits) * 100) : 0;
+
+  const chartMax = Math.max(...monthlyCredits.map((m) => m.extended), 1);
+
+  const scoreMap: Record<string, { tier: string; color: string }> = {
+    excellent: { tier: "Excellent (750–1000)", color: "#16A34A" },
+    good:      { tier: "Good (650–749)",       color: "#C9A961" },
+    fair:      { tier: "Fair (450–649)",        color: "#D97706" },
+    poor:      { tier: "Poor (0–449)",          color: "#DC2626" },
+  };
+  const totalStudentsScored = scoreDistribution.reduce((s, r) => s + Number(r.count), 0);
+
+  const vendorTypeLabels: Record<string, string> = {
+    PROVISION_SHOP: "Provision Shop",
+    FOOD_CANTEEN:   "Food Canteen",
+    LAUNDRY:        "Laundry",
+    PRINTING:       "Printing",
+    BARBING_SALON:  "Barbing Salon",
+    HAIR_SALON:     "Hair Salon",
+    PHARMACY:       "Pharmacy",
+    MINI_MART:      "Mini Mart",
+    OTHER:          "Other",
+  };
+  const totalVendors = vendorTypeBreakdown.reduce((s, v) => s + v._count._all, 0);
 
   return (
     <div className="p-6 md:p-8 max-w-7xl space-y-8">
@@ -53,204 +112,189 @@ export default function AdminAnalyticsPage() {
       <div>
         <p className="text-vodium-gold text-xs tracking-[0.3em] uppercase mb-1">Platform analytics</p>
         <h1 className="font-serif text-2xl md:text-3xl text-vodium-cream">Analytics Dashboard</h1>
-        <p className="text-vodium-cream/40 text-sm mt-0.5">Nov 2025 – Apr 2026 · Updated every hour</p>
+        <p className="text-vodium-cream/40 text-sm mt-0.5">Live data · Refreshes on page load</p>
       </div>
 
-      {/* ── Revenue metrics ────────────────────────────── */}
+      {/* ── Revenue ──────────────────────────────────── */}
       <section>
-        <h2 className="text-sm font-semibold text-vodium-cream/60 uppercase tracking-wider mb-4">
-          Revenue
-        </h2>
+        <h2 className="text-sm font-semibold text-vodium-cream/60 uppercase tracking-wider mb-4">Revenue</h2>
         <div className="grid md:grid-cols-3 gap-4 mb-6">
           {[
-            { label: "MRR", value: formatNaira(s.mrr), sub: "Monthly recurring revenue", delta: "+18.7% MoM", positive: true },
-            { label: "ARR", value: formatNaira(s.arr), sub: "Annualized run rate", delta: "+₦1.6M from March", positive: true },
-            { label: "Avg revenue per vendor", value: formatNaira(Math.round(s.mrr / s.activeVendors)), sub: "Active vendors only", delta: "+2.1% MoM", positive: true },
+            { label: "MRR",           value: formatNaira(mrr),          sub: "Monthly recurring revenue" },
+            { label: "ARR",           value: formatNaira(arr),           sub: "Annualized run rate" },
+            { label: "Total tracked", value: formatNaira(totalTracked),  sub: "All credits ever extended" },
           ].map((k) => (
             <div key={k.label} className="bg-vodium-charcoal border border-white/[0.06] rounded-xl p-5">
               <p className="text-vodium-cream/40 text-xs">{k.label}</p>
               <p className="font-serif text-2xl text-vodium-gold mt-1.5">{k.value}</p>
               <p className="text-vodium-cream/30 text-xs mt-1">{k.sub}</p>
-              <div className="flex items-center gap-1 mt-3 pt-3 border-t border-white/[0.05] text-xs text-success">
-                <ArrowUpRight size={12} /> {k.delta}
-              </div>
             </div>
           ))}
         </div>
 
-        {/* MRR + vendor growth chart */}
         <div className="grid md:grid-cols-2 gap-4">
+          {/* Monthly volume chart */}
           <div className="bg-vodium-charcoal border border-white/[0.06] rounded-2xl p-6">
-            <h3 className="text-sm font-semibold text-vodium-cream mb-1">MRR growth</h3>
-            <p className="text-vodium-cream/35 text-xs mb-6">₦180K → ₦890K in 6 months</p>
-            <div className="flex items-end gap-2 h-32">
-              {ADMIN_MRR_HISTORY.map((m) => (
-                <div key={m.month} className="flex-1 flex flex-col items-center gap-1.5">
-                  <div
-                    className="w-full gold-gradient-bg rounded-t-sm min-h-[4px] transition-all"
-                    style={{ height: `${(m.mrr / mrrMax) * 112}px` }}
-                  />
-                  <span className="text-[9px] text-vodium-cream/30">{m.month.split(" ")[0]}</span>
+            <h3 className="text-sm font-semibold text-vodium-cream mb-1">Monthly credit volume</h3>
+            <p className="text-vodium-cream/35 text-xs mb-6">₦ extended vs recovered</p>
+            {monthlyCredits.length === 0 ? (
+              <div className="h-32 flex items-center justify-center text-vodium-cream/20 text-sm">No data yet</div>
+            ) : (
+              <>
+                <div className="flex items-end gap-3 h-32">
+                  {monthlyCredits.map((m) => (
+                    <div key={m.month} className="flex-1 flex flex-col items-center gap-1.5">
+                      <div className="w-full flex flex-col gap-0.5 justify-end" style={{ height: "112px" }}>
+                        <div
+                          className="w-full gold-gradient-bg rounded-t-sm min-h-[4px]"
+                          style={{ height: `${(m.extended / chartMax) * 90}px` }}
+                        />
+                        <div
+                          className="w-full bg-success/40 rounded-sm min-h-[2px]"
+                          style={{ height: `${(m.recovered / chartMax) * 90}px` }}
+                        />
+                      </div>
+                      <span className="text-[9px] text-vodium-cream/30">{m.month.split(" ")[0]}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-center gap-4 mt-4 text-[10px] text-vodium-cream/40">
+                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm gold-gradient-bg" /> Extended</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-success/40" /> Recovered</span>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Credit health */}
+          <div className="bg-vodium-charcoal border border-white/[0.06] rounded-2xl p-6">
+            <h3 className="text-sm font-semibold text-vodium-cream mb-1">Credit health</h3>
+            <p className="text-vodium-cream/35 text-xs mb-6">{totalCredits.toLocaleString()} total credits</p>
+            <div className="space-y-3">
+              {[
+                { label: "Paid",        count: paidCredits,       color: "bg-success",     pct: totalCredits > 0 ? (paidCredits / totalCredits) * 100 : 0 },
+                { label: "Partial",     count: partialCredits,    color: "bg-vodium-gold", pct: totalCredits > 0 ? (partialCredits / totalCredits) * 100 : 0 },
+                { label: "Overdue",     count: overdueCredits,    color: "bg-warning",     pct: totalCredits > 0 ? (overdueCredits / totalCredits) * 100 : 0 },
+                { label: "Written off", count: writtenOffCredits, color: "bg-danger",      pct: totalCredits > 0 ? (writtenOffCredits / totalCredits) * 100 : 0 },
+              ].map((s) => (
+                <div key={s.label}>
+                  <div className="flex items-center justify-between mb-1 text-xs">
+                    <span className="text-vodium-cream/70">{s.label}</span>
+                    <span className="text-vodium-cream/40">{s.count} · {s.pct.toFixed(1)}%</span>
+                  </div>
+                  <div className="h-1.5 bg-vodium-slate rounded-full overflow-hidden">
+                    <div className={`h-full ${s.color} rounded-full`} style={{ width: `${s.pct}%` }} />
+                  </div>
                 </div>
               ))}
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* ── Credit scoring ────────────────────────────── */}
+      <section>
+        <h2 className="text-sm font-semibold text-vodium-cream/60 uppercase tracking-wider mb-4">Credit scoring</h2>
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="bg-vodium-charcoal border border-white/[0.06] rounded-2xl p-6">
+            <h3 className="text-sm font-semibold text-vodium-cream mb-1">Vodium score distribution</h3>
+            <p className="text-vodium-cream/35 text-xs mb-6">{totalStudentsScored} students scored</p>
+            {totalStudentsScored === 0 ? (
+              <div className="h-24 flex items-center justify-center text-vodium-cream/20 text-sm">No scores yet</div>
+            ) : (
+              <div className="space-y-3">
+                {(["excellent", "good", "fair", "poor"] as const).map((tier) => {
+                  const row = scoreDistribution.find((r) => r.tier === tier);
+                  const count = row ? Number(row.count) : 0;
+                  const pct = totalStudentsScored > 0 ? (count / totalStudentsScored) * 100 : 0;
+                  const meta = scoreMap[tier];
+                  return (
+                    <div key={tier}>
+                      <div className="flex items-center justify-between mb-1 text-xs">
+                        <span className="text-vodium-cream/70">{meta.tier}</span>
+                        <span className="text-vodium-cream/40">{count} · {pct.toFixed(1)}%</span>
+                      </div>
+                      <div className="h-1.5 bg-vodium-slate rounded-full overflow-hidden">
+                        <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: meta.color }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
           <div className="bg-vodium-charcoal border border-white/[0.06] rounded-2xl p-6">
-            <h3 className="text-sm font-semibold text-vodium-cream mb-1">Vendor growth</h3>
-            <p className="text-vodium-cream/35 text-xs mb-6">18 → 127 vendors in 6 months</p>
-            <div className="flex items-end gap-2 h-32">
-              {ADMIN_MRR_HISTORY.map((m) => {
-                const maxV = 127;
-                return (
-                  <div key={m.month} className="flex-1 flex flex-col items-center gap-1.5">
-                    <div
-                      className="w-full bg-blue-400/60 rounded-t-sm min-h-[4px] transition-all"
-                      style={{ height: `${(m.vendors / maxV) * 112}px` }}
-                    />
-                    <span className="text-[9px] text-vodium-cream/30">{m.month.split(" ")[0]}</span>
-                  </div>
-                );
-              })}
+            <h3 className="text-sm font-semibold text-vodium-cream mb-1">Platform health</h3>
+            <p className="text-vodium-cream/35 text-xs mb-6">Overall metrics</p>
+            <div className="space-y-5">
+              {[
+                { label: "Repayment rate",  value: `${repaymentRate}%`,           good: repaymentRate >= 70 },
+                { label: "Default rate",    value: `${defaultRate}%`,             good: defaultRate <= 5 },
+                { label: "Total recovered", value: formatNaira(totalRecovered),   good: true },
+                { label: "Outstanding",     value: formatNaira(Math.max(totalTracked - totalRecovered, 0)), good: false },
+              ].map((m) => (
+                <div key={m.label} className="flex items-center justify-between">
+                  <span className="text-xs text-vodium-cream/50">{m.label}</span>
+                  <span className={`text-sm font-bold ${m.good ? "text-success" : "text-warning"}`}>{m.value}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
       </section>
 
-      {/* ── Credit volume & repayment ──────────────────── */}
+      {/* ── Vendors ───────────────────────────────────── */}
       <section>
-        <h2 className="text-sm font-semibold text-vodium-cream/60 uppercase tracking-wider mb-4">
-          Credit & repayment
-        </h2>
-        <div className="grid md:grid-cols-2 gap-4 mb-6">
-          {[
-            { label: "Total ₦ tracked", value: `₦${(s.totalNairaTracked / 1e6).toFixed(1)}M`, sub: "Across all vendors", positive: true },
-            { label: "Total ₦ recovered", value: `₦${(s.totalNairaRecovered / 1e6).toFixed(1)}M`, sub: "73.4% of all credit", positive: true },
-            { label: "Avg credit amount", value: formatNaira(s.averageCreditAmount), sub: "Per single credit", positive: false },
-            { label: "Default rate", value: `${s.defaultRate}%`, sub: "Written off or abandoned", positive: false },
-          ].map((k) => (
-            <div key={k.label} className="bg-vodium-charcoal border border-white/[0.06] rounded-xl p-4">
-              <p className="text-vodium-cream/40 text-xs">{k.label}</p>
-              <p className={`font-serif text-2xl mt-1 ${k.positive ? "text-vodium-gold" : "text-vodium-cream"}`}>{k.value}</p>
-              <p className="text-vodium-cream/30 text-xs mt-0.5">{k.sub}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Repayment rate trend */}
-        <div className="bg-vodium-charcoal border border-white/[0.06] rounded-2xl p-6">
-          <div className="flex items-start justify-between mb-6">
-            <div>
-              <h3 className="font-semibold text-vodium-cream">Repayment rate trend</h3>
-              <p className="text-vodium-cream/35 text-xs mt-0.5">Platform-wide, monthly</p>
-            </div>
-            <div className="text-right">
-              <p className="text-success font-bold text-lg">{s.repaymentRate}%</p>
-              <p className="text-vodium-cream/35 text-xs">Current rate</p>
-            </div>
-          </div>
-          <div className="flex items-end gap-4 h-24">
-            {REPAYMENT_HISTORY.map((m) => (
-              <div key={m.month} className="flex-1 flex flex-col items-center gap-1.5">
-                <p className="text-[9px] text-vodium-cream/40 mb-1">{m.rate}%</p>
-                <div
-                  className="w-full bg-success/60 rounded-t-sm min-h-[4px]"
-                  style={{ height: `${(m.rate / rateMax) * 72}px` }}
-                />
-                <span className="text-[9px] text-vodium-cream/25">{m.month.split(" ")[0]}</span>
+        <h2 className="text-sm font-semibold text-vodium-cream/60 uppercase tracking-wider mb-4">Vendors</h2>
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="bg-vodium-charcoal border border-white/[0.06] rounded-2xl p-6">
+            <h3 className="text-sm font-semibold text-vodium-cream mb-4">Top vendors by credits logged</h3>
+            {topVendors.length === 0 ? (
+              <div className="h-24 flex items-center justify-center text-vodium-cream/20 text-sm">No vendors yet</div>
+            ) : (
+              <div className="space-y-3">
+                {topVendors.map((v, i) => (
+                  <div key={v.id} className="flex items-center gap-3">
+                    <span className="text-vodium-cream/20 text-xs w-4">{i + 1}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-vodium-cream/80 font-medium truncate">{v.businessName}</p>
+                      <p className="text-[10px] text-vodium-cream/35">{v.university.shortName ?? v.university.name}</p>
+                    </div>
+                    <div className="flex items-center gap-1 text-xs text-vodium-gold">
+                      <CreditCard size={11} /> {v._count.credits}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
+          </div>
+
+          <div className="bg-vodium-charcoal border border-white/[0.06] rounded-2xl p-6">
+            <h3 className="text-sm font-semibold text-vodium-cream mb-4">Vendor types</h3>
+            {vendorTypeBreakdown.length === 0 ? (
+              <div className="h-24 flex items-center justify-center text-vodium-cream/20 text-sm">No vendors yet</div>
+            ) : (
+              <div className="space-y-3">
+                {vendorTypeBreakdown.map((vt) => {
+                  const pct = totalVendors > 0 ? (vt._count._all / totalVendors) * 100 : 0;
+                  return (
+                    <div key={vt.vendorType}>
+                      <div className="flex items-center justify-between mb-1 text-xs">
+                        <span className="text-vodium-cream/70">{vendorTypeLabels[vt.vendorType] ?? vt.vendorType}</span>
+                        <span className="text-vodium-cream/40">{vt._count._all} · {pct.toFixed(0)}%</span>
+                      </div>
+                      <div className="h-1.5 bg-vodium-slate rounded-full overflow-hidden">
+                        <div className="h-full gold-gradient-bg rounded-full" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </section>
-
-      {/* ── Student score distribution ─────────────────── */}
-      <section>
-        <h2 className="text-sm font-semibold text-vodium-cream/60 uppercase tracking-wider mb-4">
-          Vodium score distribution
-        </h2>
-        <div className="bg-vodium-charcoal border border-white/[0.06] rounded-2xl p-6">
-          <div className="flex items-start justify-between mb-6">
-            <div>
-              <h3 className="font-semibold text-vodium-cream">Student score breakdown</h3>
-              <p className="text-vodium-cream/35 text-xs mt-0.5">{s.uniqueStudentsWithHistory.toLocaleString()} students with at least 1 credit</p>
-            </div>
-          </div>
-          <div className="space-y-5">
-            {SCORE_DISTRIBUTION.map((t) => (
-              <div key={t.tier}>
-                <div className="flex items-center justify-between mb-1.5 text-xs">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ background: t.color }} />
-                    <span className="text-vodium-cream/70">{t.tier}</span>
-                  </div>
-                  <div className="flex items-center gap-4 text-vodium-cream/40">
-                    <span>{t.count.toLocaleString()} students</span>
-                    <span className="font-mono">{t.pct}%</span>
-                  </div>
-                </div>
-                <div className="h-2 bg-vodium-slate rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{ width: `${t.pct}%`, background: t.color }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Top vendors + business types ──────────────── */}
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* Top performing vendors */}
-        <div className="bg-vodium-charcoal border border-white/[0.06] rounded-2xl p-6">
-          <h3 className="font-semibold text-vodium-cream mb-5 flex items-center gap-2">
-            <TrendingUp size={16} className="text-vodium-gold" /> Top performing vendors
-          </h3>
-          <div className="space-y-4">
-            {TOP_VENDORS.map((v, i) => (
-              <div key={v.name} className="flex items-center gap-3">
-                <span className="text-vodium-gold font-mono text-sm w-5 flex-shrink-0">{i + 1}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-vodium-cream truncate">{v.name}</p>
-                  <p className="text-xs text-vodium-cream/35">{v.university} · {v.students} students</p>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="text-sm font-semibold text-vodium-gold">{formatNaira(v.collected)}</p>
-                  <p className="text-xs text-success mt-0.5">{v.rate}% rate</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Vendor type breakdown */}
-        <div className="bg-vodium-charcoal border border-white/[0.06] rounded-2xl p-6">
-          <h3 className="font-semibold text-vodium-cream mb-5 flex items-center gap-2">
-            <BarChart3 size={16} className="text-vodium-gold" /> Vendor types
-          </h3>
-          <div className="space-y-3">
-            {VENDOR_TYPE_BREAKDOWN.map((t) => (
-              <div key={t.type}>
-                <div className="flex items-center justify-between mb-1 text-xs">
-                  <span className="text-vodium-cream/70">{t.type}</span>
-                  <div className="flex items-center gap-3 text-vodium-cream/40">
-                    <span>{t.count} vendors</span>
-                    <span className="font-mono w-8 text-right">{t.pct}%</span>
-                  </div>
-                </div>
-                <div className="h-1.5 bg-vodium-slate rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-vodium-gold/60 rounded-full"
-                    style={{ width: `${t.pct}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

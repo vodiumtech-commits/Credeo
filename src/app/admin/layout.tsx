@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, Store, Users, BarChart3, Shield,
-  LogOut, Menu, X, Settings, Bell, ChevronRight
+  LayoutDashboard, Store, BarChart3, Shield,
+  LogOut, Menu, X, Bell, ChevronRight
 } from "lucide-react";
 
 const NAV = [
@@ -17,6 +18,12 @@ const NAV = [
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+
+  async function handleSignOut() {
+    await fetch("/api/auth/signout", { method: "POST" });
+    router.push("/login");
+  }
 
   return (
     <div className="min-h-screen bg-[#0D0D0D] flex">
@@ -69,7 +76,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <Link href="/" className="sidebar-item text-xs">
             <ChevronRight size={16} /> Public site
           </Link>
-          <button className="sidebar-item w-full text-left text-xs">
+          <button onClick={handleSignOut} className="sidebar-item w-full text-left text-xs">
             <LogOut size={16} /> Sign out
           </button>
         </div>

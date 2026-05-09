@@ -15,12 +15,12 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "Vodium Ledger — Africa's credit infrastructure layer",
+  title: "Credeo — Africa's credit infrastructure layer",
   description:
     "WhatsApp-first credit tracking and intelligence for African campus vendors. Track who owes you, recover faster, score smarter.",
   metadataBase: new URL("https://vodiumledger.com"),
   openGraph: {
-    title: "Vodium Ledger",
+    title: "Credeo",
     description: "The credit infrastructure of African campus commerce.",
     type: "website",
   },

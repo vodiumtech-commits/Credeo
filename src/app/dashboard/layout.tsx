@@ -1,12 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, CreditCard, Settings, LogOut,
-  MessageCircle, Menu, X, Plus, Bell
+  MessageCircle, Menu, X, Plus, Bell, Store
 } from "lucide-react";
+
+type VendorInfo = {
+  businessName: string;
+  ownerName: string;
+  campusLocation: string | null;
+  university: { shortName: string | null } | null;
+  subscription: { plan: string; status: string } | null;
+};
 
 const NAV_ITEMS = [
   { href: "/dashboard",           icon: LayoutDashboard, label: "Overview" },
@@ -15,14 +23,38 @@ const NAV_ITEMS = [
   { href: "/dashboard/settings",  icon: Settings,        label: "Settings" },
 ];
 
+const PLAN_LABELS: Record<string, string> = {
+  STARTER: "Starter", GROWTH: "Growth", CAMPUS_PRO: "Campus Pro",
+};
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [vendor, setVendor] = useState<VendorInfo | null>(null);
   const pathname = usePathname();
+  const router = useRouter();
 
-  return (
-    <div className="min-h-screen bg-vodium-cream flex">
-      {/* ── Desktop sidebar ─────────────────────────────── */}
-      <aside className="hidden md:flex w-64 flex-col bg-vodium-black border-r border-white/[0.06] fixed inset-y-0 left-0 z-30">
+  useEffect(() => {
+    fetch("/api/vendor/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => data && setVendor(data));
+  }, []);
+
+  async function handleSignOut() {
+    await fetch("/api/auth/signout", { method: "POST" });
+    router.push("/login");
+  }
+
+  const businessName = vendor?.businessName ?? "My Shop";
+  const campus = vendor?.university?.shortName ?? "Campus";
+  const plan = vendor?.subscription?.plan ?? "STARTER";
+  const planLabel = PLAN_LABELS[plan] ?? plan;
+  const firstName = vendor?.ownerName?.split(" ")[0] ?? "";
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+
+  function SidebarContent() {
+    return (
+      <>
         {/* Logo */}
         <div className="px-6 py-6 border-b border-white/[0.06]">
           <Link href="/" className="flex items-center gap-3">
@@ -37,69 +69,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         {/* Vendor info */}
-        <div className="px-6 py-5 border-b border-white/[0.06]">
-          <p className="text-xs text-vodium-cream/35 uppercase tracking-widest mb-1">Your shop</p>
-          <p className="text-vodium-cream font-semibold text-sm truncate">Mama Taiwo&rsquo;s Provisions</p>
-          <p className="text-vodium-cream/40 text-xs mt-0.5">UNILAG · Growth plan</p>
+        <div className="px-5 py-4 border-b border-white/[0.06]">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-vodium-charcoal border border-white/[0.08] flex items-center justify-center flex-shrink-0">
+              <Store size={14} className="text-vodium-gold/70" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-vodium-cream truncate">{businessName}</p>
+              <p className="text-xs text-vodium-cream/40 mt-0.5 truncate">{campus}</p>
+            </div>
+          </div>
+          <div className="mt-2.5">
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-vodium-gold/10 text-vodium-gold border border-vodium-gold/20">
+              {planLabel} plan
+            </span>
+          </div>
         </div>
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
-            const isActive = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
-            return (
-              <Link key={href} href={href} className={`sidebar-item ${isActive ? "active" : ""}`}>
-                <Icon size={18} />
-                {label}
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* Bottom actions */}
-        <div className="px-3 pb-4 space-y-1 border-t border-white/[0.06] pt-4">
-          <a
-            href="https://wa.me/2348012345678?text=HELP"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="sidebar-item"
-          >
-            <MessageCircle size={18} />
-            WhatsApp bot
-          </a>
-          <button className="sidebar-item w-full text-left">
-            <LogOut size={18} />
-            Sign out
-          </button>
-        </div>
-      </aside>
-
-      {/* ── Mobile overlay ─────────────────────────────── */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/60 z-40 md:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* ── Mobile sidebar ─────────────────────────────── */}
-      <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-vodium-black flex flex-col border-r border-white/[0.06] md:hidden transition-transform duration-200 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="px-6 py-5 border-b border-white/[0.06] flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3" onClick={() => setSidebarOpen(false)}>
-            <div className="w-8 h-8 rounded-full bg-vodium-charcoal border border-vodium-gold/40 flex items-center justify-center">
-              <span className="font-serif text-vodium-gold text-base">V</span>
-            </div>
-            <span className="font-serif text-xs tracking-[0.2em] text-vodium-gold">VODIUM LEDGER</span>
-          </Link>
-          <button onClick={() => setSidebarOpen(false)} className="text-vodium-cream/40 hover:text-vodium-cream">
-            <X size={20} />
-          </button>
-        </div>
-        <div className="px-6 py-4 border-b border-white/[0.06]">
-          <p className="text-vodium-cream font-semibold text-sm">Mama Taiwo&rsquo;s Provisions</p>
-          <p className="text-vodium-cream/40 text-xs mt-0.5">UNILAG · Growth plan</p>
-        </div>
-        <nav className="flex-1 px-3 py-4 space-y-1">
           {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
             const isActive = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
             return (
@@ -115,17 +103,61 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             );
           })}
         </nav>
-        <div className="px-3 pb-4 border-t border-white/[0.06] pt-4 space-y-1">
-          <button className="sidebar-item w-full text-left">
+
+        {/* Bottom */}
+        <div className="px-3 pb-4 space-y-1 border-t border-white/[0.06] pt-4">
+          <a
+            href="https://wa.me/2348012345678?text=HELP"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="sidebar-item"
+          >
+            <MessageCircle size={18} />
+            WhatsApp bot
+          </a>
+          <button onClick={handleSignOut} className="sidebar-item w-full text-left">
             <LogOut size={18} />
             Sign out
           </button>
         </div>
+      </>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-vodium-cream flex">
+      {/* Desktop sidebar */}
+      <aside className="hidden md:flex w-64 flex-col bg-vodium-black border-r border-white/[0.06] fixed inset-y-0 left-0 z-30">
+        <SidebarContent />
       </aside>
 
-      {/* ── Main content ─────────────────────────────────── */}
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+
+      {/* Mobile sidebar */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-72 bg-vodium-black flex flex-col border-r border-white/[0.06] md:hidden transition-transform duration-200 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="px-6 py-5 border-b border-white/[0.06] flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-3" onClick={() => setSidebarOpen(false)}>
+            <div className="w-8 h-8 rounded-full bg-vodium-charcoal border border-vodium-gold/40 flex items-center justify-center">
+              <span className="font-serif text-vodium-gold text-base">V</span>
+            </div>
+            <span className="font-serif text-xs tracking-[0.2em] text-vodium-gold">VODIUM LEDGER</span>
+          </Link>
+          <button onClick={() => setSidebarOpen(false)} className="text-vodium-cream/40 hover:text-vodium-cream">
+            <X size={20} />
+          </button>
+        </div>
+        <SidebarContent />
+      </aside>
+
+      {/* Main */}
       <div className="flex-1 md:ml-64 flex flex-col min-h-screen">
-        {/* Top bar */}
         <header className="bg-white border-b border-border sticky top-0 z-20 px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
@@ -136,8 +168,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </button>
             <div className="hidden md:block">
               <p className="text-xs text-muted-foreground">
-                Welcome back,{" "}
-                <span className="font-semibold text-vodium-black">Taiwo</span>
+                {greeting}{firstName ? `, ` : ""}<span className="font-semibold text-vodium-black">{firstName}</span>
               </p>
             </div>
           </div>
@@ -155,10 +186,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </header>
 
-        {/* Page content */}
-        <main className="flex-1 overflow-auto">
-          {children}
-        </main>
+        <main className="flex-1 overflow-auto">{children}</main>
       </div>
     </div>
   );

@@ -1,18 +1,60 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { CheckCircle, Store, Phone, Mail, MapPin, Bell, Shield, CreditCard } from "lucide-react";
-import { DEMO_VENDOR } from "@/lib/data/demo-data";
+
+type Vendor = {
+  businessName: string;
+  ownerName: string;
+  phone: string;
+  email: string | null;
+  campusLocation: string | null;
+  subscription: { plan: string; status: string } | null;
+};
 
 export default function SettingsPage() {
-  const v = DEMO_VENDOR;
+  const [vendor, setVendor] = useState<Vendor | null>(null);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
-  function handleSave(e: React.FormEvent) {
+  useEffect(() => {
+    fetch("/api/vendor/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => data && setVendor(data));
+  }, []);
+
+  async function handleSave(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    if (!formRef.current) return;
+    setSaving(true);
+    setError(null);
+    const fd = new FormData(formRef.current);
+    try {
+      const res = await fetch("/api/vendor/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          businessName: fd.get("businessName") as string,
+          ownerName: fd.get("ownerName") as string,
+          campusLocation: fd.get("campusLocation") as string,
+          email: fd.get("email") as string,
+        }),
+      });
+      if (!res.ok) throw new Error("Could not save changes");
+      const updated = await res.json();
+      setVendor(updated);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setSaving(false);
+    }
   }
+
+  const v = vendor;
 
   return (
     <div className="p-6 md:p-8 max-w-3xl space-y-8">
@@ -33,44 +75,47 @@ export default function SettingsPage() {
             <p className="text-xs text-muted-foreground">How your shop appears to students</p>
           </div>
         </div>
-        <form onSubmit={handleSave} className="p-6 space-y-4">
+        <form ref={formRef} onSubmit={handleSave} className="p-6 space-y-4">
           <div className="grid sm:grid-cols-2 gap-4">
             <Field label="Business name">
-              <input type="text" defaultValue={v.businessName} className="input-premium" />
+              <input name="businessName" type="text" defaultValue={v?.businessName ?? ""} className="input-premium" />
             </Field>
             <Field label="Owner name">
-              <input type="text" defaultValue={v.ownerName} className="input-premium" />
+              <input name="ownerName" type="text" defaultValue={v?.ownerName ?? ""} className="input-premium" />
             </Field>
           </div>
           <Field label="Campus location">
             <div className="relative">
               <MapPin size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input type="text" defaultValue={v.campusLocation} className="input-premium pl-9" />
+              <input name="campusLocation" type="text" defaultValue={v?.campusLocation ?? ""} className="input-premium pl-9" />
             </div>
           </Field>
           <div className="grid sm:grid-cols-2 gap-4">
             <Field label="Phone number">
               <div className="relative">
                 <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <input type="tel" defaultValue={v.phone} className="input-premium pl-9" />
+                <input type="tel" value={v?.phone ?? ""} readOnly className="input-premium pl-9 bg-muted/30 cursor-not-allowed" />
               </div>
             </Field>
             <Field label="Email address">
               <div className="relative">
                 <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <input type="email" defaultValue={v.email ?? ""} className="input-premium pl-9" />
+                <input name="email" type="email" defaultValue={v?.email ?? ""} className="input-premium pl-9" />
               </div>
             </Field>
           </div>
           <div className="flex items-center justify-between pt-2">
-            {saved && (
-              <div className="flex items-center gap-2 text-sm text-success">
-                <CheckCircle size={15} /> Changes saved
-              </div>
-            )}
+            <div>
+              {saved && (
+                <div className="flex items-center gap-2 text-sm text-success">
+                  <CheckCircle size={15} /> Changes saved
+                </div>
+              )}
+              {error && <p className="text-sm text-danger">{error}</p>}
+            </div>
             <div className="ml-auto">
-              <button type="submit" className="btn-gold px-6 py-2.5 rounded-xl text-sm">
-                Save changes
+              <button type="submit" disabled={saving} className="btn-gold px-6 py-2.5 rounded-xl text-sm disabled:opacity-60">
+                {saving ? "Saving…" : "Save changes"}
               </button>
             </div>
           </div>
@@ -114,11 +159,16 @@ export default function SettingsPage() {
         <div className="p-6">
           <div className="flex items-start justify-between">
             <div>
-              <p className="font-semibold text-vodium-black">Growth plan</p>
-              <p className="text-sm text-muted-foreground mt-1">₦5,000/month · Up to 200 students · Cross-vendor scores</p>
-              <p className="text-xs text-muted-foreground mt-1">Renews May 1, 2026</p>
+              <p className="font-semibold text-vodium-black">{v?.subscription?.plan ?? "STARTER"} plan</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                {v?.subscription?.plan === "STARTER" ? "₦2,000/month · Up to 50 students" :
+                 v?.subscription?.plan === "GROWTH"   ? "₦5,000/month · Up to 200 students" :
+                 v?.subscription?.plan === "CAMPUS_PRO" ? "₦10,000/month · Unlimited" : ""}
+              </p>
             </div>
-            <span className="badge badge-active">Active</span>
+            <span className={`badge ${v?.subscription?.status === "ACTIVE" ? "badge-active" : "badge-trial"}`}>
+              {v?.subscription?.status ?? "Trial"}
+            </span>
           </div>
           <div className="mt-6 flex gap-3">
             <button className="btn-gold px-5 py-2.5 rounded-xl text-sm">Upgrade to Campus Pro</button>
@@ -142,7 +192,7 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between py-3 border-b border-border">
             <div>
               <p className="text-sm font-medium text-vodium-black">Phone verification</p>
-              <p className="text-xs text-muted-foreground">{v.phone}</p>
+              <p className="text-xs text-muted-foreground">{v?.phone ?? "—"}</p>
             </div>
             <span className="badge badge-active text-xs">Verified</span>
           </div>
