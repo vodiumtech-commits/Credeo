@@ -39,11 +39,12 @@ model Vendor {
   businessName  String
   ownerName     String
   phone         String   @unique
-  email         String?
+  email         String   @unique
+  passwordHash  String
   vendorType    VendorType
   universityId  String
   university    University @relation(fields: [universityId], references: [id])
-  campusLocation String?  // e.g. "Behind faculty of arts", "Block A canteen"
+  campusLocation String?
   status        VendorStatus @default(ACTIVE)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -54,6 +55,7 @@ model Vendor {
 
   @@index([universityId])
   @@index([phone])
+  @@index([email])
 }
 
 enum VendorType {
