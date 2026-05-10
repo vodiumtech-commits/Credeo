@@ -5,6 +5,7 @@
  */
 
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
@@ -36,6 +37,8 @@ async function main() {
   console.log("✅ Universities seeded");
 
   // ─── Vendors ────────────────────────────────────────────────────────────────
+  const seedHash = await bcrypt.hash("password123", 10);
+
   const mamaTaiwo = await prisma.vendor.upsert({
     where: { phone: "+2348012345678" },
     update: {},
@@ -44,6 +47,7 @@ async function main() {
       businessName: "Mama Taiwo's Provisions",
       phone: "+2348012345678",
       email: "taiwo@mamataiwoprovisions.ng",
+      passwordHash: seedHash,
       universityId: unilag.id,
       vendorType: "PROVISION_SHOP",
       campusLocation: "Faculty of Arts Complex, Block C",
@@ -58,6 +62,8 @@ async function main() {
       ownerName: "Waheed Babatunde",
       businessName: "Baba Wale's Food Canteen",
       phone: "+2348023456789",
+      email: "babawale@foodcanteen.ng",
+      passwordHash: seedHash,
       universityId: unilag.id,
       vendorType: "FOOD_CANTEEN",
       campusLocation: "Student Union Building, Ground Floor",
@@ -72,6 +78,8 @@ async function main() {
       ownerName: "Emmanuel Osei",
       businessName: "FastPrint Solutions",
       phone: "+2348034567890",
+      email: "emmanuel@fastprint.ng",
+      passwordHash: seedHash,
       universityId: oau.id,
       vendorType: "PRINTING",
       campusLocation: "Library Road, opposite gate 1",
@@ -86,6 +94,8 @@ async function main() {
       ownerName: "Kayode Babatunde",
       businessName: "Kay Laundry Services",
       phone: "+2348045678901",
+      email: "kayode@kaylaundry.ng",
+      passwordHash: seedHash,
       universityId: covenant.id,
       vendorType: "LAUNDRY",
       campusLocation: "Hall 4 Block B",
