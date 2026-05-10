@@ -15,6 +15,8 @@ function getRedis(): Redis | null {
   return _redis;
 }
 
+export { getRedis };
+
 export async function rateLimit(
   key: string,
   max: number,

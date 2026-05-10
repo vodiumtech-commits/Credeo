@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Shield, Eye, EyeOff } from "lucide-react";
+import Link from "next/link";
+import { Shield, Eye, EyeOff, Lock, ArrowLeft, Loader2 } from "lucide-react";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -32,58 +33,98 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-vodium-black flex items-center justify-center px-6">
-      <div className="w-full max-w-sm">
-        {/* Logo */}
-        <div className="flex flex-col items-center mb-10">
-          <div className="w-14 h-14 rounded-2xl bg-vodium-charcoal border border-vodium-gold/30 flex items-center justify-center mb-5">
-            <Shield size={24} className="text-vodium-gold" />
+    <div className="min-h-screen bg-vodium-black mesh-bg flex items-center justify-center px-6 py-12">
+      <div className="w-full max-w-md">
+        {/* Card */}
+        <div className="bg-vodium-charcoal rounded-2xl border border-white/[0.08] p-10 w-full shadow-[0_0_60px_rgba(201,169,97,0.08)]">
+          {/* Header */}
+          <div className="flex flex-col items-center mb-10">
+            {/* Shield icon in gold circle */}
+            <div className="w-16 h-16 rounded-full bg-vodium-gold/10 border border-vodium-gold/30 flex items-center justify-center mb-5">
+              <Shield size={28} className="text-vodium-gold" />
+            </div>
+            <p className="text-vodium-gold text-xs tracking-[0.3em] uppercase font-medium mb-2">
+              Admin Console
+            </p>
+            <h1 className="font-serif text-2xl text-vodium-cream text-center">
+              Vodium Ledger
+            </h1>
+            <p className="text-vodium-cream/35 text-xs mt-1.5 text-center">
+              Restricted access — authorised personnel only
+            </p>
           </div>
-          <p className="font-serif text-vodium-gold text-sm tracking-[0.25em] uppercase">
-            Vodium Admin
-          </p>
-          <p className="text-vodium-cream/30 text-xs mt-1">Restricted access</p>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Password field */}
+            <div>
+              <label className="block text-xs font-medium text-vodium-cream/50 mb-2 uppercase tracking-wider">
+                Admin Password
+              </label>
+              <div className="relative">
+                {/* Lock icon on left */}
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-vodium-cream/30 pointer-events-none">
+                  <Lock size={15} />
+                </div>
+                <input
+                  type={show ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setError(null);
+                  }}
+                  placeholder="Enter admin password"
+                  className="input-dark pl-11 pr-12"
+                  autoFocus
+                  required
+                />
+                {/* Eye toggle on right */}
+                <button
+                  type="button"
+                  onClick={() => setShow(!show)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-vodium-cream/30 hover:text-vodium-cream/70 transition-colors"
+                  tabIndex={-1}
+                  aria-label={show ? "Hide password" : "Show password"}
+                >
+                  {show ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Error message */}
+            {error && (
+              <p className="text-rose-400 text-sm bg-rose-500/10 border border-rose-500/20 rounded-xl px-4 py-2.5">
+                {error}
+              </p>
+            )}
+
+            {/* Submit button */}
+            <button
+              type="submit"
+              disabled={loading || !password}
+              className="btn-gold w-full py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <>
+                  <Loader2 size={15} className="animate-spin" />
+                  Signing in…
+                </>
+              ) : (
+                "Sign in to Admin Console"
+              )}
+            </button>
+          </form>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-vodium-cream/60 mb-2">
-              Admin password
-            </label>
-            <div className="relative">
-              <input
-                type={show ? "text" : "password"}
-                value={password}
-                onChange={(e) => { setPassword(e.target.value); setError(null); }}
-                placeholder="Enter admin password"
-                className="input-dark pr-12"
-                autoFocus
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShow(!show)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-vodium-cream/30 hover:text-vodium-cream/60 transition-colors"
-              >
-                {show ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            </div>
-          </div>
-
-          {error && (
-            <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2.5">
-              {error}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading || !password}
-            className="btn-gold w-full py-3 rounded-xl text-sm disabled:opacity-40"
+        {/* Back to site link */}
+        <div className="flex justify-center mt-6">
+          <Link
+            href="/"
+            className="flex items-center gap-1.5 text-vodium-cream/30 hover:text-vodium-cream/60 text-xs transition-colors"
           >
-            {loading ? "Signing in…" : "Sign in to admin"}
-          </button>
-        </form>
+            <ArrowLeft size={13} />
+            Back to site
+          </Link>
+        </div>
       </div>
     </div>
   );

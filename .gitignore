@@ -36,3 +36,6 @@ yarn-error.log*
 
 # prisma
 prisma/migrations/dev.db*
+
+# Sentry Config File
+.env.sentry-build-plugin

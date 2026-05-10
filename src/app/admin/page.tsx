@@ -1,7 +1,8 @@
 import Link from "next/link";
 import {
-  Store, Users, CreditCard, TrendingUp, ArrowUpRight,
-  ArrowRight, Shield, Activity, Zap, CheckCircle2, AlertCircle
+  Store, Users, CreditCard, TrendingUp, ArrowRight,
+  Shield, Activity, Zap, CheckCircle2, BarChart3,
+  Database, MessageCircle, AlertTriangle,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { formatNaira } from "@/lib/utils";
@@ -126,131 +127,181 @@ export default async function AdminPage() {
   // Monthly chart data
   const chartMax = Math.max(...monthlyCredits.map((m) => m.total), 1);
 
+  // Suppress unused variable warning (monthAgo used for potential future queries)
+  void monthAgo;
+
   return (
-    <div className="p-6 md:p-8 max-w-7xl space-y-8">
-      {/* ── Header ────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="p-5 md:p-8 max-w-7xl space-y-7">
+
+      {/* ── Header ──────────────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pt-1">
         <div>
-          <p className="text-vodium-gold text-xs tracking-[0.3em] uppercase mb-1">Platform overview</p>
-          <h1 className="font-serif text-2xl md:text-3xl text-vodium-cream">Vodium Ledger Admin</h1>
-          <p className="text-vodium-cream/40 text-sm mt-0.5">Real-time platform metrics</p>
+          <p className="text-vodium-gold text-xs tracking-[0.35em] uppercase font-medium mb-2">
+            Platform overview
+          </p>
+          <h1 className="font-serif text-2xl md:text-3xl text-vodium-cream leading-tight">
+            Vodium Ledger
+          </h1>
+          <p className="text-vodium-cream/35 text-sm mt-1">
+            Real-time platform metrics
+          </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-success/10 border border-success/20">
-            <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
-            <span className="text-success text-xs font-medium">All systems operational</span>
-          </div>
+        {/* Live status indicator */}
+        <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-500/[0.08] border border-emerald-500/20 self-start">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
+          <span className="text-emerald-400 text-xs font-medium whitespace-nowrap">
+            All systems operational
+          </span>
         </div>
       </div>
 
-      {/* ── Primary KPIs ──────────────────────────────── */}
+      {/* ── Primary KPI grid — 2×2 mobile, 4 across desktop ────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <AdminKpi
-          label="Active vendors"
+          label="Active Vendors"
           value={String(activeVendors)}
           sub={`${trialVendors} on trial · ${inactiveVendors + suspendedVendors} inactive`}
           icon={<Store size={18} />}
         />
         <AdminKpi
-          label="Total students"
+          label="Total Students"
           value={totalStudents.toLocaleString()}
           sub={`${studentsWithHistory.toLocaleString()} with credit history`}
           icon={<Users size={18} />}
         />
         <AdminKpi
-          label="Total ₦ tracked"
-          value={totalNairaTracked >= 1_000_000
-            ? `₦${(totalNairaTracked / 1_000_000).toFixed(1)}M`
-            : formatNaira(totalNairaTracked)}
-          sub={`${totalNairaRecovered >= 1_000_000
-            ? `₦${(totalNairaRecovered / 1_000_000).toFixed(1)}M`
-            : formatNaira(totalNairaRecovered)} recovered`}
+          label="Total ₦ Tracked"
+          value={
+            totalNairaTracked >= 1_000_000
+              ? `₦${(totalNairaTracked / 1_000_000).toFixed(1)}M`
+              : formatNaira(totalNairaTracked)
+          }
+          sub={`${
+            totalNairaRecovered >= 1_000_000
+              ? `₦${(totalNairaRecovered / 1_000_000).toFixed(1)}M`
+              : formatNaira(totalNairaRecovered)
+          } recovered`}
           icon={<CreditCard size={18} />}
         />
         <AdminKpi
-          label="Monthly revenue (MRR)"
+          label="Monthly Revenue"
           value={formatNaira(mrr)}
           sub={`${formatNaira(mrr * 12)} ARR`}
           icon={<TrendingUp size={18} />}
         />
       </div>
 
-      {/* ── Secondary KPIs ────────────────────────────── */}
+      {/* ── Secondary metrics strip ──────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: "Credits logged (all time)", value: totalCredits.toLocaleString() },
-          { label: "Credits this week",         value: creditsThisWeek.toLocaleString() },
-          { label: "Platform repayment rate",   value: `${repaymentRate}%` },
-          { label: "Default rate",              value: `${defaultRate}%` },
-        ].map((k) => (
-          <div key={k.label} className="bg-vodium-charcoal border border-white/[0.06] rounded-xl p-4">
-            <p className="text-vodium-cream/40 text-xs">{k.label}</p>
-            <p className="font-serif text-2xl text-vodium-cream mt-1">{k.value}</p>
-          </div>
-        ))}
+        <SecondaryKpi label="Credits logged (all time)" value={totalCredits.toLocaleString()} />
+        <SecondaryKpi label="Credits this week" value={creditsThisWeek.toLocaleString()} accent="gold" />
+        <SecondaryKpi
+          label="Repayment rate"
+          value={`${repaymentRate}%`}
+          accent={repaymentRate >= 70 ? "emerald" : repaymentRate >= 40 ? "gold" : "rose"}
+        />
+        <SecondaryKpi
+          label="Default rate"
+          value={`${defaultRate}%`}
+          accent={defaultRate <= 5 ? "emerald" : defaultRate <= 15 ? "gold" : "rose"}
+        />
       </div>
 
-      {/* ── Charts row ────────────────────────────────── */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Monthly credit volume chart */}
+      {/* ── Charts row ───────────────────────────────────────────────────── */}
+      <div className="grid lg:grid-cols-2 gap-5">
+        {/* Monthly credit volume — inline CSS bars (server component safe) */}
         <div className="bg-vodium-charcoal border border-white/[0.06] rounded-2xl p-6">
           <div className="flex items-start justify-between mb-6">
             <div>
-              <h2 className="font-semibold text-vodium-cream">Monthly credit volume</h2>
-              <p className="text-vodium-cream/40 text-xs mt-0.5">₦ extended per month</p>
+              <div className="flex items-center gap-2 mb-1">
+                <BarChart3 size={15} className="text-vodium-gold" />
+                <h2 className="font-semibold text-vodium-cream text-sm">
+                  Monthly credit volume
+                </h2>
+              </div>
+              <p className="text-vodium-cream/40 text-xs">₦ extended per month (last 6 months)</p>
             </div>
             <div className="text-right">
-              <p className="text-vodium-gold font-serif text-xl">{formatNaira(totalNairaTracked)}</p>
-              <p className="text-vodium-cream/40 text-xs mt-0.5">all time</p>
+              <p className="text-vodium-gold font-serif text-lg leading-none">
+                {totalNairaTracked >= 1_000_000
+                  ? `₦${(totalNairaTracked / 1_000_000).toFixed(1)}M`
+                  : formatNaira(totalNairaTracked)}
+              </p>
+              <p className="text-vodium-cream/35 text-[10px] mt-1">all time</p>
             </div>
           </div>
+
           {monthlyCredits.length === 0 ? (
-            <div className="h-36 flex items-center justify-center text-vodium-cream/25 text-sm">
-              No credit data yet
+            <div className="h-36 flex flex-col items-center justify-center gap-2 text-vodium-cream/20">
+              <BarChart3 size={28} />
+              <span className="text-sm">No credit data yet</span>
             </div>
           ) : (
             <div className="flex items-end gap-2 h-36">
-              {monthlyCredits.map((m) => (
-                <div key={m.month} className="flex-1 flex flex-col items-center gap-1.5">
-                  <div
-                    className="w-full gold-gradient-bg rounded-t-md transition-all min-h-[4px]"
-                    style={{ height: `${(m.total / chartMax) * 112}px` }}
-                  />
-                  <span className="text-[10px] text-vodium-cream/35">{m.month.split(" ")[0]}</span>
-                </div>
-              ))}
+              {monthlyCredits.map((m) => {
+                const heightPx = Math.max((m.total / chartMax) * 132, 4);
+                return (
+                  <div key={m.month} className="flex-1 flex flex-col items-center gap-1.5 group">
+                    <div
+                      className="w-full rounded-t-md transition-all"
+                      style={{
+                        height: `${heightPx}px`,
+                        background:
+                          "linear-gradient(to top, #C9A961, rgba(201,169,97,0.5))",
+                      }}
+                    />
+                    <span className="text-[10px] text-vodium-cream/35 group-hover:text-vodium-cream/60 transition-colors">
+                      {m.month.split(" ")[0]}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
 
-        {/* University breakdown */}
+        {/* University coverage bars */}
         <div className="bg-vodium-charcoal border border-white/[0.06] rounded-2xl p-6">
           <div className="flex items-start justify-between mb-6">
             <div>
-              <h2 className="font-semibold text-vodium-cream">University Coverage</h2>
-              <p className="text-vodium-cream/40 text-xs mt-0.5">Vendors by campus</p>
+              <div className="flex items-center gap-2 mb-1">
+                <Shield size={15} className="text-vodium-gold" />
+                <h2 className="font-semibold text-vodium-cream text-sm">
+                  University Coverage
+                </h2>
+              </div>
+              <p className="text-vodium-cream/40 text-xs">Vendor penetration by campus</p>
             </div>
-            <span className="badge badge-active text-xs">{uniData.length} campuses</span>
+            <span className="badge-active text-[10px] px-2.5 py-1 rounded-full font-medium">
+              {uniData.length} campuses
+            </span>
           </div>
+
           {uniData.length === 0 ? (
-            <div className="h-36 flex items-center justify-center text-vodium-cream/25 text-sm">
-              No university data yet
+            <div className="h-36 flex flex-col items-center justify-center gap-2 text-vodium-cream/20">
+              <Shield size={28} />
+              <span className="text-sm">No university data yet</span>
             </div>
           ) : (
             <div className="space-y-4">
               {uniData.map((u) => (
                 <div key={u.shortName}>
                   <div className="flex items-center justify-between mb-1.5 text-xs">
-                    <span className="text-vodium-cream/80 font-medium">{u.shortName}</span>
-                    <div className="flex items-center gap-4 text-vodium-cream/40">
+                    <span className="text-vodium-cream/80 font-medium truncate max-w-[120px]">
+                      {u.shortName}
+                    </span>
+                    <div className="flex items-center gap-3 text-vodium-cream/40 flex-shrink-0">
                       <span>{u.vendors} vendor{u.vendors !== 1 ? "s" : ""}</span>
                       <span>{u.students.toLocaleString()} students</span>
                     </div>
                   </div>
-                  <div className="h-1.5 bg-vodium-slate rounded-full overflow-hidden">
+                  <div className="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
                     <div
-                      className="h-full gold-gradient-bg rounded-full transition-all"
-                      style={{ width: `${(u.vendors / maxUniVendors) * 100}%` }}
+                      className="h-full rounded-full transition-all"
+                      style={{
+                        width: `${(u.vendors / maxUniVendors) * 100}%`,
+                        background: "linear-gradient(to right, #C9A961, rgba(201,169,97,0.6))",
+                      }}
                     />
                   </div>
                 </div>
@@ -260,151 +311,298 @@ export default async function AdminPage() {
         </div>
       </div>
 
-      {/* ── Recent vendors + activity ─────────────────── */}
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Recent vendor signups */}
+      {/* ── Recent vendors + Activity log ────────────────────────────────── */}
+      <div className="grid lg:grid-cols-3 gap-5">
+        {/* Recent vendors table */}
         <div className="lg:col-span-2 bg-vodium-charcoal border border-white/[0.06] rounded-2xl overflow-hidden">
           <div className="px-6 py-4 border-b border-white/[0.06] flex items-center justify-between">
-            <h2 className="font-semibold text-vodium-cream flex items-center gap-2">
-              <Store size={16} className="text-vodium-gold" /> Recent vendors
+            <h2 className="font-semibold text-vodium-cream text-sm flex items-center gap-2">
+              <Store size={15} className="text-vodium-gold" />
+              Recent vendors
             </h2>
-            <Link href="/admin/vendors" className="text-xs text-vodium-gold hover:underline flex items-center gap-1">
+            <Link
+              href="/admin/vendors"
+              className="text-xs text-vodium-gold hover:underline flex items-center gap-1 transition-colors"
+            >
               View all <ArrowRight size={11} />
             </Link>
           </div>
+
           {recentVendors.length === 0 ? (
-            <div className="px-6 py-12 text-center text-vodium-cream/25 text-sm">No vendors yet</div>
+            <div className="px-6 py-14 text-center">
+              <Store size={32} className="text-vodium-cream/15 mx-auto mb-3" />
+              <p className="text-vodium-cream/25 text-sm">No vendors yet</p>
+            </div>
           ) : (
             <div className="divide-y divide-white/[0.04]">
-              {recentVendors.map((v) => (
-                <div key={v.id} className="px-6 py-4 flex items-center justify-between table-row-dark">
-                  <div className="flex items-start gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-lg bg-vodium-slate flex items-center justify-center flex-shrink-0">
-                      <Store size={14} className="text-vodium-gold/60" />
+              {recentVendors.map((v) => {
+                // Derive initial letter from business name
+                const initial = v.businessName.charAt(0).toUpperCase();
+                return (
+                  <div
+                    key={v.id}
+                    className="px-6 py-3.5 flex items-center justify-between hover:bg-white/[0.02] transition-colors"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      {/* Vendor logo initial */}
+                      <div className="w-8 h-8 rounded-lg bg-vodium-gold/10 border border-vodium-gold/20 flex items-center justify-center flex-shrink-0">
+                        <span className="font-serif text-vodium-gold text-sm font-bold">
+                          {initial}
+                        </span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm text-vodium-cream truncate">
+                          {v.businessName}
+                        </p>
+                        <p className="text-xs text-vodium-cream/40 mt-0.5">
+                          {v.university.shortName ?? v.university.name} ·{" "}
+                          {v.vendorType.replace(/_/g, " ")}
+                        </p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="font-medium text-sm text-vodium-cream truncate">{v.businessName}</p>
-                      <p className="text-xs text-vodium-cream/40 mt-0.5">
-                        {v.university.shortName ?? v.university.name} · {v.vendorType.replace(/_/g, " ")}
-                      </p>
+
+                    <div className="flex items-center gap-3 flex-shrink-0 ml-4">
+                      <div className="text-right hidden sm:block">
+                        <p className="text-xs text-vodium-cream/55">
+                          {v._count.credits} credits
+                        </p>
+                        <p className="text-xs text-vodium-gold mt-0.5">
+                          {v.subscription?.status === "ACTIVE"
+                            ? formatNaira(Number(v.subscription.monthlyAmount)) + "/mo"
+                            : "Trial"}
+                        </p>
+                      </div>
+                      <span
+                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                          v.subscription?.status === "TRIAL"
+                            ? "badge-trial"
+                            : v.status === "ACTIVE"
+                            ? "badge-active"
+                            : "badge-inactive"
+                        }`}
+                      >
+                        {v.subscription?.status === "TRIAL" ? "TRIAL" : v.status}
+                      </span>
+                      {v.subscription && <PlanBadge plan={v.subscription.plan} />}
                     </div>
                   </div>
-                  <div className="flex items-center gap-4 flex-shrink-0 ml-4">
-                    <div className="text-right hidden sm:block">
-                      <p className="text-xs text-vodium-cream/60">{v._count.credits} credits</p>
-                      <p className="text-xs text-vodium-gold mt-0.5">
-                        {v.subscription?.status === "ACTIVE"
-                          ? formatNaira(Number(v.subscription.monthlyAmount)) + "/mo"
-                          : "Trial"}
-                      </p>
-                    </div>
-                    <span className={`badge text-[10px] ${
-                      v.status === "ACTIVE" ? "badge-active"
-                      : v.status === "INACTIVE" ? "badge-inactive"
-                      : "badge-inactive"
-                    }`}>
-                      {v.subscription?.status === "TRIAL" ? "TRIAL" : v.status}
-                    </span>
-                    {v.subscription && <PlanBadge plan={v.subscription.plan} />}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
 
-        {/* System activity (recent audit log) */}
+        {/* Activity log */}
         <div className="bg-vodium-charcoal border border-white/[0.06] rounded-2xl overflow-hidden">
           <div className="px-5 py-4 border-b border-white/[0.06]">
-            <h2 className="font-semibold text-vodium-cream flex items-center gap-2">
-              <Activity size={16} className="text-vodium-gold" /> System activity
+            <h2 className="font-semibold text-vodium-cream text-sm flex items-center gap-2">
+              <Activity size={15} className="text-vodium-gold" />
+              System activity
             </h2>
           </div>
+
           {recentAudit.length === 0 ? (
-            <div className="px-5 py-12 text-center text-vodium-cream/25 text-sm">No activity yet</div>
+            <div className="px-5 py-14 text-center">
+              <Activity size={32} className="text-vodium-cream/15 mx-auto mb-3" />
+              <p className="text-vodium-cream/25 text-sm">No activity yet</p>
+            </div>
           ) : (
             <div className="divide-y divide-white/[0.04]">
-              {recentAudit.map((a) => (
-                <div key={a.id} className="px-5 py-4 flex items-start gap-3 table-row-dark">
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 bg-vodium-gold/10 text-vodium-gold">
-                    {a.action.includes("credit") && <CreditCard size={13} />}
-                    {a.action.includes("vendor") && <Store size={13} />}
-                    {a.action.includes("repayment") && <CheckCircle2 size={13} />}
-                    {!a.action.includes("credit") && !a.action.includes("vendor") && !a.action.includes("repayment") && <Zap size={13} />}
+              {recentAudit.map((a) => {
+                const isCredit = a.action.includes("credit");
+                const isVendor = a.action.includes("vendor");
+                const isRepayment = a.action.includes("repayment");
+                const dotColor = isCredit
+                  ? "bg-vodium-gold"
+                  : isVendor
+                  ? "bg-emerald-400"
+                  : isRepayment
+                  ? "bg-sky-400"
+                  : "bg-vodium-cream/30";
+                return (
+                  <div
+                    key={a.id}
+                    className="px-5 py-3.5 flex items-start gap-3 hover:bg-white/[0.02] transition-colors"
+                  >
+                    {/* Colored dot */}
+                    <div className="mt-1.5 flex-shrink-0">
+                      <span className={`w-2 h-2 rounded-full block ${dotColor}`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-vodium-cream/75 leading-relaxed">
+                        {a.action}
+                      </p>
+                      <p className="text-[10px] text-vodium-cream/30 mt-1">
+                        {a.entityType ? `${a.entityType} · ` : ""}
+                        {a.actorType}
+                      </p>
+                      <p className="text-[10px] text-vodium-cream/20 mt-0.5">
+                        {new Date(a.createdAt).toLocaleDateString("en-NG", {
+                          day: "numeric",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    </div>
+                    {/* Icon */}
+                    <div className="flex-shrink-0 text-vodium-cream/20 mt-0.5">
+                      {isCredit && <CreditCard size={12} />}
+                      {isVendor && <Store size={12} />}
+                      {isRepayment && <CheckCircle2 size={12} />}
+                      {!isCredit && !isVendor && !isRepayment && <Zap size={12} />}
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-vodium-cream/80 leading-relaxed">{a.action}</p>
-                    <p className="text-[10px] text-vodium-cream/35 mt-1">
-                      {a.entityType ? `${a.entityType} · ${a.actorType}` : a.actorType}
-                    </p>
-                    <p className="text-[10px] text-vodium-cream/25 mt-0.5">
-                      {new Date(a.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
-                    </p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
       </div>
 
-      {/* ── Platform health strip ──────────────────────── */}
+      {/* ── Platform health strip ────────────────────────────────────────── */}
       <div className="bg-vodium-charcoal border border-white/[0.06] rounded-2xl p-6">
-        <h2 className="font-semibold text-vodium-cream mb-5 flex items-center gap-2">
-          <Shield size={16} className="text-vodium-gold" /> Platform health
+        <h2 className="font-semibold text-vodium-cream text-sm mb-5 flex items-center gap-2">
+          <Shield size={15} className="text-vodium-gold" />
+          Platform health
         </h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          {[
-            { label: "DB connection",     value: "OK",    status: "good" },
-            { label: "Total vendors",     value: String(activeVendors + inactiveVendors + suspendedVendors), status: "good" },
-            { label: "WhatsApp channel",  value: "Active", status: "good" },
-            { label: "Default rate",      value: `${defaultRate}%`, status: defaultRate > 5 ? "warning" : "good" },
-          ].map((h) => (
-            <div key={h.label}>
-              <p className="text-vodium-cream/40 text-xs">{h.label}</p>
-              <p className={`font-mono font-bold text-xl mt-1 ${h.status === "good" ? "text-success" : "text-warning"}`}>
-                {h.value}
-              </p>
-            </div>
-          ))}
+          <HealthMetric
+            label="DB connection"
+            value="OK"
+            status="good"
+            icon={<Database size={13} />}
+          />
+          <HealthMetric
+            label="Total vendors"
+            value={String(activeVendors + inactiveVendors + suspendedVendors)}
+            status="good"
+            icon={<Store size={13} />}
+          />
+          <HealthMetric
+            label="WhatsApp channel"
+            value="Active"
+            status="good"
+            icon={<MessageCircle size={13} />}
+          />
+          <HealthMetric
+            label="Default rate"
+            value={`${defaultRate}%`}
+            status={defaultRate > 5 ? "warning" : "good"}
+            icon={<AlertTriangle size={13} />}
+          />
         </div>
       </div>
     </div>
   );
 }
 
-// ── Sub-components ──────────────────────────────────────────────────────────
+// ── Sub-components ────────────────────────────────────────────────────────────
 
 function AdminKpi({
-  label, value, sub, icon,
+  label,
+  value,
+  sub,
+  icon,
 }: {
-  label: string; value: string; sub: string; icon: React.ReactNode;
+  label: string;
+  value: string;
+  sub: string;
+  icon: React.ReactNode;
 }) {
   return (
     <div className="bg-vodium-charcoal border border-white/[0.06] rounded-2xl p-5">
       <div className="flex items-start justify-between mb-4">
-        <p className="text-vodium-cream/40 text-xs uppercase tracking-wider leading-tight">{label}</p>
-        <div className="w-8 h-8 rounded-lg bg-vodium-gold/10 border border-vodium-gold/20 flex items-center justify-center text-vodium-gold flex-shrink-0">
+        <p className="text-vodium-cream/40 text-[11px] uppercase tracking-wider leading-tight pr-2">
+          {label}
+        </p>
+        <div className="w-9 h-9 rounded-xl bg-vodium-gold/10 border border-vodium-gold/20 flex items-center justify-center text-vodium-gold flex-shrink-0">
           {icon}
         </div>
       </div>
-      <p className="font-serif text-2xl md:text-3xl text-vodium-gold">{value}</p>
-      <p className="text-vodium-cream/35 text-xs mt-1.5">{sub}</p>
+      <p className="font-serif text-3xl text-vodium-gold leading-none">{value}</p>
+      <p className="text-vodium-cream/35 text-xs mt-2 leading-relaxed">{sub}</p>
+    </div>
+  );
+}
+
+function SecondaryKpi({
+  label,
+  value,
+  accent = "default",
+}: {
+  label: string;
+  value: string;
+  accent?: "default" | "gold" | "emerald" | "rose";
+}) {
+  const valueColor =
+    accent === "gold"
+      ? "text-vodium-gold"
+      : accent === "emerald"
+      ? "text-emerald-400"
+      : accent === "rose"
+      ? "text-rose-400"
+      : "text-vodium-cream";
+  return (
+    <div className="bg-vodium-charcoal border border-white/[0.06] rounded-xl p-4">
+      <p className="text-vodium-cream/40 text-xs leading-tight">{label}</p>
+      <p className={`font-serif text-2xl mt-2 leading-none ${valueColor}`}>{value}</p>
+    </div>
+  );
+}
+
+function HealthMetric({
+  label,
+  value,
+  status,
+  icon,
+}: {
+  label: string;
+  value: string;
+  status: "good" | "warning" | "danger";
+  icon: React.ReactNode;
+}) {
+  const valueColor =
+    status === "good"
+      ? "text-emerald-400"
+      : status === "warning"
+      ? "text-amber-400"
+      : "text-rose-400";
+  const dotColor =
+    status === "good"
+      ? "bg-emerald-400"
+      : status === "warning"
+      ? "bg-amber-400"
+      : "bg-rose-400";
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 mb-2">
+        <span className={`text-vodium-cream/30`}>{icon}</span>
+        <p className="text-vodium-cream/40 text-xs">{label}</p>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dotColor}`} />
+        <p className={`font-mono font-bold text-xl leading-none ${valueColor}`}>{value}</p>
+      </div>
     </div>
   );
 }
 
 function PlanBadge({ plan }: { plan: string }) {
   const map: Record<string, string> = {
-    STARTER:    "text-vodium-cream/50 bg-vodium-slate",
+    STARTER:    "text-vodium-cream/50 bg-white/[0.06]",
     GROWTH:     "text-vodium-gold bg-vodium-gold/10",
     CAMPUS_PRO: "text-purple-400 bg-purple-400/10",
   };
   const labels: Record<string, string> = {
-    STARTER: "Starter", GROWTH: "Growth", CAMPUS_PRO: "Pro",
+    STARTER: "Starter",
+    GROWTH: "Growth",
+    CAMPUS_PRO: "Pro",
   };
   return (
-    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${map[plan] ?? ""}`}>
+    <span
+      className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${map[plan] ?? "text-vodium-cream/40 bg-white/[0.05]"}`}
+    >
       {labels[plan] ?? plan}
     </span>
   );

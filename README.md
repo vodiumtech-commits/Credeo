@@ -22,20 +22,20 @@ Every paying vendor and every tracked student credit transaction builds the prop
 
 ## Tech Stack
 
-| Layer | Choice | Why |
-|---|---|---|
-| Framework | Next.js 14 (App Router) + TypeScript | Single codebase for web + API |
-| Styling | Tailwind CSS + shadcn/ui | Speed + consistency with Vodium brand |
-| Database | PostgreSQL via Supabase | Relational data, generous free tier |
-| ORM | Prisma | Type-safe DB access |
-| Auth | Phone OTP via Twilio Verify | Vendors don't trust email |
-| WhatsApp | Twilio WhatsApp Business API | Easiest entry, migrate to Meta Cloud API at scale |
-| SMS fallback | Termii | Cheap & reliable in Nigeria |
-| Payments | Paystack | Nigerian-native, supports cards/transfer/USSD |
-| Cache/Queues | Upstash Redis | Serverless, generous free tier |
-| Analytics | PostHog | Open-source, self-hostable later |
-| Errors | Sentry | Free tier covers MVP |
-| Hosting | Vercel | Zero-config Next.js deploys |
+| Layer        | Choice                               | Why                                               |
+| ------------ | ------------------------------------ | ------------------------------------------------- |
+| Framework    | Next.js 14 (App Router) + TypeScript | Single codebase for web + API                     |
+| Styling      | Tailwind CSS + shadcn/ui             | Speed + consistency with Vodium brand             |
+| Database     | PostgreSQL via Supabase              | Relational data, generous free tier               |
+| ORM          | Prisma                               | Type-safe DB access                               |
+| Auth         | Phone OTP via Twilio Verify          | Vendors don't trust email                         |
+| WhatsApp     | Twilio WhatsApp Business API         | Easiest entry, migrate to Meta Cloud API at scale |
+| SMS fallback | Termii                               | Cheap & reliable in Nigeria                       |
+| Payments     | Paystack                             | Nigerian-native, supports cards/transfer/USSD     |
+| Cache/Queues | Upstash Redis                        | Serverless, generous free tier                    |
+| Analytics    | PostHog                              | Open-source, self-hostable later                  |
+| Errors       | Sentry                               | Free tier covers MVP                              |
+| Hosting      | Vercel                               | Zero-config Next.js deploys                       |
 
 **Estimated monthly infra cost for first 100 vendors: $30-$80.**
 
@@ -96,15 +96,15 @@ vodium-ledger/
 
 ## Brand System (Vodium)
 
-| Token | Value | Usage |
-|---|---|---|
-| `--vodium-black` | `#0A0A0A` | Backgrounds, primary text |
-| `--vodium-gold` | `#C9A961` | Accents, CTAs, highlights |
-| `--vodium-cream` | `#FAFAF7` | Dashboard background |
-| `--vodium-charcoal` | `#1F1F1F` | Cards on dark |
-| `--success-green` | `#16A34A` | Paid status |
-| `--warning-amber` | `#D97706` | Due soon |
-| `--danger-red` | `#DC2626` | Overdue |
+| Token               | Value     | Usage                     |
+| ------------------- | --------- | ------------------------- |
+| `--vodium-black`    | `#0A0A0A` | Backgrounds, primary text |
+| `--vodium-gold`     | `#C9A961` | Accents, CTAs, highlights |
+| `--vodium-cream`    | `#FAFAF7` | Dashboard background      |
+| `--vodium-charcoal` | `#1F1F1F` | Cards on dark             |
+| `--success-green`   | `#16A34A` | Paid status               |
+| `--warning-amber`   | `#D97706` | Due soon                  |
+| `--danger-red`      | `#DC2626` | Overdue                   |
 
 Headers use **Playfair Display** (serif). Body uses **Inter** (sans-serif).
 
@@ -113,6 +113,7 @@ Headers use **Playfair Display** (serif). Body uses **Inter** (sans-serif).
 ## 90-Day Roadmap
 
 ### Weeks 1-2: Foundation
+
 - [x] Repo + Vercel + Supabase + Twilio set up
 - [x] Database schema deployed
 - [x] Brand kit finalised
@@ -120,28 +121,33 @@ Headers use **Playfair Display** (serif). Body uses **Inter** (sans-serif).
 - [ ] 5 pilot vendors signed (free 60 days)
 
 ### Weeks 3-4: WhatsApp MVP
+
 - [ ] Vendor registers via WhatsApp
 - [ ] Vendor adds credit via WhatsApp
 - [ ] Vendor marks credit as paid
 - [ ] Bot sends auto-reminder 2 days before due
 
 ### Weeks 5-6: Web Dashboard v1
+
 - [ ] Phone OTP login
 - [ ] Customer list + credit history view
 - [ ] Add credit via web
 - [ ] 10 pilot vendors live
 
 ### Weeks 7-8: Polish + Onboarding
+
 - [ ] 5-min vendor onboarding flow
 - [ ] Subscription billing via Paystack
 - [ ] 20-25 paying vendors
 
 ### Weeks 9-10: Cross-Vendor Credit Score v1
+
 - [ ] Score logic (% on time, volume, defaults)
 - [ ] Score visible on student profile lookup
 - [ ] **This is the moat — vendors pay for this signal**
 
 ### Weeks 11-12: Second Campus
+
 - [ ] Recruit campus rep at university #2
 - [ ] Replicate playbook
 - [ ] 50+ paying vendors total
@@ -165,12 +171,12 @@ Headers use **Playfair Display** (serif). Body uses **Inter** (sans-serif).
 
 ## Founding Team & Roles
 
-| Role | Owner | Focus |
-|---|---|---|
-| CEO | Victor Kalejaiye | Strategy, vendor sales, fundraising |
-| Co-CEO + Data | Brian Adesina | Credit scoring, analytics, data layer |
-| CPO | Demilade Akinsipe | Product, UX, brand |
-| CTO | Ogunyade Olamilekan | Engineering lead, infra, code quality |
+| Role          | Owner               | Focus                                 |
+| ------------- | ------------------- | ------------------------------------- |
+| CEO           | Victor Kalejaiye    | Strategy, vendor sales, fundraising   |
+| Co-CEO + Data | Adeyemi Folusho     | Credit scoring, analytics, data layer |
+| CPO           | Demilade Akinsipe   | Product, UX, brand                    |
+| CTO           | Ogunyade Olamilekan | Engineering lead, infra, code quality |
 
 ---
 

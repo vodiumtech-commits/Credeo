@@ -2,11 +2,14 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
   TrendingUp, AlertCircle, CheckCircle2, Clock,
-  ArrowRight, Plus, MessageCircle, Zap, Users
+  ArrowRight, Plus, MessageCircle, Users, Zap, BarChart3,
 } from "lucide-react";
 import { getVendorSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { formatNaira } from "@/lib/utils";
+import { StatCard } from "@/components/ui/stat-card";
+import { GlowBadge } from "@/components/ui/glow-badge";
+import { RevenueChart } from "@/components/ui/revenue-chart";
 
 export default async function DashboardPage() {
   const vendor = await getVendorSession();
@@ -55,7 +58,6 @@ export default async function DashboardPage() {
         .reduce((s, c) => s + Number(c.amount), 0),
     };
   });
-  const maxVolume = Math.max(...monthlyVolume.map((m) => m.extended), 1);
 
   // ── Activity feed (8 most recent events) ──────────────────
   const activity = credits.slice(0, 8).map((c) => ({
@@ -75,284 +77,376 @@ export default async function DashboardPage() {
   const thisMonthExtended = monthlyVolume[5]?.extended ?? 0;
 
   return (
-    <div className="p-6 md:p-8 max-w-7xl space-y-8">
+    <div className="p-6 md:p-8 max-w-7xl space-y-8 bg-vodium-cream min-h-full">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="font-serif text-2xl md:text-3xl text-vodium-black">{vendor.businessName}</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">
+          <h1 className="font-serif text-2xl md:text-3xl text-vodium-black">
+            {vendor.businessName}
+          </h1>
+          <p className="text-sm text-vodium-black/50 mt-0.5">
             {vendor.campusLocation ?? "Campus"}
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <span className="badge badge-active text-xs">
-            <span className="w-1.5 h-1.5 rounded-full bg-success inline-block mr-1" />
+          <GlowBadge color="green">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
             {vendor.subscription?.plan ?? "STARTER"} plan
-          </span>
-          <Link href="/dashboard/credit/new" className="btn-gold px-5 py-2.5 rounded-lg text-sm flex items-center gap-2">
+          </GlowBadge>
+          <Link
+            href="/dashboard/credit/new"
+            className="btn-gold px-5 py-2.5 rounded-lg text-sm flex items-center gap-2"
+          >
             <Plus size={15} /> Add credit
           </Link>
         </div>
       </div>
 
-      {/* KPI cards */}
+      {/* KPI stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard
+        <StatCard
           label="Total owed to you"
           value={formatNaira(totalOwed)}
           sub={`${creditsOwing} credits outstanding`}
-          accent
-          icon={<TrendingUp size={18} />}
+          icon={<TrendingUp size={16} />}
+          delay={0}
         />
-        <KpiCard
-          label="Recovered this month"
+        <StatCard
+          label="Paid this month"
           value={formatNaira(paidThisMonth)}
-          sub={`${recoveryRate}% recovery rate`}
-          positive
-          icon={<CheckCircle2 size={18} />}
+          sub="Recovered successfully"
+          icon={<CheckCircle2 size={16} />}
+          delay={0.08}
         />
-        <KpiCard
-          label="Overdue"
-          value={String(overdueList.length + (credits.filter((c) => c.status === "OVERDUE").length - overdueList.length))}
-          sub="Need attention now"
-          danger
-          icon={<AlertCircle size={18} />}
+        <StatCard
+          label="Customers owing"
+          value={String(creditsOwing)}
+          sub={`of ${totalStudents} total customers`}
+          icon={<Users size={16} />}
+          delay={0.16}
         />
-        <KpiCard
-          label="Due within 2 days"
-          value={String(credits.filter((c) => c.status === "DUE_SOON").length)}
-          sub="Reminders sent"
-          warning
-          icon={<Clock size={18} />}
+        <StatCard
+          label="Recovery rate"
+          value={`${recoveryRate}%`}
+          sub="All-time paid vs issued"
+          icon={<BarChart3 size={16} />}
+          trend={recoveryRate >= 70 ? "Strong repayment trend" : "Needs attention"}
+          trendUp={recoveryRate >= 70}
+          delay={0.24}
         />
       </div>
 
-      {/* Main grid */}
+      {/* Main grid: chart + quick actions */}
       <div className="grid lg:grid-cols-5 gap-6">
-        {/* Monthly chart */}
-        <div className="lg:col-span-3 bg-white border border-border rounded-2xl p-6">
+        {/* Revenue chart */}
+        <div className="lg:col-span-3 bg-vodium-charcoal border border-white/[0.06] rounded-2xl p-6">
           <div className="flex items-start justify-between mb-6">
             <div>
-              <h2 className="font-semibold text-vodium-black">Credit volume</h2>
-              <p className="text-sm text-muted-foreground mt-0.5">Extended vs recovered, last 6 months</p>
+              <h2 className="font-semibold text-vodium-cream">Credit volume</h2>
+              <p className="text-xs text-vodium-cream/40 mt-0.5">
+                Extended vs recovered, last 6 months
+              </p>
             </div>
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            <div className="flex items-center gap-4 text-[11px] text-vodium-cream/40">
               <span className="flex items-center gap-1.5">
-                <span className="w-3 h-1.5 rounded bg-vodium-black/20 inline-block" /> Extended
+                <span className="w-3 h-1.5 rounded bg-vodium-gold inline-block" />
+                Extended
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-3 h-1.5 rounded bg-vodium-gold inline-block" /> Recovered
+                <span className="w-3 h-1.5 rounded bg-emerald-400 inline-block" />
+                Recovered
               </span>
             </div>
           </div>
-          <div className="flex items-end gap-3 h-40">
-            {monthlyVolume.map((m) => (
-              <div key={m.month} className="flex-1 flex flex-col items-center gap-1">
-                <div className="w-full flex items-end gap-1 justify-center" style={{ height: "120px" }}>
-                  <div
-                    className="w-[45%] bg-vodium-black/10 rounded-t-sm transition-all"
-                    style={{ height: `${(m.extended / maxVolume) * 100}%`, minHeight: m.extended ? "4px" : "0" }}
-                  />
-                  <div
-                    className="w-[45%] bg-vodium-gold rounded-t-sm transition-all"
-                    style={{ height: `${(m.recovered / maxVolume) * 100}%`, minHeight: m.recovered ? "4px" : "0" }}
-                  />
-                </div>
-                <span className="text-[11px] text-muted-foreground">{m.month}</span>
-              </div>
-            ))}
-          </div>
-          <div className="border-t border-border mt-6 pt-4 grid grid-cols-3 gap-4 text-center">
+          <RevenueChart data={monthlyVolume} />
+          <div className="border-t border-white/[0.05] mt-5 pt-4 grid grid-cols-3 gap-4 text-center">
             <div>
-              <p className="text-xs text-muted-foreground">This month extended</p>
-              <p className="font-semibold text-vodium-black mt-0.5">{formatNaira(thisMonthExtended)}</p>
+              <p className="text-[11px] text-vodium-cream/35 uppercase tracking-wider">
+                Extended
+              </p>
+              <p className="font-serif text-base text-vodium-gold mt-0.5">
+                {formatNaira(thisMonthExtended)}
+              </p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Recovered</p>
-              <p className="font-semibold text-success mt-0.5">{formatNaira(paidThisMonth)}</p>
+              <p className="text-[11px] text-vodium-cream/35 uppercase tracking-wider">
+                Recovered
+              </p>
+              <p className="font-serif text-base text-emerald-400 mt-0.5">
+                {formatNaira(paidThisMonth)}
+              </p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Still outstanding</p>
-              <p className="font-semibold text-warning mt-0.5">{formatNaira(Math.max(0, thisMonthExtended - paidThisMonth))}</p>
+              <p className="text-[11px] text-vodium-cream/35 uppercase tracking-wider">
+                Outstanding
+              </p>
+              <p className="font-serif text-base text-amber-400 mt-0.5">
+                {formatNaira(Math.max(0, thisMonthExtended - paidThisMonth))}
+              </p>
             </div>
           </div>
         </div>
 
         {/* Quick actions + mini stats */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="bg-vodium-black rounded-2xl p-5">
-            <p className="text-xs text-vodium-cream/40 uppercase tracking-wider mb-4">Quick actions</p>
+          {/* Quick actions */}
+          <div className="bg-vodium-charcoal border border-white/[0.06] rounded-2xl p-5">
+            <p className="text-[11px] text-vodium-cream/35 uppercase tracking-widest mb-4">
+              Quick actions
+            </p>
             <div className="space-y-2">
               {[
-                { href: "/dashboard/credit/new", icon: <Plus size={16} className="text-vodium-gold" />, label: "Add a credit" },
-                { href: "/dashboard/customers",  icon: <Users size={16} className="text-vodium-gold" />,   label: "View all customers" },
-                { href: "https://wa.me/2348012345678?text=LIST", icon: <MessageCircle size={16} className="text-vodium-gold" />, label: "WhatsApp bot", external: true },
+                {
+                  href: "/dashboard/credit/new",
+                  icon: <Plus size={16} className="text-vodium-gold" />,
+                  label: "Add a credit",
+                  external: false,
+                },
+                {
+                  href: "/dashboard/credits",
+                  icon: <BarChart3 size={16} className="text-vodium-gold" />,
+                  label: "View all credits",
+                  external: false,
+                },
+                {
+                  href: "https://wa.me/2348012345678?text=LIST",
+                  icon: <MessageCircle size={16} className="text-vodium-gold" />,
+                  label: "WhatsApp bot",
+                  external: true,
+                },
               ].map((a) =>
                 a.external ? (
-                  <a key={a.label} href={a.href} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center justify-between px-4 py-3 rounded-xl bg-vodium-charcoal hover:bg-vodium-gold/10 transition-colors group">
-                    <div className="flex items-center gap-3 text-sm text-vodium-cream/80 group-hover:text-vodium-cream">{a.icon} {a.label}</div>
-                    <ArrowRight size={14} className="text-vodium-cream/30 group-hover:text-vodium-gold" />
+                  <a
+                    key={a.label}
+                    href={a.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between px-4 py-3 rounded-xl bg-vodium-black/40 hover:bg-vodium-gold/10 border border-white/[0.04] hover:border-vodium-gold/20 transition-all group"
+                  >
+                    <div className="flex items-center gap-3 text-sm text-vodium-cream/70 group-hover:text-vodium-cream">
+                      {a.icon}
+                      {a.label}
+                    </div>
+                    <ArrowRight size={14} className="text-vodium-cream/20 group-hover:text-vodium-gold transition-colors" />
                   </a>
                 ) : (
-                  <Link key={a.label} href={a.href}
-                    className="flex items-center justify-between px-4 py-3 rounded-xl bg-vodium-charcoal hover:bg-vodium-gold/10 transition-colors group">
-                    <div className="flex items-center gap-3 text-sm text-vodium-cream/80 group-hover:text-vodium-cream">{a.icon} {a.label}</div>
-                    <ArrowRight size={14} className="text-vodium-cream/30 group-hover:text-vodium-gold" />
+                  <Link
+                    key={a.label}
+                    href={a.href}
+                    className="flex items-center justify-between px-4 py-3 rounded-xl bg-vodium-black/40 hover:bg-vodium-gold/10 border border-white/[0.04] hover:border-vodium-gold/20 transition-all group"
+                  >
+                    <div className="flex items-center gap-3 text-sm text-vodium-cream/70 group-hover:text-vodium-cream">
+                      {a.icon}
+                      {a.label}
+                    </div>
+                    <ArrowRight size={14} className="text-vodium-cream/20 group-hover:text-vodium-gold transition-colors" />
                   </Link>
                 )
               )}
             </div>
           </div>
-          <div className="bg-white border border-border rounded-2xl p-5 grid grid-cols-2 gap-4">
-            <MiniStat label="Total customers" value={String(totalStudents)} />
-            <MiniStat label="Avg credit" value={formatNaira(Math.round(avgCredit))} />
-            <MiniStat label="This month" value={String(creditsThisMonth)} sub="credits" />
-            <MiniStat label="All time" value={String(credits.length)} sub="logged" />
+
+          {/* Mini stats grid */}
+          <div className="bg-vodium-charcoal border border-white/[0.06] rounded-2xl p-5 grid grid-cols-2 gap-5">
+            <div>
+              <p className="text-[11px] text-vodium-cream/35 uppercase tracking-wider">Customers</p>
+              <p className="font-serif text-xl text-vodium-cream mt-1">{totalStudents}</p>
+            </div>
+            <div>
+              <p className="text-[11px] text-vodium-cream/35 uppercase tracking-wider">Avg credit</p>
+              <p className="font-serif text-xl text-vodium-cream mt-1">{formatNaira(Math.round(avgCredit))}</p>
+            </div>
+            <div>
+              <p className="text-[11px] text-vodium-cream/35 uppercase tracking-wider">This month</p>
+              <p className="font-serif text-xl text-vodium-cream mt-1">{creditsThisMonth}</p>
+              <p className="text-[11px] text-vodium-cream/25 mt-0.5">credits issued</p>
+            </div>
+            <div>
+              <p className="text-[11px] text-vodium-cream/35 uppercase tracking-wider">All time</p>
+              <p className="font-serif text-xl text-vodium-cream mt-1">{credits.length}</p>
+              <p className="text-[11px] text-vodium-cream/25 mt-0.5">logged</p>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Due soon + Overdue */}
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="bg-white border border-border rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-border flex items-center justify-between">
-            <h2 className="font-semibold text-vodium-black flex items-center gap-2">
-              <Clock size={16} className="text-warning" /> Due soon
-            </h2>
-            <span className="badge badge-due-soon">{dueSoonList.length}</span>
-          </div>
-          <div className="divide-y divide-border">
-            {dueSoonList.length === 0 ? (
-              <p className="px-6 py-8 text-sm text-muted-foreground text-center">No upcoming dues</p>
-            ) : dueSoonList.map((c) => {
-              const daysUntil = Math.ceil((new Date(c.dueDate).getTime() - now.getTime()) / 86_400_000);
-              return (
-                <div key={c.id} className="px-6 py-4 flex items-center justify-between table-row">
-                  <div>
-                    <p className="font-medium text-sm text-vodium-black">{c.student.fullName}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {c.student.matricNumber ?? "—"} · Due {new Date(c.dueDate).toLocaleDateString("en-NG", { month: "short", day: "numeric" })}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-warning text-sm">{formatNaira(Number(c.amount) - Number(c.amountRepaid))}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">in {Math.max(0, daysUntil)} day{daysUntil !== 1 ? "s" : ""}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <div className="px-6 py-3 border-t border-border">
-            <Link href="/dashboard/credits" className="text-sm text-vodium-gold hover:underline flex items-center gap-1">
-              View all credits <ArrowRight size={13} />
-            </Link>
-          </div>
+      {/* Overdue table */}
+      <div className="bg-vodium-charcoal border border-rose-500/10 rounded-2xl overflow-hidden">
+        <div className="px-6 py-4 border-b border-rose-500/10 flex items-center justify-between">
+          <h2 className="font-semibold text-vodium-cream flex items-center gap-2">
+            <AlertCircle size={16} className="text-rose-400" />
+            Overdue credits
+          </h2>
+          <GlowBadge color="red">
+            {credits.filter((c) => c.status === "OVERDUE").length} overdue
+          </GlowBadge>
         </div>
 
-        <div className="bg-white border border-border rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-border flex items-center justify-between">
-            <h2 className="font-semibold text-vodium-black flex items-center gap-2">
-              <AlertCircle size={16} className="text-danger" /> Overdue
-            </h2>
-            <span className="badge badge-overdue">{credits.filter((c) => c.status === "OVERDUE").length}</span>
-          </div>
-          <div className="divide-y divide-border">
-            {overdueList.length === 0 ? (
-              <p className="px-6 py-8 text-sm text-muted-foreground text-center">No overdue credits</p>
-            ) : overdueList.map((c) => {
-              const daysOver = Math.floor((now.getTime() - new Date(c.dueDate).getTime()) / 86_400_000);
+        {overdueList.length === 0 ? (
+          <p className="px-6 py-10 text-sm text-vodium-cream/30 text-center">
+            No overdue credits — great work!
+          </p>
+        ) : (
+          <div className="divide-y divide-white/[0.04]">
+            {overdueList.map((c) => {
+              const daysOver = Math.floor(
+                (now.getTime() - new Date(c.dueDate).getTime()) / 86_400_000
+              );
               return (
-                <div key={c.id} className="px-6 py-4 flex items-center justify-between table-row">
-                  <div>
-                    <p className="font-medium text-sm text-vodium-black">{c.student.fullName}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {c.student.matricNumber ?? "—"} · {daysOver} day{daysOver !== 1 ? "s" : ""} overdue
-                    </p>
+                <div
+                  key={c.id}
+                  className="px-6 py-4 flex items-center justify-between hover:bg-white/[0.02] transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center flex-shrink-0">
+                      <AlertCircle size={14} className="text-rose-400" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm text-vodium-cream">
+                        {c.student.fullName}
+                      </p>
+                      <p className="text-[11px] text-vodium-cream/35 mt-0.5">
+                        {c.student.matricNumber ?? "No matric"} ·{" "}
+                        <span className="text-rose-400/70">{daysOver} day{daysOver !== 1 ? "s" : ""} overdue</span>
+                      </p>
+                    </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-semibold text-danger text-sm">{formatNaira(Number(c.amount) - Number(c.amountRepaid))}</p>
-                    <button className="text-xs text-vodium-gold hover:underline mt-0.5 block">Send reminder</button>
+                    <p className="font-serif text-base text-rose-400">
+                      {formatNaira(Number(c.amount) - Number(c.amountRepaid))}
+                    </p>
+                    <GlowBadge color="red" className="mt-1 text-[10px]">
+                      Overdue
+                    </GlowBadge>
                   </div>
                 </div>
               );
             })}
           </div>
-          <div className="px-6 py-3 border-t border-border">
-            <Link href="/dashboard/credits" className="text-sm text-vodium-gold hover:underline flex items-center gap-1">
-              View overdue credits <ArrowRight size={13} />
-            </Link>
+        )}
+
+        <div className="px-6 py-3 border-t border-white/[0.04]">
+          <Link
+            href="/dashboard/credits"
+            className="text-sm text-vodium-gold hover:text-vodium-gold/80 flex items-center gap-1 transition-colors"
+          >
+            View all overdue credits <ArrowRight size={13} />
+          </Link>
+        </div>
+      </div>
+
+      {/* Due soon */}
+      <div className="bg-vodium-charcoal border border-amber-500/10 rounded-2xl overflow-hidden">
+        <div className="px-6 py-4 border-b border-amber-500/10 flex items-center justify-between">
+          <h2 className="font-semibold text-vodium-cream flex items-center gap-2">
+            <Clock size={16} className="text-amber-400" />
+            Due soon
+          </h2>
+          <GlowBadge color="amber">
+            {dueSoonList.length} due soon
+          </GlowBadge>
+        </div>
+        {dueSoonList.length === 0 ? (
+          <p className="px-6 py-10 text-sm text-vodium-cream/30 text-center">
+            No upcoming dues in the next 2 days
+          </p>
+        ) : (
+          <div className="divide-y divide-white/[0.04]">
+            {dueSoonList.map((c) => {
+              const daysUntil = Math.ceil(
+                (new Date(c.dueDate).getTime() - now.getTime()) / 86_400_000
+              );
+              return (
+                <div
+                  key={c.id}
+                  className="px-6 py-4 flex items-center justify-between hover:bg-white/[0.02] transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
+                      <Clock size={14} className="text-amber-400" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm text-vodium-cream">
+                        {c.student.fullName}
+                      </p>
+                      <p className="text-[11px] text-vodium-cream/35 mt-0.5">
+                        {c.student.matricNumber ?? "No matric"} · Due{" "}
+                        {new Date(c.dueDate).toLocaleDateString("en-NG", {
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-serif text-base text-amber-400">
+                      {formatNaira(Number(c.amount) - Number(c.amountRepaid))}
+                    </p>
+                    <p className="text-[11px] text-vodium-cream/35 mt-0.5">
+                      in {Math.max(0, daysUntil)} day{daysUntil !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
+        )}
+        <div className="px-6 py-3 border-t border-white/[0.04]">
+          <Link
+            href="/dashboard/credits"
+            className="text-sm text-vodium-gold hover:text-vodium-gold/80 flex items-center gap-1 transition-colors"
+          >
+            View all credits <ArrowRight size={13} />
+          </Link>
         </div>
       </div>
 
       {/* Activity feed */}
-      <div className="bg-white border border-border rounded-2xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-border">
-          <h2 className="font-semibold text-vodium-black flex items-center gap-2">
-            <Zap size={16} className="text-vodium-gold" /> Recent activity
-          </h2>
+      <div className="bg-vodium-charcoal border border-white/[0.06] rounded-2xl overflow-hidden">
+        <div className="px-6 py-4 border-b border-white/[0.05] flex items-center gap-2">
+          <Zap size={16} className="text-vodium-gold" />
+          <h2 className="font-semibold text-vodium-cream">Recent activity</h2>
         </div>
-        <div className="divide-y divide-border">
-          {activity.length === 0 ? (
-            <div className="px-6 py-12 text-center">
-              <p className="text-muted-foreground text-sm">No activity yet.</p>
-              <Link href="/dashboard/credit/new" className="btn-gold px-5 py-2.5 rounded-xl text-sm mt-4 inline-block">
-                Record your first credit
-              </Link>
-            </div>
-          ) : activity.map((a) => (
-            <div key={a.id} className="px-6 py-4 flex items-start gap-4 table-row">
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                a.type === "paid"    ? "bg-success/10 text-success" :
-                a.type === "overdue" ? "bg-danger/10 text-danger" :
-                "bg-vodium-gold/10 text-vodium-gold"
-              }`}>
-                {a.type === "paid"    && <CheckCircle2 size={15} />}
-                {a.type === "overdue" && <AlertCircle size={15} />}
-                {a.type === "credit"  && <Plus size={15} />}
+        {activity.length === 0 ? (
+          <div className="px-6 py-14 text-center">
+            <p className="text-vodium-cream/30 text-sm">No activity yet.</p>
+            <Link
+              href="/dashboard/credit/new"
+              className="btn-gold px-5 py-2.5 rounded-xl text-sm mt-4 inline-block"
+            >
+              Record your first credit
+            </Link>
+          </div>
+        ) : (
+          <div className="divide-y divide-white/[0.04]">
+            {activity.map((a) => (
+              <div
+                key={a.id}
+                className="px-6 py-4 flex items-start gap-4 hover:bg-white/[0.02] transition-colors"
+              >
+                <div
+                  className={`w-2 h-2 rounded-full flex-shrink-0 mt-2 ${
+                    a.type === "paid"
+                      ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]"
+                      : a.type === "overdue"
+                      ? "bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.6)]"
+                      : "bg-vodium-gold shadow-[0_0_8px_rgba(201,169,97,0.6)]"
+                  }`}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-vodium-cream">{a.text}</p>
+                  {a.subtext && (
+                    <p className="text-xs text-vodium-cream/30 mt-0.5">{a.subtext}</p>
+                  )}
+                </div>
+                <span className="text-[11px] text-vodium-cream/25 whitespace-nowrap flex-shrink-0 mt-0.5">
+                  {a.at}
+                </span>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-vodium-black">{a.text}</p>
-                {a.subtext && <p className="text-xs text-muted-foreground mt-0.5">{a.subtext}</p>}
-              </div>
-              <span className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">{a.at}</span>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
-    </div>
-  );
-}
-
-function KpiCard({
-  label, value, sub, accent, positive, danger, warning, icon,
-}: {
-  label: string; value: string; sub: string;
-  accent?: boolean; positive?: boolean; danger?: boolean; warning?: boolean;
-  icon: React.ReactNode;
-}) {
-  const bgClass = accent ? "bg-vodium-black text-vodium-cream border-vodium-gold/30" : "bg-white border-border";
-  const valClass = accent ? "text-vodium-gold" : danger ? "text-danger" : warning ? "text-warning" : positive ? "text-success" : "text-vodium-black";
-  const iconBg = accent ? "bg-vodium-gold/15 text-vodium-gold" : danger ? "bg-danger/10 text-danger" : warning ? "bg-warning/10 text-warning" : positive ? "bg-success/10 text-success" : "bg-muted text-muted-foreground";
-  return (
-    <div className={`rounded-2xl border p-5 ${bgClass}`}>
-      <div className="flex items-start justify-between mb-4">
-        <p className={`text-xs uppercase tracking-wider ${accent ? "text-vodium-cream/50" : "text-muted-foreground"}`}>{label}</p>
-        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${iconBg}`}>{icon}</div>
-      </div>
-      <p className={`font-serif text-2xl md:text-3xl ${valClass}`}>{value}</p>
-      <p className={`text-xs mt-1.5 ${accent ? "text-vodium-cream/40" : "text-muted-foreground"}`}>{sub}</p>
-    </div>
-  );
-}
-
-function MiniStat({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <div>
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="font-semibold text-vodium-black mt-0.5">{value}</p>
-      {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
     </div>
   );
 }
