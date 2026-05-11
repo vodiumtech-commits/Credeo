@@ -115,6 +115,7 @@ model Credit {
   amountRepaid    Decimal  @default(0) @db.Decimal(12, 2)
   closedAt        DateTime?
   notes           String?
+  reminderSentAt  DateTime?            // set when 2-day-before reminder is dispatched
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

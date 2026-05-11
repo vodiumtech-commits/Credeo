@@ -1,14 +1,14 @@
 /**
  * Vodium Ledger — WhatsApp conversation state machine.
  *
- * Pure functions: take (state + incoming message + persisted context)
- * and return (next state + outgoing reply + side-effects to execute).
- *
- * Keep this file business-logic-only. Twilio I/O lives in the route handler.
+ * Pure functions only. No I/O, no DB calls, no Twilio.
+ * The route handler owns all side-effect execution.
  */
 
 import { messages } from "./messages";
 import type { WhatsAppState } from "@prisma/client";
+
+// ─── public types ─────────────────────────────────────────────────────────────
 
 export type Intent =
   | "START"
@@ -28,162 +28,206 @@ export interface IncomingMessage {
 
 export interface SessionContext {
   state: WhatsAppState;
-  context: Record<string, any>;
+  context: Record<string, unknown>;
   vendorId?: string;
 }
 
 export interface StepResult {
   reply: string;
   nextState: WhatsAppState;
-  contextPatch?: Record<string, any>;
+  contextPatch?: Record<string, unknown>;
   sideEffects?: SideEffect[];
 }
 
 export type SideEffect =
-  | { type: "CREATE_VENDOR"; data: { name: string; businessName: string; universityShortName: string; phone: string } }
-  | { type: "CREATE_CREDIT"; data: { vendorId: string; studentName: string; matric?: string; amount: number; dueInDays: number } }
-  | { type: "MARK_PAID"; data: { vendorId: string; studentName: string } }
-  | { type: "FETCH_LIST"; data: { vendorId: string } }
-  | { type: "FETCH_SCORE"; data: { studentQuery: string } };
+  | { type: "CREATE_VENDOR";  data: { name: string; businessName: string; universityShortName: string; phone: string } }
+  | { type: "CREATE_CREDIT";  data: { vendorId: string; studentName: string; matric?: string; amount: number; dueInDays: number } }
+  | { type: "MARK_PAID";      data: { vendorId: string; studentName: string } }
+  | { type: "FETCH_LIST";     data: { vendorId: string } }
+  | { type: "FETCH_SCORE";    data: { studentQuery: string } };
 
-/** Detect the intent of an incoming message in a state-aware way. */
+// ─── intent detection ─────────────────────────────────────────────────────────
+
 export function detectIntent(body: string): Intent {
-  const cleaned = body.trim().toUpperCase();
-  if (cleaned === "START" || cleaned === "BEGIN") return "START";
-  if (cleaned === "ADD" || cleaned === "NEW" || cleaned === "CREDIT") return "ADD";
-  if (cleaned.startsWith("PAID")) return "PAID";
-  if (cleaned === "LIST" || cleaned === "OWE" || cleaned === "OWING") return "LIST";
-  if (cleaned.startsWith("SCORE")) return "SCORE";
-  if (cleaned === "HELP" || cleaned === "?" || cleaned === "MENU") return "HELP";
-  if (cleaned === "DASHBOARD" || cleaned === "WEB") return "DASHBOARD";
-  if (cleaned === "SUPPORT") return "SUPPORT";
+  const t = body.trim().toUpperCase();
+  if (t === "START" || t === "BEGIN" || t === "HI" || t === "HELLO") return "START";
+  if (t === "ADD" || t === "NEW" || t === "CREDIT")                   return "ADD";
+  if (t.startsWith("PAID"))                                            return "PAID";
+  if (t === "LIST" || t === "OWE" || t === "OWING" || t === "WHO")   return "LIST";
+  if (t.startsWith("SCORE"))                                           return "SCORE";
+  if (t === "HELP" || t === "?" || t === "MENU" || t === "COMMANDS")  return "HELP";
+  if (t === "DASHBOARD" || t === "WEB" || t === "PORTAL")             return "DASHBOARD";
+  if (t === "SUPPORT" || t === "AGENT" || t === "HUMAN")              return "SUPPORT";
   return "FREE_TEXT";
 }
 
-/** Main step function. Given the session and an incoming message, return the next reply. */
-export function step(session: SessionContext, msg: IncomingMessage): StepResult {
-  const intent = detectIntent(msg.body);
+// ─── main step function ───────────────────────────────────────────────────────
 
-  // Onboarding flow is sticky — if mid-flow, prioritise it.
+export function step(session: SessionContext, msg: IncomingMessage): StepResult {
+  const body = msg.body.trim();
+  const intent = detectIntent(body);
+
+  // ── mid-flow states (sticky — always take priority over intent) ──────────
+
   switch (session.state) {
     case "ONBOARDING_NAME":
       return {
-        reply: messages.onboardingAskBusiness(msg.body.trim()),
+        reply: messages.onboardingAskBusiness(body),
         nextState: "ONBOARDING_BUSINESS",
-        contextPatch: { ownerName: msg.body.trim() },
+        contextPatch: { ownerName: body },
       };
 
     case "ONBOARDING_BUSINESS":
       return {
         reply: messages.onboardingAskUniversity(),
         nextState: "ONBOARDING_UNIVERSITY",
-        contextPatch: { businessName: msg.body.trim() },
+        contextPatch: { businessName: body },
       };
 
-    case "ONBOARDING_UNIVERSITY":
+    case "ONBOARDING_UNIVERSITY": {
+      const businessName = String(session.context.businessName ?? "your shop");
       return {
-        reply: messages.onboardingDone(session.context.businessName),
+        reply: messages.onboardingDone(businessName),
         nextState: "IDLE",
-        contextPatch: { universityShortName: msg.body.trim().toUpperCase() },
+        contextPatch: { universityShortName: body.toUpperCase() },
         sideEffects: [
           {
             type: "CREATE_VENDOR",
             data: {
-              name: session.context.ownerName,
-              businessName: session.context.businessName,
-              universityShortName: msg.body.trim().toUpperCase(),
+              name: String(session.context.ownerName ?? "Vendor"),
+              businessName,
+              universityShortName: body.toUpperCase(),
               phone: msg.fromPhone,
             },
           },
         ],
       };
+    }
 
     case "ADDING_CREDIT_STUDENT":
       return {
-        reply: messages.addCreditAskAmount(msg.body.trim()),
+        reply: messages.addCreditAskAmount(body),
         nextState: "ADDING_CREDIT_AMOUNT",
-        contextPatch: { creditStudentName: msg.body.trim() },
+        contextPatch: { creditStudentName: body },
       };
 
     case "ADDING_CREDIT_AMOUNT": {
-      const amount = parseAmount(msg.body);
+      const amount = parseAmount(body);
       if (!amount) {
-        return {
-          reply: "Please send just the amount as a number, e.g. *2500*.",
-          nextState: "ADDING_CREDIT_AMOUNT",
-        };
+        return { reply: messages.invalidAmount(), nextState: "ADDING_CREDIT_AMOUNT" };
       }
       return {
-        reply: messages.addCreditAskDue(session.context.creditStudentName, amount),
+        reply: messages.addCreditAskDue(String(session.context.creditStudentName ?? "Student"), amount),
         nextState: "ADDING_CREDIT_DUE",
         contextPatch: { creditAmount: amount },
       };
     }
 
     case "ADDING_CREDIT_DUE": {
-      const dueInDays = parseDueDays(msg.body);
+      const dueInDays = parseDueDays(body);
       if (!dueInDays) {
-        return {
-          reply:
-            "Please reply with a number of days (e.g. *7*), *END* for end of month, or a date like *15-06-2026*.",
-          nextState: "ADDING_CREDIT_DUE",
-        };
+        return { reply: messages.invalidDueDate(), nextState: "ADDING_CREDIT_DUE" };
       }
-      const studentName = session.context.creditStudentName;
-      const amount = session.context.creditAmount;
+      const studentName = String(session.context.creditStudentName ?? "Student");
+      const amount = Number(session.context.creditAmount ?? 0);
       return {
-        reply: messages.addCreditConfirmed(studentName, amount, `in ${dueInDays} days`),
+        reply: messages.addCreditConfirmed(studentName, amount, `in ${dueInDays} day${dueInDays === 1 ? "" : "s"}`),
         nextState: "IDLE",
+        contextPatch: { creditStudentName: null, creditAmount: null },
         sideEffects: [
           {
             type: "CREATE_CREDIT",
-            data: {
-              vendorId: session.vendorId!,
-              studentName,
-              amount,
-              dueInDays,
-            },
+            data: { vendorId: session.vendorId!, studentName, amount, dueInDays },
           },
         ],
       };
     }
+
+    case "MARKING_PAID": {
+      // vendor typed student name after we asked "who paid?"
+      return {
+        reply: "Checking…",
+        nextState: "IDLE",
+        sideEffects: [
+          { type: "MARK_PAID", data: { vendorId: session.vendorId!, studentName: body } },
+        ],
+      };
+    }
+
+    case "LOOKING_UP_SCORE":
+      return {
+        reply: "Looking up score…",
+        nextState: "IDLE",
+        sideEffects: [{ type: "FETCH_SCORE", data: { studentQuery: body } }],
+      };
   }
 
-  // Idle / fresh intent dispatch.
+  // ── IDLE / fresh intent dispatch ─────────────────────────────────────────
+
   switch (intent) {
     case "START":
-      return {
-        reply: messages.onboardingAskName(),
-        nextState: "ONBOARDING_NAME",
-      };
-    case "ADD":
-      if (!session.vendorId) {
+      if (session.vendorId) {
+        // already registered — handled by route (passes businessName in context)
         return { reply: messages.welcome(), nextState: "IDLE" };
       }
+      return { reply: messages.onboardingAskName(), nextState: "ONBOARDING_NAME" };
+
+    case "ADD":
+      if (!session.vendorId) return { reply: messages.noVendorAccount(), nextState: "IDLE" };
+      return { reply: messages.addCreditAskStudent(), nextState: "ADDING_CREDIT_STUDENT" };
+
+    case "PAID": {
+      if (!session.vendorId) return { reply: messages.noVendorAccount(), nextState: "IDLE" };
+      const nameAfterPaid = body.replace(/^PAID\s*/i, "").trim();
+      if (nameAfterPaid) {
+        return {
+          reply: "Checking…",
+          nextState: "IDLE",
+          sideEffects: [
+            { type: "MARK_PAID", data: { vendorId: session.vendorId, studentName: nameAfterPaid } },
+          ],
+        };
+      }
+      return { reply: messages.paidAsk(), nextState: "MARKING_PAID" };
+    }
+
+    case "LIST":
+      if (!session.vendorId) return { reply: messages.noVendorAccount(), nextState: "IDLE" };
       return {
-        reply: messages.addCreditAskStudent(),
-        nextState: "ADDING_CREDIT_STUDENT",
+        reply: "Fetching…",
+        nextState: "IDLE",
+        sideEffects: [{ type: "FETCH_LIST", data: { vendorId: session.vendorId } }],
       };
+
+    case "SCORE": {
+      const queryAfterScore = body.replace(/^SCORE\s*/i, "").trim();
+      if (queryAfterScore) {
+        return {
+          reply: "Looking up score…",
+          nextState: "IDLE",
+          sideEffects: [{ type: "FETCH_SCORE", data: { studentQuery: queryAfterScore } }],
+        };
+      }
+      return { reply: messages.scoreLookupAsk(), nextState: "LOOKING_UP_SCORE" };
+    }
+
     case "HELP":
       return { reply: messages.help(), nextState: "IDLE" };
-    case "LIST":
-      return {
-        reply: "Fetching your outstanding credits…",
-        nextState: "IDLE",
-        sideEffects: [{ type: "FETCH_LIST", data: { vendorId: session.vendorId! } }],
-      };
-    case "SCORE":
-      return {
-        reply: messages.scoreLookupAsk(),
-        nextState: "LOOKING_UP_SCORE",
-      };
+
     case "DASHBOARD":
       return {
-        reply: `Open your dashboard: ${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
+        reply: `Open your dashboard here:\n${process.env.NEXT_PUBLIC_APP_URL ?? "https://credeo.vercel.app"}/dashboard`,
         nextState: "IDLE",
       };
+
+    case "SUPPORT":
+      return {
+        reply: `For support, send an email to *support@credeo.app* or reply here and a human will be in touch within 24 hours.`,
+        nextState: "IDLE",
+      };
+
     default:
-      // First-touch: offer the welcome.
+      // First touch from an unknown number
       if (session.state === "IDLE" && !session.vendorId) {
         return { reply: messages.welcome(), nextState: "IDLE" };
       }
@@ -191,31 +235,28 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
   }
 }
 
-// ─── helpers ─────────────────────────────────────────
+// ─── helpers ──────────────────────────────────────────────────────────────────
 
-function parseAmount(input: string): number | null {
+export function parseAmount(input: string): number | null {
   const cleaned = input.replace(/[₦,\s]/g, "");
   const n = parseFloat(cleaned);
   return isNaN(n) || n <= 0 ? null : n;
 }
 
-function parseDueDays(input: string): number | null {
+export function parseDueDays(input: string): number | null {
   const cleaned = input.trim().toUpperCase();
   if (cleaned === "END") {
-    // days until end of current month
     const now = new Date();
     const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    return Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    return Math.max(1, Math.ceil((end.getTime() - now.getTime()) / 86_400_000));
   }
-  // "15-06-2026" or "15/06/2026"
   const dateMatch = cleaned.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/);
   if (dateMatch) {
     const [, d, m, y] = dateMatch;
     const target = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
-    const days = Math.ceil((target.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    const days = Math.ceil((target.getTime() - Date.now()) / 86_400_000);
     return days > 0 ? days : null;
   }
-  // raw number of days
   const n = parseInt(cleaned, 10);
-  return isNaN(n) || n <= 0 || n > 365 ? null : n;
+  return isNaN(n) || n <= 0 || n > 730 ? null : n;
 }
