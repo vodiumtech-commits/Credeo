@@ -7,6 +7,8 @@ import {
 import { prisma } from "@/lib/prisma";
 import { formatNaira } from "@/lib/utils";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminPage() {
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);

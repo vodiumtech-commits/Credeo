@@ -4,6 +4,8 @@ import {
 import { prisma } from "@/lib/prisma";
 import { formatNaira } from "@/lib/utils";
 
+export const dynamic = "force-dynamic";
+
 const PLAN_LABELS: Record<string, string> = {
   STARTER: "Starter", GROWTH: "Growth", CAMPUS_PRO: "Campus Pro",
 };

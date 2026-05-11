@@ -10,6 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { step, type SessionContext, type SideEffect } from "@/lib/whatsapp/state-machine";
 
@@ -97,11 +98,16 @@ async function runSideEffect(effect: SideEffect, fromPhone: string) {
           status: "PILOT",
         },
       });
+      const normalPhone = stripWhatsAppPrefix(phone);
+      const placeholderEmail = `${normalPhone.replace("+", "")}@wa.credeo.app`;
+      const placeholderHash = `$2a$12$placeholder${crypto.randomBytes(16).toString("hex")}`;
       await prisma.vendor.create({
         data: {
           ownerName: name,
           businessName,
-          phone: stripWhatsAppPrefix(phone),
+          phone: normalPhone,
+          email: placeholderEmail,
+          passwordHash: placeholderHash,
           universityId: university.id,
           vendorType: "OTHER",
         },

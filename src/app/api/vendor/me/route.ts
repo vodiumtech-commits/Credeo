@@ -17,10 +17,10 @@ export async function GET() {
 }
 
 const patchSchema = z.object({
-  businessName:  z.string().min(2).max(100).optional(),
-  ownerName:     z.string().min(2).max(100).optional(),
-  campusLocation:z.string().min(3).max(200).optional(),
-  email:         z.string().email().optional().or(z.literal("")),
+  businessName:   z.string().min(2).max(100).optional(),
+  ownerName:      z.string().min(2).max(100).optional(),
+  campusLocation: z.string().min(3).max(200).optional(),
+  email:          z.string().email().optional(),
 });
 
 export async function PATCH(req: NextRequest) {
@@ -42,7 +42,7 @@ export async function PATCH(req: NextRequest) {
       ...(parsed.data.businessName   && { businessName: parsed.data.businessName }),
       ...(parsed.data.ownerName      && { ownerName: parsed.data.ownerName }),
       ...(parsed.data.campusLocation && { campusLocation: parsed.data.campusLocation }),
-      ...(parsed.data.email !== undefined && { email: parsed.data.email || null }),
+      ...(parsed.data.email && { email: parsed.data.email }),
     },
     include: { subscription: true },
   });
