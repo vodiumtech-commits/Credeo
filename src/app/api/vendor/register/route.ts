@@ -41,82 +41,94 @@ function parseUniversity(raw: string) {
 }
 
 export async function POST(req: NextRequest) {
-  const json = await req.json();
-  const parsed = schema.safeParse(json);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.issues[0]?.message ?? "Invalid input" },
-      { status: 400 }
-    );
-  }
+  try {
+    const json = await req.json();
+    const parsed = schema.safeParse(json);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? "Invalid input" },
+        { status: 400 }
+      );
+    }
 
-  const { businessName, vendorType, campusLocation, university, ownerName, phone, email, password } =
-    parsed.data;
+    const { businessName, vendorType, campusLocation, university, ownerName, phone, email, password } =
+      parsed.data;
 
-  const normalisedPhone = normalisePhoneNG(phone);
-  if (!normalisedPhone) {
-    return NextResponse.json({ error: "Invalid phone number" }, { status: 400 });
-  }
+    const normalisedPhone = normalisePhoneNG(phone);
+    if (!normalisedPhone) {
+      return NextResponse.json({ error: "Invalid phone number" }, { status: 400 });
+    }
 
-  // Check for existing account
-  const existing = await prisma.vendor.findFirst({
-    where: { OR: [{ email }, { phone: normalisedPhone }] },
-  });
-  if (existing) {
-    return NextResponse.json(
-      { error: "An account with this email or phone already exists. Please log in." },
-      { status: 409 }
-    );
-  }
+    // Check for existing account
+    const existing = await prisma.vendor.findFirst({
+      where: { OR: [{ email }, { phone: normalisedPhone }] },
+    });
+    if (existing) {
+      return NextResponse.json(
+        { error: "An account with this email or phone already exists. Please log in." },
+        { status: 409 }
+      );
+    }
 
-  const passwordHash = await bcrypt.hash(password, 12);
-  const uniMeta = parseUniversity(university);
+    const passwordHash = await bcrypt.hash(password, 12);
+    const uniMeta = parseUniversity(university);
 
-  const uni = await prisma.university.upsert({
-    where: { name: uniMeta.name },
-    update: {},
-    create: {
-      name:      uniMeta.name,
-      shortName: uniMeta.shortName,
-      city:      uniMeta.city,
-      state:     uniMeta.state,
-      status:    "PILOT",
-    },
-  });
+    const uni = await prisma.university.upsert({
+      where: { name: uniMeta.name },
+      update: {},
+      create: {
+        name:      uniMeta.name,
+        shortName: uniMeta.shortName,
+        city:      uniMeta.city,
+        state:     uniMeta.state,
+        status:    "PILOT",
+      },
+    });
 
-  const trialEndsAt = new Date();
-  trialEndsAt.setDate(trialEndsAt.getDate() + 60);
+    const trialEndsAt = new Date();
+    trialEndsAt.setDate(trialEndsAt.getDate() + 60);
 
-  const vendor = await prisma.vendor.create({
-    data: {
-      businessName,
-      ownerName,
-      phone:        normalisedPhone,
-      email,
-      passwordHash,
-      vendorType:   (vendorType as VendorType) ?? "OTHER",
-      universityId: uni.id,
-      campusLocation,
-      status:       "ACTIVE",
-      subscription: {
-        create: {
-          plan:          "STARTER",
-          status:        "TRIAL",
-          trialEndsAt,
-          monthlyAmount: 2000,
+    const vendor = await prisma.vendor.create({
+      data: {
+        businessName,
+        ownerName,
+        phone:        normalisedPhone,
+        email,
+        passwordHash,
+        vendorType:   (vendorType as VendorType) ?? "OTHER",
+        universityId: uni.id,
+        campusLocation,
+        status:       "ACTIVE",
+        subscription: {
+          create: {
+            plan:          "STARTER",
+            status:        "TRIAL",
+            trialEndsAt,
+            monthlyAmount: 2000,
+          },
         },
       },
-    },
-  });
+    });
 
-  // Set session cookie immediately after registration
-  cookies().set("vodium_phone", normalisedPhone, {
-    httpOnly: true,
-    secure:   process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge:   60 * 60 * 24 * 30,
-    path:     "/",
-  });
+    cookies().set("vodium_phone", normalisedPhone, {
+      httpOnly: true,
+      secure:   process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge:   60 * 60 * 24 * 30,
+      path:     "/",
+    });
 
-  return NextResponse.json({ ok: true, vendorId: vendor.id });
+    return NextResponse.json({ ok: true, vendorId: vendor.id });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Unexpected error";
+    // Prisma unique constraint violation (race condition double-submit)
+    if (msg.includes("Unique constraint") || msg.includes("unique constraint")) {
+      return NextResponse.json(
+        { error: "An account with this email or phone already exists. Please log in." },
+        { status: 409 }
+      );
+    }
+    console.error("[register]", err);
+    return NextResponse.json({ error: "Something went wrong. Please try again." }, { status: 500 });
+  }
 }

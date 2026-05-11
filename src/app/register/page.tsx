@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -59,6 +59,7 @@ const STEPS = [
 
 export default function RegisterPage() {
   const router = useRouter();
+  const submitting = useRef(false);
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,6 +94,8 @@ export default function RegisterPage() {
   };
 
   async function handleCreateAccount() {
+    if (submitting.current) return;
+    submitting.current = true;
     setLoading(true);
     setError(null);
     try {
@@ -117,6 +120,7 @@ export default function RegisterPage() {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setLoading(false);
+      submitting.current = false;
     }
   }
 
