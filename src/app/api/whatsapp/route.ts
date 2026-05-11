@@ -1,20 +1,24 @@
 /**
- * Twilio WhatsApp webhook — POST /api/whatsapp
+ * SendPulse WhatsApp webhook — POST /api/whatsapp
  *
- * Twilio sends form-encoded payloads:
- *   From: "whatsapp:+2348012345678"
- *   Body: "ADD"
+ * SendPulse sends JSON payloads (not form-encoded like Twilio).
+ * We return { ok: true } immediately and send the reply via SendPulse API.
  *
- * We respond with TwiML <Message> for synchronous replies.
- * Side effects run before the response so they can override the reply text.
+ * Payload shape SendPulse delivers:
+ * {
+ *   event_name: "incoming message",
+ *   bot:     { id: "bot_id", channel_type: "whatsapp" },
+ *   contact: { id: "...", phone: "+2348012345678", name: "John" },
+ *   message: { id: "...", type: "text", data: { text: "ADD" } }
+ * }
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import twilio from "twilio";
 import { prisma } from "@/lib/prisma";
 import { computeScore } from "@/lib/credit-score/score";
 import { messages } from "@/lib/whatsapp/messages";
+import { sendWhatsAppMessage } from "@/lib/whatsapp/outbound";
 import {
   step,
   type SessionContext,
@@ -23,67 +27,77 @@ import {
 
 export const runtime = "nodejs";
 
+// ─── SendPulse webhook payload type ──────────────────────────────────────────
+
+interface SendPulseWebhook {
+  event_name?: string;
+  bot?:        { id: string; channel_type: string };
+  contact?:    { id: string; phone: string; name?: string };
+  message?:    { id: string; type: string; data?: { text?: string } };
+}
+
 // ─── webhook ──────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-  const form = await req.formData();
+  // 1. Parse JSON body.
+  let payload: SendPulseWebhook;
+  try {
+    payload = (await req.json()) as SendPulseWebhook;
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
 
-  // 1. Validate Twilio signature in production.
-  if (process.env.NODE_ENV === "production") {
-    const authToken = process.env.TWILIO_AUTH_TOKEN ?? "";
-    const appUrl    = process.env.NEXT_PUBLIC_APP_URL ?? "";
-    const webhookUrl = `${appUrl.replace(/\/$/, "")}/api/whatsapp`;
-    const signature  = req.headers.get("x-twilio-signature") ?? "";
-
-    const params: Record<string, string> = {};
-    form.forEach((value, key) => { params[key] = String(value); });
-
-    if (authToken && !twilio.validateRequest(authToken, signature, webhookUrl, params)) {
-      return new NextResponse("Forbidden", { status: 403 });
+  // 2. Verify webhook secret (SendPulse sends X-Secret-Token header).
+  const webhookSecret = process.env.SENDPULSE_WEBHOOK_SECRET;
+  if (webhookSecret) {
+    const incoming = req.headers.get("x-secret-token") ?? "";
+    if (incoming !== webhookSecret) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
   }
 
-  const fromPhone = String(form.get("From") ?? "");
-  const body      = String(form.get("Body") ?? "").trim();
+  // 3. Only handle text messages — silently ack everything else.
+  const fromPhone   = payload.contact?.phone;
+  const messageText = payload.message?.data?.text?.trim();
 
-  if (!fromPhone || !body) {
-    return new NextResponse("Bad request", { status: 400 });
+  if (!fromPhone || !messageText || payload.message?.type !== "text") {
+    return NextResponse.json({ ok: true });
   }
 
-  // 2. Load or create session.
+  // 4. Load or create session (stored with E.164 phone, no prefix needed).
   const session = await prisma.whatsAppSession.upsert({
     where:  { phone: fromPhone },
     update: { lastInteractionAt: new Date() },
     create: { phone: fromPhone, state: "IDLE", context: {} },
   });
 
-  // 3. Find vendor — by linked session ID first, then by phone.
+  // 5. Resolve vendor — by linked session first, then by phone.
   const vendor = session.vendorId
     ? await prisma.vendor.findUnique({ where: { id: session.vendorId } })
-    : await prisma.vendor.findUnique({ where: { phone: stripPrefix(fromPhone) } });
+    : await prisma.vendor.findUnique({ where: { phone: fromPhone } });
 
-  // 4. Run state machine.
+  // 6. Run state machine.
   const sessionCtx: SessionContext = {
     state:    session.state,
     context:  (session.context as Record<string, unknown>) ?? {},
     vendorId: vendor?.id,
   };
 
-  const result = step(sessionCtx, { body, fromPhone });
+  const result = step(sessionCtx, { body: messageText, fromPhone });
 
-  // 5. Persist session (link vendorId if we found one).
+  // 7. Persist updated session.
   await prisma.whatsAppSession.update({
     where: { phone: fromPhone },
     data: {
-      state:    result.nextState,
+      state:   result.nextState,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      context:  { ...sessionCtx.context, ...(result.contextPatch ?? {}) } as any,
+      context: { ...sessionCtx.context, ...(result.contextPatch ?? {}) } as any,
       vendorId: vendor?.id,
     },
   });
 
-  // 6. Run side effects — each can return a reply override.
-  let finalReply = result.reply;
+  // 8. Run side effects — each can override the reply.
+  let finalReply    = result.reply;
   let linkedVendorId = vendor?.id;
 
   if (result.sideEffects?.length) {
@@ -93,11 +107,11 @@ export async function POST(req: NextRequest) {
         fromPhone,
         vendor?.id
       );
-      if (replyOverride !== undefined) finalReply = replyOverride;
+      if (replyOverride !== undefined) finalReply   = replyOverride;
       if (newVendorId)                 linkedVendorId = newVendorId;
     }
 
-    // If CREATE_VENDOR ran, link the new vendor to this session.
+    // Link newly-created vendor to this session.
     if (linkedVendorId && linkedVendorId !== vendor?.id) {
       await prisma.whatsAppSession.update({
         where: { phone: fromPhone },
@@ -106,14 +120,13 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 7. Respond with TwiML.
-  return new NextResponse(twiml(finalReply), {
-    status:  200,
-    headers: { "Content-Type": "text/xml" },
-  });
+  // 9. Send reply via SendPulse API (not TwiML — that's Twilio only).
+  await sendWhatsAppMessage(fromPhone, finalReply);
+
+  return NextResponse.json({ ok: true });
 }
 
-// Twilio pings GET to verify the endpoint exists.
+// SendPulse pings GET to verify the endpoint.
 export async function GET() {
   return NextResponse.json({ ok: true, service: "vodium-ledger-whatsapp" });
 }
@@ -126,7 +139,7 @@ interface SideEffectResult {
 }
 
 async function runSideEffect(
-  effect:   SideEffect,
+  effect:    SideEffect,
   fromPhone: string,
   vendorId?: string
 ): Promise<SideEffectResult> {
@@ -136,9 +149,8 @@ async function runSideEffect(
     case "CREATE_VENDOR": {
       const { name, businessName, universityShortName, phone } = effect.data;
 
-      // Avoid duplicate if vendor already registered via web.
-      const normalPhone = stripPrefix(phone);
-      const existing = await prisma.vendor.findUnique({ where: { phone: normalPhone } });
+      const normalPhone = phone.replace(/^whatsapp:/, "");
+      const existing    = await prisma.vendor.findUnique({ where: { phone: normalPhone } });
       if (existing) return { newVendorId: existing.id };
 
       const university = await prisma.university.upsert({
@@ -186,7 +198,6 @@ async function runSideEffect(
       if (!vendorId) return {};
       const { studentName, matric, amount, dueInDays } = effect.data;
 
-      // Resolve student — match by name under this vendor, or create.
       const pendingPhone = `pending:${studentName.toLowerCase().replace(/\s+/g, "-")}`;
       const student = await prisma.student.upsert({
         where:  { phone: pendingPhone },
@@ -200,24 +211,11 @@ async function runSideEffect(
 
       const dueDate = new Date(Date.now() + dueInDays * 86_400_000);
       await prisma.credit.create({
-        data: {
-          vendorId,
-          studentId: student.id,
-          amount,
-          dueDate,
-          status: "OUTSTANDING",
-        },
+        data: { vendorId, studentId: student.id, amount, dueDate, status: "OUTSTANDING" },
       });
 
-      // Record score event: credit extended.
       await prisma.creditScoreEvent.create({
-        data: {
-          studentId:  student.id,
-          vendorId,
-          eventType:  "CREDIT_EXTENDED",
-          amount,
-          scoreDelta: 0,
-        },
+        data: { studentId: student.id, vendorId, eventType: "CREDIT_EXTENDED", amount, scoreDelta: 0 },
       });
 
       return {};
@@ -226,22 +224,20 @@ async function runSideEffect(
     // ── FETCH_LIST ─────────────────────────────────────────────────────────
     case "FETCH_LIST": {
       const credits = await prisma.credit.findMany({
-        where: {
+        where:   {
           vendorId: effect.data.vendorId,
           status:   { in: ["OUTSTANDING", "DUE_SOON", "OVERDUE", "PARTIALLY_PAID"] },
         },
-        include:  { student: true },
-        orderBy:  { dueDate: "asc" },
+        include: { student: true },
+        orderBy: { dueDate: "asc" },
       });
 
-      if (!credits.length) {
-        return { replyOverride: messages.listEmpty() };
-      }
+      if (!credits.length) return { replyOverride: messages.listEmpty() };
 
-      const now = Date.now();
+      const now     = Date.now();
       const entries = credits.map((c) => ({
-        studentName: c.student.fullName,
-        amount:      Number(c.amount),
+        studentName:  c.student.fullName,
+        amount:       Number(c.amount),
         daysUntilDue: Math.ceil((c.dueDate.getTime() - now) / 86_400_000),
       }));
 
@@ -253,12 +249,11 @@ async function runSideEffect(
       if (!vendorId) return { replyOverride: messages.noVendorAccount() };
       const { studentName } = effect.data;
 
-      // Find credits for students whose name contains any word from the input.
-      const words = studentName.split(/\s+/).filter(Boolean);
+      const words   = studentName.split(/\s+/).filter(Boolean);
       const credits = await prisma.credit.findMany({
         where: {
           vendorId,
-          status: { in: ["OUTSTANDING", "DUE_SOON", "OVERDUE", "PARTIALLY_PAID"] },
+          status:  { in: ["OUTSTANDING", "DUE_SOON", "OVERDUE", "PARTIALLY_PAID"] },
           student: {
             OR: words.map((w) => ({
               fullName: { contains: w, mode: "insensitive" as const },
@@ -270,59 +265,33 @@ async function runSideEffect(
         take:    1,
       });
 
-      if (!credits.length) {
-        return { replyOverride: messages.paidNotFound(studentName) };
-      }
+      if (!credits.length) return { replyOverride: messages.paidNotFound(studentName) };
 
       const credit  = credits[0];
       const amount  = Number(credit.amount);
       const student = credit.student;
       const now     = new Date();
 
-      // Determine if paid on time or late.
       const paidOnTime = now <= credit.dueDate;
       const scoreDelta = paidOnTime ? 25 : -15;
-      const eventType  = paidOnTime ? "PAID_ON_TIME" : "PAID_LATE";
+      const eventType  = paidOnTime ? "PAID_ON_TIME" : "PAID_LATE" as const;
 
-      // Mark credit paid.
       await prisma.credit.update({
         where: { id: credit.id },
-        data:  {
-          status:      "PAID",
-          amountRepaid: amount,
-          closedAt:    now,
-        },
+        data:  { status: "PAID", amountRepaid: amount, closedAt: now },
       });
 
-      // Record repayment.
       await prisma.repayment.create({
-        data: {
-          creditId:   credit.id,
-          amount,
-          method:     "CASH",
-          receivedAt: now,
-          recordedBy: vendorId,
-        },
+        data: { creditId: credit.id, amount, method: "CASH", receivedAt: now, recordedBy: vendorId },
       });
 
-      // Record score event + update student score.
       await prisma.creditScoreEvent.create({
-        data: {
-          studentId:  student.id,
-          vendorId,
-          creditId:   credit.id,
-          eventType,
-          amount,
-          scoreDelta,
-        },
+        data: { studentId: student.id, vendorId, creditId: credit.id, eventType, amount, scoreDelta },
       });
 
       await prisma.student.update({
         where: { id: student.id },
-        data:  {
-          vodiumScore:    { increment: scoreDelta },
-          scoreUpdatedAt: now,
-        },
+        data:  { vodiumScore: { increment: scoreDelta }, scoreUpdatedAt: now },
       });
 
       return { replyOverride: messages.paidConfirmed(student.fullName, amount) };
@@ -333,30 +302,22 @@ async function runSideEffect(
       const { studentQuery } = effect.data;
       const words = studentQuery.split(/\s+/).filter(Boolean);
 
-      // Try matric number match first.
       const byMatric = await prisma.student.findFirst({
-        where: { matricNumber: { equals: studentQuery, mode: "insensitive" } },
+        where:   { matricNumber: { equals: studentQuery, mode: "insensitive" } },
         include: { scoreEvents: { orderBy: { occurredAt: "asc" } } },
       });
 
       const student = byMatric ?? await prisma.student.findFirst({
         where: {
-          OR: words.map((w) => ({
-            fullName: { contains: w, mode: "insensitive" as const },
-          })),
+          OR: words.map((w) => ({ fullName: { contains: w, mode: "insensitive" as const } })),
           NOT: { phone: { startsWith: "pending:" } },
         },
         include: { scoreEvents: { orderBy: { occurredAt: "asc" } } },
         orderBy: { createdAt: "desc" },
       });
 
-      if (!student) {
-        return { replyOverride: messages.scoreNotFound(studentQuery) };
-      }
-
-      if (!student.scoreEvents.length) {
-        return { replyOverride: messages.scoreNoHistory(student.fullName) };
-      }
+      if (!student)                    return { replyOverride: messages.scoreNotFound(studentQuery) };
+      if (!student.scoreEvents.length) return { replyOverride: messages.scoreNoHistory(student.fullName) };
 
       const { score, summary } = computeScore(student.scoreEvents);
       return { replyOverride: messages.scoreReply(student.fullName, score, summary) };
@@ -366,18 +327,3 @@ async function runSideEffect(
       return {};
   }
 }
-
-// ─── helpers ──────────────────────────────────────────────────────────────────
-
-function stripPrefix(phone: string): string {
-  return phone.replace(/^whatsapp:/, "");
-}
-
-function twiml(message: string): string {
-  const escaped = message
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-  return `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${escaped}</Message></Response>`;
-}
-
