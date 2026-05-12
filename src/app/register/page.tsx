@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, ArrowRight, CheckCircle, Store, MapPin, Phone,
   MessageCircle, Building2, ShoppingBag, UtensilsCrossed,
   WashingMachine, Printer, Scissors, Sparkles, Pill, ShoppingCart, HelpCircle,
-  Shield, Zap, TrendingUp, Lock, Eye, EyeOff, Mail,
+  Shield, Zap, TrendingUp, Lock, Eye, EyeOff, Mail, RefreshCw,
 } from "lucide-react";
 import { ShimmerButton } from "@/components/ui/shimmer-button";
 import { Spotlight } from "@/components/ui/spotlight";
@@ -55,16 +55,27 @@ const STEPS = [
   { id: 1, label: "Business" },
   { id: 2, label: "Campus" },
   { id: 3, label: "Contact" },
+  { id: 4, label: "Verify" },
 ];
 
 export default function RegisterPage() {
   const router = useRouter();
-  const submitting = useRef(false);
-  const [step, setStep] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const submitting  = useRef(false);
+  const otpRefs     = useRef<(HTMLInputElement | null)[]>([]);
+  const [step, setStep]               = useState(1);
+  const [loading, setLoading]         = useState(false);
+  const [resending, setResending]     = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [error, setError]             = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-  const [done, setDone] = useState(false);
+  const [otp, setOtp]                 = useState(["", "", "", "", "", ""]);
+  const [done, setDone]               = useState(false);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendCooldown]);
   const [form, setForm] = useState<FormData>({
     businessName:   "",
     vendorType:     "",
@@ -90,38 +101,117 @@ export default function RegisterPage() {
       form.email.includes("@") &&
       form.password.length >= 8
     );
+    if (step === 4) return otp.join("").length === 6;
     return false;
   };
 
-  async function handleCreateAccount() {
+  const formPayload = () => ({
+    businessName:   form.businessName,
+    vendorType:     form.vendorType,
+    campusLocation: form.campusLocation,
+    university:     form.university,
+    ownerName:      form.ownerName,
+    phone:          form.phone,
+    email:          form.email,
+    password:       form.password,
+  });
+
+  // Step 3 → send OTP
+  async function handleRequestOtp() {
     if (submitting.current) return;
     submitting.current = true;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/vendor/register", {
-        method: "POST",
+      const res  = await fetch("/api/vendor/register", {
+        method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          businessName:   form.businessName,
-          vendorType:     form.vendorType,
-          campusLocation: form.campusLocation,
-          university:     form.university,
-          ownerName:      form.ownerName,
-          phone:          form.phone,
-          email:          form.email,
-          password:       form.password,
-        }),
+        body:    JSON.stringify(formPayload()),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Could not create account");
-      setDone(true);
+      if (!res.ok) throw new Error(data.error ?? "Could not send code");
+      setStep(4);
+      setResendCooldown(30);
+      setTimeout(() => otpRefs.current[0]?.focus(), 100);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setLoading(false);
       submitting.current = false;
     }
+  }
+
+  // Step 4 → verify OTP + create account
+  async function handleVerifyOtp() {
+    const code = otp.join("");
+    if (code.length !== 6 || submitting.current) return;
+    submitting.current = true;
+    setLoading(true);
+    setError(null);
+    try {
+      const res  = await fetch("/api/vendor/register", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ ...formPayload(), otp: code }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Invalid code");
+      setDone(true);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+      setOtp(["", "", "", "", "", ""]);
+      otpRefs.current[0]?.focus();
+    } finally {
+      setLoading(false);
+      submitting.current = false;
+    }
+  }
+
+  async function handleResendOtp() {
+    if (resendCooldown > 0 || resending) return;
+    setResending(true);
+    setError(null);
+    try {
+      const res  = await fetch("/api/vendor/register", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify(formPayload()),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setResendCooldown(30);
+      setOtp(["", "", "", "", "", ""]);
+      otpRefs.current[0]?.focus();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not resend");
+    } finally {
+      setResending(false);
+    }
+  }
+
+  function handleOtpInput(index: number, value: string) {
+    const digit = value.replace(/\D/g, "").slice(-1);
+    const next  = [...otp];
+    next[index] = digit;
+    setOtp(next);
+    setError(null);
+    if (digit && index < 5) otpRefs.current[index + 1]?.focus();
+  }
+
+  function handleOtpKeyDown(index: number, e: React.KeyboardEvent) {
+    if (e.key === "Backspace" && !otp[index] && index > 0) {
+      otpRefs.current[index - 1]?.focus();
+    }
+  }
+
+  function handleOtpPaste(e: React.ClipboardEvent) {
+    e.preventDefault();
+    const text   = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    const digits = text.split("");
+    const next   = [...otp];
+    digits.forEach((d, i) => { if (i < 6) next[i] = d; });
+    setOtp(next);
+    otpRefs.current[Math.min(digits.length, 5)]?.focus();
   }
 
   if (done) return <SuccessScreen name={form.ownerName} business={form.businessName} onDashboard={() => router.push("/dashboard")} />;
@@ -391,6 +481,57 @@ export default function RegisterPage() {
               </div>
             )}
 
+            {/* ── Step 4: OTP verification ──────────────────────────── */}
+            {step === 4 && (
+              <div className="animate-fade-up">
+                <div className="mb-7">
+                  <div className="w-11 h-11 rounded-2xl bg-vodium-gold/10 border border-vodium-gold/25 flex items-center justify-center mb-5">
+                    <Shield size={20} className="text-vodium-gold" />
+                  </div>
+                  <h1 className="font-serif text-3xl text-vodium-black mb-2">Verify your email</h1>
+                  <p className="text-muted-foreground text-sm">
+                    We sent a 6-digit code to{" "}
+                    <span className="text-vodium-black font-semibold">{form.email}</span>.
+                    <br />It expires in 10 minutes.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-vodium-black mb-3">Verification code</label>
+                  <div className="flex gap-2">
+                    {otp.map((digit, i) => (
+                      <input
+                        key={i}
+                        ref={(el) => { otpRefs.current[i] = el; }}
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={1}
+                        value={digit}
+                        onChange={(e) => handleOtpInput(i, e.target.value)}
+                        onKeyDown={(e) => handleOtpKeyDown(i, e)}
+                        onPaste={handleOtpPaste}
+                        className={`w-full aspect-square text-center text-xl font-bold border rounded-xl transition-all outline-none
+                          ${digit ? "border-vodium-gold bg-vodium-gold/5 text-vodium-black" : "border-border bg-white text-vodium-black"}
+                          focus:border-vodium-gold focus:ring-2 focus:ring-vodium-gold/20`}
+                      />
+                    ))}
+                  </div>
+
+                  <div className="mt-4 text-center">
+                    <button
+                      type="button"
+                      onClick={handleResendOtp}
+                      disabled={resendCooldown > 0 || resending}
+                      className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-vodium-black transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                    >
+                      <RefreshCw size={14} className={resending ? "animate-spin" : ""} />
+                      {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend code"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Error */}
             {error && (
               <div className="mt-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-danger flex items-start gap-2">
@@ -401,9 +542,16 @@ export default function RegisterPage() {
 
             {/* Navigation */}
             <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
-              {step > 1 ? (
+              {step > 1 && step < 4 ? (
                 <button
                   onClick={() => { setStep(step - 1); setError(null); }}
+                  className="flex items-center gap-2 text-sm text-muted-foreground hover:text-vodium-black transition-colors"
+                >
+                  <ArrowLeft size={16} /> Back
+                </button>
+              ) : step === 4 ? (
+                <button
+                  onClick={() => { setStep(3); setOtp(["", "", "", "", "", ""]); setError(null); }}
                   className="flex items-center gap-2 text-sm text-muted-foreground hover:text-vodium-black transition-colors"
                 >
                   <ArrowLeft size={16} /> Back
@@ -425,7 +573,16 @@ export default function RegisterPage() {
 
               {step === 3 && (
                 <ShimmerButton
-                  onClick={handleCreateAccount}
+                  onClick={handleRequestOtp}
+                  className={`px-6 h-11 text-sm gap-2 ${!canAdvance() || loading ? "opacity-40 pointer-events-none" : ""}`}
+                >
+                  {loading ? "Sending code…" : <><span>Continue</span> <ArrowRight size={15} /></>}
+                </ShimmerButton>
+              )}
+
+              {step === 4 && (
+                <ShimmerButton
+                  onClick={handleVerifyOtp}
                   className={`px-6 h-11 text-sm gap-2 ${!canAdvance() || loading ? "opacity-40 pointer-events-none" : ""}`}
                 >
                   {loading ? "Creating account…" : <><span>Create account</span> <ArrowRight size={15} /></>}
