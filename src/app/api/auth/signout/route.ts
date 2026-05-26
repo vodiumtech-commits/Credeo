@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { clearVendorSession, clearAdminSession } from "@/lib/session";
 
 export async function POST() {
-  cookies().delete("vodium_phone");
-  cookies().delete("vodium_admin");
+  clearVendorSession();
+  clearAdminSession();
   return NextResponse.json({ ok: true });
 }

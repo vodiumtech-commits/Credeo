@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { cookies } from "next/headers";
 import { normalisePhoneNG } from "@/lib/utils";
 import { prisma } from "@/lib/prisma";
 import { rateLimit, getRedis } from "@/lib/redis";
+import { setVendorSession, setAdminSession } from "@/lib/session";
 
 const schema = z.object({
   phone: z.string().min(7),
@@ -88,28 +88,16 @@ export async function POST(req: NextRequest) {
     await redis.del(`otp:code:${phone}`);
   }
 
-  // Set session cookie (30 days, httpOnly)
-  cookies().set("vodium_phone", phone, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 60 * 60 * 24 * 30,
-    path: "/",
-  });
+  // Set HMAC-signed session cookie
+  setVendorSession(phone);
 
-  // Set admin cookie if phone is in the admin list
+  // Grant admin session if phone is in ADMIN_PHONES
   const adminPhones = (process.env.ADMIN_PHONES ?? "")
     .split(",")
     .map((p) => p.trim())
     .filter(Boolean);
-  if (adminPhones.includes(phone) && process.env.ADMIN_SECRET) {
-    cookies().set("vodium_admin", process.env.ADMIN_SECRET, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 30,
-      path: "/",
-    });
+  if (adminPhones.includes(phone)) {
+    setAdminSession();
   }
 
   const vendor = await prisma.vendor.findUnique({ where: { phone } });

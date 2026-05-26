@@ -3,10 +3,12 @@
 import { useState, useEffect, useRef } from "react";
 import {
   CheckCircle, Store, Phone, Mail, MapPin, Bell, Shield,
-  CreditCard, Lock, ArrowUpRight, X,
+  CreditCard, Lock, X,
 } from "lucide-react";
 import { GlowBadge } from "@/components/ui/glow-badge";
 import { AnimatedBorder } from "@/components/ui/animated-border";
+import { SubscriptionActions } from "@/components/ui/subscription-actions";
+import type { SubscriptionPlan, SubscriptionStatus } from "@prisma/client";
 
 type Vendor = {
   businessName: string;
@@ -15,8 +17,8 @@ type Vendor = {
   email: string | null;
   campusLocation: string | null;
   subscription: {
-    plan: string;
-    status: string;
+    plan: SubscriptionPlan;
+    status: SubscriptionStatus;
     trialEndsAt?: string | null;
     currentPeriodStart?: string | null;
     currentPeriodEnd?: string | null;
@@ -333,8 +335,8 @@ export default function SettingsPage() {
                   <p className="font-serif text-xl text-vodium-cream mt-2">{planPrice}</p>
                   <p className="text-xs text-vodium-cream/40 mt-0.5">{planDesc}</p>
                 </div>
-                <GlowBadge color={subStatus === "ACTIVE" ? "green" : subStatus === "SUSPENDED" ? "red" : "blue"}>
-                  {subStatus === "ACTIVE" ? "Active" : subStatus === "SUSPENDED" ? "Suspended" : "Trial"}
+                <GlowBadge color={subStatus === "ACTIVE" ? "green" : subStatus === "PAST_DUE" || subStatus === "CANCELLED" ? "red" : "blue"}>
+                  {subStatus === "ACTIVE" ? "Active" : subStatus === "PAST_DUE" ? "Past due" : subStatus === "CANCELLED" ? "Cancelled" : "Trial"}
                 </GlowBadge>
               </div>
 
@@ -384,14 +386,11 @@ export default function SettingsPage() {
               {/* Divider */}
               <div className="h-px bg-white/[0.06] mb-6" />
 
-              {/* Upgrade */}
-              <button className="btn-gold w-full py-2.5 rounded-xl text-sm flex items-center justify-center gap-2">
-                Upgrade to Campus Pro
-                <ArrowUpRight size={14} />
-              </button>
-              <button className="w-full mt-2.5 py-2.5 rounded-xl text-sm text-vodium-cream/40 hover:text-vodium-cream/70 transition-colors border border-white/[0.06] hover:border-white/[0.12]">
-                Manage billing
-              </button>
+              {/* Upgrade / manage billing */}
+              <SubscriptionActions
+                currentPlan={v?.subscription?.plan ?? "STARTER"}
+                currentStatus={v?.subscription?.status ?? "TRIAL"}
+              />
             </div>
 
             {/* Vodium tip */}

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { cookies } from "next/headers";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { getRedis, rateLimit } from "@/lib/redis";
 import { sendOtpEmail } from "@/lib/email/otp";
+import { setVendorSession, setAdminSession } from "@/lib/session";
 
 // ── Step 1: verify password, send OTP ────────────────────────────────────────
 
@@ -106,26 +106,14 @@ async function handleVerify(json: unknown) {
     return NextResponse.json({ error: "Account not found" }, { status: 404 });
   }
 
-  // Set session cookie.
-  cookies().set("vodium_phone", vendor.phone, {
-    httpOnly: true,
-    secure:   process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge:   60 * 60 * 24 * 30,
-    path:     "/",
-  });
+  // Set HMAC-signed session cookie.
+  setVendorSession(vendor.phone);
 
-  // Grant admin cookie if phone is in ADMIN_PHONES.
+  // Grant admin session if phone is in ADMIN_PHONES.
   const adminPhones = (process.env.ADMIN_PHONES ?? "")
     .split(",").map((p) => p.trim()).filter(Boolean);
-  if (adminPhones.includes(vendor.phone) && process.env.ADMIN_SECRET) {
-    cookies().set("vodium_admin", process.env.ADMIN_SECRET, {
-      httpOnly: true,
-      secure:   process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge:   60 * 60 * 24 * 30,
-      path:     "/",
-    });
+  if (adminPhones.includes(vendor.phone)) {
+    setAdminSession();
   }
 
   return NextResponse.json({ ok: true });

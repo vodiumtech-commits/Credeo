@@ -19,6 +19,7 @@ import { prisma } from "@/lib/prisma";
 import { computeScore } from "@/lib/credit-score/score";
 import { messages } from "@/lib/whatsapp/messages";
 import { sendWhatsAppMessage } from "@/lib/whatsapp/outbound";
+import { parseUniversity } from "@/lib/university";
 import {
   step,
   type SessionContext,
@@ -47,11 +48,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  // 2. Verify webhook secret (SendPulse sends X-Secret-Token header).
+  // 2. Verify webhook secret — FAIL CLOSED.
+  // If SENDPULSE_WEBHOOK_SECRET is not configured, all requests are rejected in production.
   const webhookSecret = process.env.SENDPULSE_WEBHOOK_SECRET;
+  if (!webhookSecret && process.env.NODE_ENV === "production") {
+    console.error("[whatsapp] SENDPULSE_WEBHOOK_SECRET not set — rejecting all webhook traffic");
+    return NextResponse.json({ error: "Webhook not configured" }, { status: 503 });
+  }
   if (webhookSecret) {
     const incoming = req.headers.get("x-secret-token") ?? "";
-    if (incoming !== webhookSecret) {
+    // Constant-time compare to prevent timing oracle on the secret
+    const enc = new TextEncoder();
+    const a = enc.encode(incoming.padEnd(webhookSecret.length, "\0"));
+    const b = enc.encode(webhookSecret.padEnd(incoming.length, "\0"));
+    // Use Web Crypto for constant-time compare in edge-compatible way
+    let diff = 0;
+    for (let i = 0; i < Math.max(a.length, b.length); i++) {
+      diff |= (a[i] ?? 0) ^ (b[i] ?? 0);
+    }
+    if (diff !== 0 || incoming.length !== webhookSecret.length) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
   }
@@ -153,14 +168,15 @@ async function runSideEffect(
       const existing    = await prisma.vendor.findUnique({ where: { phone: normalPhone } });
       if (existing) return { newVendorId: existing.id };
 
+      const uniMeta    = parseUniversity(universityShortName);
       const university = await prisma.university.upsert({
-        where:  { name: universityShortName },
+        where:  { name: uniMeta.name },
         update: {},
         create: {
-          name:      universityShortName,
-          shortName: universityShortName,
-          city:      "Nigeria",
-          state:     "Nigeria",
+          name:      uniMeta.name,          // always lowercase
+          shortName: uniMeta.shortName ?? null,
+          city:      uniMeta.city,
+          state:     uniMeta.state,
           status:    "PILOT",
         },
       });
@@ -289,9 +305,12 @@ async function runSideEffect(
         data: { studentId: student.id, vendorId, creditId: credit.id, eventType, amount, scoreDelta },
       });
 
+      // Clamp score to [0, 1000] — never let raw increment push it out of range.
+      const currentScore = student.vodiumScore ?? 500;
+      const newScore = Math.min(1000, Math.max(0, currentScore + scoreDelta));
       await prisma.student.update({
         where: { id: student.id },
-        data:  { vodiumScore: { increment: scoreDelta }, scoreUpdatedAt: now },
+        data:  { vodiumScore: newScore, scoreUpdatedAt: now },
       });
 
       return { replyOverride: messages.paidConfirmed(student.fullName, amount) };

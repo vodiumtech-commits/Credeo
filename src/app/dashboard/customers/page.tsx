@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Plus, ArrowRight, Users } from "lucide-react";
+import { Plus, ArrowRight, Users, ExternalLink } from "lucide-react";
 import { getVendorSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { formatNaira } from "@/lib/utils";
@@ -140,9 +140,10 @@ export default async function CustomersPage() {
               : "text-emerald-400";
 
             return (
-              <div
+              <Link
                 key={s.id}
-                className="md:grid grid-cols-12 items-center px-6 py-4 table-row-dark gap-2"
+                href={`/dashboard/customers/${s.id}`}
+                className="md:grid grid-cols-12 items-center px-6 py-4 table-row-dark gap-2 block hover:bg-white/[0.03] transition-colors"
               >
                 {/* Customer name + matric */}
                 <div className="col-span-3 mb-1 md:mb-0">
@@ -176,9 +177,9 @@ export default async function CustomersPage() {
 
                 {/* Arrow */}
                 <div className="col-span-1 flex justify-end">
-                  <ArrowRight size={14} className="text-vodium-cream/20" />
+                  <ArrowRight size={14} className="text-vodium-cream/20 group-hover:text-vodium-gold transition-colors" />
                 </div>
-              </div>
+              </Link>
             );
           })
         )}

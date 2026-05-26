@@ -16,13 +16,13 @@ datasource db {
 // ─────────────────────────────────────────────
 
 model University {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  shortName String?  // e.g. "UNILAG", "OAU"
+  id        String           @id @default(cuid())
+  name      String           @unique   // always stored lowercase — used for all upsert lookups
+  shortName String?                    // optional short code e.g. "UNILAG", "OAU"
   city      String
   state     String
   status    UniversityStatus @default(PILOT)
-  createdAt DateTime @default(now())
+  createdAt DateTime         @default(now())
 
   vendors  Vendor[]
   students Student[]

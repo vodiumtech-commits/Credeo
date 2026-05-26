@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
   Plus, ArrowRight, TrendingUp, AlertCircle, CheckCircle2,
-  DollarSign, CreditCard,
+  DollarSign, CreditCard, Download,
 } from "lucide-react";
 import { getVendorSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
@@ -106,12 +106,22 @@ export default async function CreditsPage() {
             )}
           </div>
         </div>
-        <Link
-          href="/dashboard/credit/new"
-          className="btn-gold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 flex-shrink-0"
-        >
-          <Plus size={15} /> New credit
-        </Link>
+        <div className="flex items-center gap-2">
+          {credits.length > 0 && (
+            <a
+              href="/api/credits/export"
+              className="px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 border border-white/[0.10] text-vodium-cream/50 hover:text-vodium-cream hover:border-white/[0.20] transition-colors"
+            >
+              <Download size={14} /> Export CSV
+            </a>
+          )}
+          <Link
+            href="/dashboard/credit/new"
+            className="btn-gold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 flex-shrink-0"
+          >
+            <Plus size={15} /> New credit
+          </Link>
+        </div>
       </div>
 
       {/* Quick stat cards */}

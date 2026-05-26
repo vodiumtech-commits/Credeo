@@ -1,57 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { cookies } from "next/headers";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { getRedis, rateLimit } from "@/lib/redis";
 import { normalisePhoneNG } from "@/lib/utils";
+import { parseUniversity } from "@/lib/university";
 import { sendOtpEmail } from "@/lib/email/otp";
-import type { VendorType } from "@prisma/client";
+import { setVendorSession } from "@/lib/session";
 
 // ─── shared form schema ───────────────────────────────────────────────────────
 
+const VENDOR_TYPES = [
+  "PROVISION_SHOP", "FOOD_CANTEEN", "LAUNDRY", "PRINTING",
+  "BARBING_SALON", "HAIR_SALON", "PHARMACY", "MINI_MART", "OTHER",
+] as const;
+
 const formSchema = z.object({
-  businessName:   z.string().min(2).max(100),
-  vendorType:     z.string(),
-  campusLocation: z.string().min(3).max(200),
-  university:     z.string().min(2),
-  ownerName:      z.string().min(2).max(100),
-  phone:          z.string().min(7),
-  email:          z.string().email(),
-  password:       z.string().min(8, "Password must be at least 8 characters"),
+  businessName:   z.string().min(2).max(100).trim(),
+  vendorType:     z.enum(VENDOR_TYPES, { errorMap: () => ({ message: "Invalid vendor type" }) }),
+  campusLocation: z.string().min(3).max(200).trim(),
+  university:     z.string().min(2).max(200).trim(),
+  ownerName:      z.string().min(2).max(100).trim(),
+  phone:          z.string().min(7).max(20),
+  email:          z.string().email().max(255).toLowerCase(),
+  password:       z.string().min(8, "Password must be at least 8 characters").max(128),
 });
 
 const verifySchema = formSchema.extend({
   otp: z.string().length(6).regex(/^\d{6}$/),
 });
 
-// ─── university lookup ────────────────────────────────────────────────────────
-
-const UNI_META: Record<string, { city: string; state: string }> = {
-  UNILAG:   { city: "Lagos",        state: "Lagos" },
-  OAU:      { city: "Ile-Ife",      state: "Osun" },
-  UI:       { city: "Ibadan",       state: "Oyo" },
-  COVENANT: { city: "Ota",          state: "Ogun" },
-  FUTA:     { city: "Akure",        state: "Ondo" },
-  LASU:     { city: "Lagos",        state: "Lagos" },
-  UNIBEN:   { city: "Benin City",   state: "Edo" },
-  ABU:      { city: "Zaria",        state: "Kaduna" },
-  UNN:      { city: "Nsukka",       state: "Enugu" },
-  UNILORIN: { city: "Ilorin",       state: "Kwara" },
-  BABCOCK:  { city: "Ilishan-Remo", state: "Ogun" },
-  PAU:      { city: "Lagos",        state: "Lagos" },
-};
-
-function parseUniversity(raw: string) {
-  const match     = raw.match(/\(([^)]+)\)$/);
-  const shortName = match
-    ? match[1]
-    : raw.split(" ").map((w) => w[0]).join("").toUpperCase();
-  const name = raw.replace(/\s*\([^)]*\)$/, "").trim() || raw;
-  const meta = UNI_META[shortName] ?? { city: "Nigeria", state: "Nigeria" };
-  return { name, shortName, ...meta };
-}
+// parseUniversity is imported from @/lib/university
 
 // ─── route ────────────────────────────────────────────────────────────────────
 
@@ -174,15 +154,15 @@ async function handleVerify(json: unknown) {
     );
   }
 
-  const passwordHash = await bcrypt.hash(password, 12);
+  const passwordHash = await bcrypt.hash(password, 12); // cost=12 ≈ 400ms; fine for registration
   const uniMeta      = parseUniversity(university);
 
   const uni = await prisma.university.upsert({
     where:  { name: uniMeta.name },
     update: {},
     create: {
-      name:      uniMeta.name,
-      shortName: uniMeta.shortName,
+      name:      uniMeta.name,          // always lowercase
+      shortName: uniMeta.shortName ?? null,
       city:      uniMeta.city,
       state:     uniMeta.state,
       status:    "PILOT",
@@ -198,7 +178,7 @@ async function handleVerify(json: unknown) {
       phone:         normalisedPhone,
       email,
       passwordHash,
-      vendorType:    (vendorType as VendorType) ?? "OTHER",
+      vendorType,          // Already validated as VendorType by z.enum
       universityId:  uni.id,
       campusLocation,
       status:        "ACTIVE",
@@ -213,13 +193,7 @@ async function handleVerify(json: unknown) {
     },
   });
 
-  cookies().set("vodium_phone", normalisedPhone, {
-    httpOnly: true,
-    secure:   process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge:   60 * 60 * 24 * 30,
-    path:     "/",
-  });
+  setVendorSession(normalisedPhone);
 
   return NextResponse.json({ ok: true, vendorId: vendor.id });
 }

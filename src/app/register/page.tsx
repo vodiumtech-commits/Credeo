@@ -12,21 +12,6 @@ import {
 import { ShimmerButton } from "@/components/ui/shimmer-button";
 import { Spotlight } from "@/components/ui/spotlight";
 
-const UNIVERSITIES = [
-  "University of Lagos (UNILAG)",
-  "Obafemi Awolowo University (OAU)",
-  "University of Ibadan (UI)",
-  "Covenant University",
-  "Federal University of Technology, Akure (FUTA)",
-  "Lagos State University (LASU)",
-  "University of Benin (UNIBEN)",
-  "Ahmadu Bello University (ABU)",
-  "University of Nigeria, Nsukka (UNN)",
-  "University of Ilorin (UNILORIN)",
-  "Babcock University",
-  "Pan-Atlantic University (PAU)",
-  "Other",
-];
 
 const VENDOR_TYPES = [
   { value: "PROVISION_SHOP", label: "Provision Shop",  icon: ShoppingBag },
@@ -370,7 +355,7 @@ export default function RegisterPage() {
               </div>
             )}
 
-            {/* ── Step 2: University ────────────────────────────────── */}
+            {/* ── Step 2: University (free-text) ───────────────────── */}
             {step === 2 && (
               <div className="animate-fade-up">
                 <div className="mb-7">
@@ -378,25 +363,38 @@ export default function RegisterPage() {
                     <Building2 size={20} className="text-vodium-gold" />
                   </div>
                   <h1 className="font-serif text-3xl text-vodium-black mb-2">Which campus?</h1>
-                  <p className="text-muted-foreground text-sm">We use this to connect you with students at your university.</p>
+                  <p className="text-muted-foreground text-sm">
+                    Type your university name exactly as you know it — abbreviation or full name both work.
+                  </p>
                 </div>
-                <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
-                  {UNIVERSITIES.map((uni) => (
-                    <button
-                      key={uni}
-                      type="button"
-                      onClick={() => update("university", uni)}
-                      className={`w-full text-left px-4 py-3.5 rounded-xl border transition-all text-sm flex items-center justify-between ${
-                        form.university === uni
-                          ? "border-vodium-gold bg-vodium-gold/8 text-vodium-black font-medium"
-                          : "border-border text-muted-foreground hover:border-vodium-gold/40 hover:text-vodium-black"
-                      }`}
-                    >
-                      <span>{uni}</span>
-                      {form.university === uni && <CheckCircle size={15} className="text-vodium-gold flex-shrink-0" />}
-                    </button>
-                  ))}
-                </div>
+
+                <Field label="University / campus name" required hint="e.g. Dominion University, UNILAG, Covenant University">
+                  <div className="relative">
+                    <Building2 size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="e.g. Dominion University"
+                      value={form.university}
+                      onChange={(e) => update("university", e.target.value)}
+                      className="input-premium pl-9"
+                      autoFocus
+                      autoComplete="off"
+                    />
+                  </div>
+                </Field>
+
+                {/* Live normalisation preview — shows exactly what will be stored */}
+                {form.university.trim().length > 1 && (
+                  <div className="mt-3 flex items-center gap-2 px-3.5 py-2.5 bg-vodium-gold/5 border border-vodium-gold/20 rounded-xl">
+                    <CheckCircle size={13} className="text-vodium-gold flex-shrink-0" />
+                    <p className="text-xs text-vodium-black/60">
+                      Will be saved as{" "}
+                      <span className="font-semibold text-vodium-black font-mono">
+                        {form.university.trim().replace(/\s+/g, " ").toLowerCase()}
+                      </span>
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 

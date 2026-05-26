@@ -7,6 +7,7 @@ import {
   LayoutDashboard, Users, CreditCard, Settings, LogOut,
   MessageCircle, Menu, X, Plus, Bell, Store, ChevronRight,
 } from "lucide-react";
+import { NpsWidget } from "@/components/ui/nps-widget";
 
 type VendorInfo = {
   businessName: string;
@@ -227,6 +228,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         <main className="flex-1 overflow-auto">{children}</main>
       </div>
+      <NpsWidget />
     </div>
   );
 }

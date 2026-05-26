@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getSessionPhone } from "@/lib/session";
 import { normalisePhoneNG } from "@/lib/utils";
+import { getStudentLimit, isPlanActive } from "@/lib/plan";
 import type { CreditStatus } from "@prisma/client";
 
 // GET /api/credits?status=OVERDUE&search=emeka&page=1&limit=20
@@ -62,8 +63,22 @@ export async function POST(req: NextRequest) {
   const phone = getSessionPhone();
   if (!phone) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const vendor = await prisma.vendor.findUnique({ where: { phone } });
+  const vendor = await prisma.vendor.findUnique({
+    where: { phone },
+    include: { subscription: true },
+  });
   if (!vendor) return NextResponse.json({ error: "Vendor not found" }, { status: 404 });
+
+  // ── Subscription status check ────────────────────────────────────────────
+  const sub = vendor.subscription;
+  const status = sub?.status ?? "TRIAL";
+
+  if (!isPlanActive(status)) {
+    return NextResponse.json(
+      { error: "Your subscription has expired. Please renew to continue adding credits." },
+      { status: 403 }
+    );
+  }
 
   const json = await req.json();
   const parsed = createSchema.safeParse(json);
@@ -90,6 +105,33 @@ export async function POST(req: NextRequest) {
       universityId: vendor.universityId,
     },
   });
+
+  // ── Student count gating (only for new students) ─────────────────────────
+  const plan = vendor.subscription?.plan ?? "STARTER";
+  const studentLimit = getStudentLimit(plan);
+
+  if (studentLimit !== null) {
+    const alreadyOnBook = await prisma.credit.findFirst({
+      where: { vendorId: vendor.id, studentId: student.id },
+      select: { id: true },
+    });
+    if (!alreadyOnBook) {
+      const uniqueStudentCount = await prisma.student.count({
+        where: { credits: { some: { vendorId: vendor.id } } },
+      });
+      if (uniqueStudentCount >= studentLimit) {
+        return NextResponse.json(
+          {
+            error: `You've reached the ${studentLimit}-student limit on your ${plan} plan. Upgrade to add more students.`,
+            limitReached: true,
+            plan,
+            limit: studentLimit,
+          },
+          { status: 403 }
+        );
+      }
+    }
+  }
 
   const credit = await prisma.credit.create({
     data: {

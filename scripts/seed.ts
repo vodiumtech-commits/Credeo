@@ -12,26 +12,27 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("🌱 Seeding Vodium Ledger with rich pilot data…\n");
 
-  // ─── Universities ───────────────────────────────────────────────────────────
+  // ─── Universities ─────────────────────────────────────────────────────────
+  // Names are always stored lowercase — that is the unique key.
   const unilag = await prisma.university.upsert({
-    where: { name: "University of Lagos" },
+    where:  { name: "university of lagos" },
     update: {},
-    create: { name: "University of Lagos", shortName: "UNILAG", city: "Lagos", state: "Lagos", status: "ACTIVE" },
+    create: { name: "university of lagos", shortName: "UNILAG", city: "Lagos", state: "Lagos", status: "ACTIVE" },
   });
   const oau = await prisma.university.upsert({
-    where: { name: "Obafemi Awolowo University" },
+    where:  { name: "obafemi awolowo university" },
     update: {},
-    create: { name: "Obafemi Awolowo University", shortName: "OAU", city: "Ile-Ife", state: "Osun", status: "ACTIVE" },
+    create: { name: "obafemi awolowo university", shortName: "OAU", city: "Ile-Ife", state: "Osun", status: "ACTIVE" },
   });
   await prisma.university.upsert({
-    where: { name: "University of Ibadan" },
+    where:  { name: "university of ibadan" },
     update: {},
-    create: { name: "University of Ibadan", shortName: "UI", city: "Ibadan", state: "Oyo", status: "PILOT" },
+    create: { name: "university of ibadan", shortName: "UI", city: "Ibadan", state: "Oyo", status: "PILOT" },
   });
   const covenant = await prisma.university.upsert({
-    where: { name: "Covenant University" },
+    where:  { name: "covenant university" },
     update: {},
-    create: { name: "Covenant University", shortName: "Covenant", city: "Ota", state: "Ogun", status: "PILOT" },
+    create: { name: "covenant university", shortName: "COVENANT", city: "Ota", state: "Ogun", status: "PILOT" },
   });
 
   console.log("✅ Universities seeded");

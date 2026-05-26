@@ -10,6 +10,7 @@ import { formatNaira } from "@/lib/utils";
 import { StatCard } from "@/components/ui/stat-card";
 import { GlowBadge } from "@/components/ui/glow-badge";
 import { RevenueChart } from "@/components/ui/revenue-chart";
+import { BulkRemindButton } from "@/components/ui/bulk-remind-button";
 
 export default async function DashboardPage() {
   const vendor = await getVendorSession();
@@ -272,14 +273,17 @@ export default async function DashboardPage() {
 
       {/* Overdue table */}
       <div className="bg-vodium-charcoal border border-rose-500/10 rounded-2xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-rose-500/10 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-rose-500/10 flex items-center justify-between gap-4 flex-wrap">
           <h2 className="font-semibold text-vodium-cream flex items-center gap-2">
             <AlertCircle size={16} className="text-rose-400" />
             Overdue credits
           </h2>
-          <GlowBadge color="red">
-            {credits.filter((c) => c.status === "OVERDUE").length} overdue
-          </GlowBadge>
+          <div className="flex items-center gap-3">
+            <BulkRemindButton overdueCount={credits.filter((c) => c.status === "OVERDUE").length} />
+            <GlowBadge color="red">
+              {credits.filter((c) => c.status === "OVERDUE").length} overdue
+            </GlowBadge>
+          </div>
         </div>
 
         {overdueList.length === 0 ? (

@@ -86,17 +86,18 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
 
     case "ONBOARDING_UNIVERSITY": {
       const businessName = String(session.context.businessName ?? "your shop");
+      // Pass the raw input — parseUniversity() in the route handler normalises it.
       return {
         reply: messages.onboardingDone(businessName),
         nextState: "IDLE",
-        contextPatch: { universityShortName: body.toUpperCase() },
+        contextPatch: { universityShortName: body },
         sideEffects: [
           {
             type: "CREATE_VENDOR",
             data: {
               name: String(session.context.ownerName ?? "Vendor"),
               businessName,
-              universityShortName: body.toUpperCase(),
+              universityShortName: body,
               phone: msg.fromPhone,
             },
           },

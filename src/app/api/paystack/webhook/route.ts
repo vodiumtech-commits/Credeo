@@ -5,11 +5,26 @@ import { prisma } from "@/lib/prisma";
 export async function POST(req: NextRequest) {
   const body = await req.text();
   const signature = req.headers.get("x-paystack-signature") ?? "";
-  const secret = process.env.PAYSTACK_WEBHOOK_SECRET ?? "";
 
-  // Verify HMAC-SHA512 signature
-  const hash = crypto.createHmac("sha512", secret).update(body).digest("hex");
-  if (hash !== signature) {
+  // Fail closed — reject all traffic if secret is not configured in production.
+  const secret = process.env.PAYSTACK_WEBHOOK_SECRET;
+  if (!secret && process.env.NODE_ENV === "production") {
+    console.error("[paystack/webhook] PAYSTACK_WEBHOOK_SECRET not set — rejecting all webhook traffic");
+    return new NextResponse("Webhook not configured", { status: 503 });
+  }
+
+  // Verify HMAC-SHA512 signature with constant-time compare.
+  const hash = crypto.createHmac("sha512", secret ?? "").update(body).digest("hex");
+
+  // Use timingSafeEqual to prevent length-leak and timing-oracle attacks.
+  const sigBuf  = Buffer.from(signature, "hex");
+  const hashBuf = Buffer.from(hash, "hex");
+  const sigValid =
+    sigBuf.length === hashBuf.length &&
+    sigBuf.length > 0 &&
+    crypto.timingSafeEqual(sigBuf, hashBuf);
+
+  if (!sigValid) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
