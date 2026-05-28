@@ -17,14 +17,14 @@ export async function sendOtpEmail(to: string, otp: string, purpose: Purpose) {
 
   const subject =
     purpose === "login"
-      ? "Your Credeo login code"
-      : "Verify your Credeo account";
+      ? "Your Vodium Ledger login code"
+      : "Verify your Vodium Ledger account";
 
   const action =
     purpose === "login" ? "complete your sign-in to" : "verify your";
 
   await resend.emails.send({
-    from:    "Credeo <noreply@credeo.app>",   // verify credeo.app in Resend dashboard
+    from:    "Vodium Ledger <noreply@vodiumledger.com>",   // verify vodiumledger.com in Resend dashboard
     to,
     subject,
     html:    buildHtml(otp, action),
@@ -43,7 +43,7 @@ function buildHtml(otp: string, action: string) {
         <!-- Header -->
         <tr>
           <td style="background:#0A0A0A;padding:32px 40px;">
-            <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:22px;color:#C9A961;letter-spacing:0.15em;">CREDEO</p>
+            <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:22px;color:#C9A961;letter-spacing:0.15em;">VODIUM LEDGER</p>
           </td>
         </tr>
 
@@ -55,7 +55,7 @@ function buildHtml(otp: string, action: string) {
               Your verification code
             </h1>
             <p style="margin:0 0 32px;font-size:15px;color:#6B7280;line-height:1.6;">
-              Use the code below to ${action} your Credeo account.<br>
+              Use the code below to ${action} your Vodium Ledger account.<br>
               It expires in <strong>10 minutes</strong> and can only be used once.
             </p>
 
@@ -79,7 +79,7 @@ function buildHtml(otp: string, action: string) {
         <tr>
           <td style="background:#F9F9F7;padding:20px 40px;border-top:1px solid #F0F0EC;">
             <p style="margin:0;font-size:12px;color:#9CA3AF;">
-              © ${new Date().getFullYear()} Credeo · For campus vendors across Nigeria
+              © ${new Date().getFullYear()} Vodium Ledger · For campus vendors across Nigeria
             </p>
           </td>
         </tr>

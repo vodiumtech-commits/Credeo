@@ -11,7 +11,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { VENDOR_COOKIE, ADMIN_COOKIE, ADMIN_COOKIE_AGE } from "@/lib/session";
+import { VENDOR_COOKIE, ADMIN_COOKIE, ADMIN_COOKIE_AGE } from "@/lib/session-cookies";
 
 // ── Web-Crypto HMAC verification (Edge-compatible) ───────────────────────────
 
@@ -88,7 +88,7 @@ function addSecurityHeaders(res: NextResponse): NextResponse {
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: https:",
-      "connect-src 'self' https://api.paystack.co https://app.posthog.com",
+      "connect-src 'self' https://api.paystack.co https://app.posthog.com https://eu.posthog.com https://*.ingest.de.sentry.io https://*.ingest.sentry.io https://innocent-teal-82236.upstash.io",
       "frame-src https://js.paystack.co https://checkout.paystack.com",
     ].join("; ")
   );

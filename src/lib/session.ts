@@ -14,14 +14,10 @@ import { cookies } from "next/headers";
 import { prisma } from "./prisma";
 import crypto from "crypto";
 import type { Vendor, VendorSubscription } from "@prisma/client";
+export { VENDOR_COOKIE, ADMIN_COOKIE, VENDOR_COOKIE_AGE, ADMIN_COOKIE_AGE } from "./session-cookies";
+import { VENDOR_COOKIE, ADMIN_COOKIE, VENDOR_COOKIE_AGE, ADMIN_COOKIE_AGE } from "./session-cookies";
 
 export type VendorWithSub = Vendor & { subscription: VendorSubscription | null };
-
-// ── Cookie names (exported so middleware can read them) ──────────────────────
-export const VENDOR_COOKIE      = "vodium_sid";
-export const ADMIN_COOKIE       = "vodium_asid";
-export const VENDOR_COOKIE_AGE  = 60 * 60 * 24 * 30;  // 30 days
-export const ADMIN_COOKIE_AGE   = 60 * 60 * 8;         // 8 hours
 
 // ── Secret ───────────────────────────────────────────────────────────────────
 

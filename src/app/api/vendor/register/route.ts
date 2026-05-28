@@ -127,6 +127,15 @@ async function handleVerify(json: unknown) {
     ownerName, phone, email, password, otp,
   } = parsed.data;
 
+  // Rate-limit: max 5 OTP guesses per email per 10 min.
+  const rl = await rateLimit(`rl:register-verify:${email}`, 5, 600);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: "Too many attempts. Request a new code." },
+      { status: 429 }
+    );
+  }
+
   // Verify OTP.
   const redis  = getRedis();
   const stored = redis ? await redis.get<string>(`otp:register:${email}`) : null;

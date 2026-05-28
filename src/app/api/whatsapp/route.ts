@@ -181,7 +181,7 @@ async function runSideEffect(
         },
       });
 
-      const placeholderEmail = `${normalPhone.replace("+", "")}@wa.credeo.app`;
+      const placeholderEmail = `${normalPhone.replace("+", "")}@wa.vodiumledger.com`;
       const placeholderHash  = `$2a$12$whatsapp${crypto.randomBytes(16).toString("hex")}`;
       const trialEndsAt      = new Date(Date.now() + 60 * 86_400_000);
 

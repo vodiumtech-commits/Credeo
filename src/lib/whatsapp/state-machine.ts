@@ -217,13 +217,13 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
 
     case "DASHBOARD":
       return {
-        reply: `Open your dashboard here:\n${process.env.NEXT_PUBLIC_APP_URL ?? "https://credeo.vercel.app"}/dashboard`,
+        reply: `Open your dashboard here:\n${process.env.NEXT_PUBLIC_APP_URL ?? "https://vodiumledger.com"}/dashboard`,
         nextState: "IDLE",
       };
 
     case "SUPPORT":
       return {
-        reply: `For support, send an email to *support@credeo.app* or reply here and a human will be in touch within 24 hours.`,
+        reply: `For support, send an email to *support@vodiumledger.com* or reply here and a human will be in touch within 24 hours.`,
         nextState: "IDLE",
       };
 

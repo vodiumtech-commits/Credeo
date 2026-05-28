@@ -19,6 +19,10 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   // Auth: Vercel passes Authorization: Bearer <CRON_SECRET>
   const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret && process.env.NODE_ENV === "production") {
+    console.error("[cron/reminders] CRON_SECRET not set — refusing to run in production");
+    return NextResponse.json({ error: "Cron not configured" }, { status: 503 });
+  }
   if (cronSecret) {
     const auth = req.headers.get("authorization") ?? "";
     if (auth !== `Bearer ${cronSecret}`) {
