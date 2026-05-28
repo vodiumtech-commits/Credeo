@@ -7,6 +7,7 @@ import {
 import { getVendorSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { formatNaira } from "@/lib/utils";
+import { MarkPaidButton } from "@/components/ui/mark-paid-button";
 import type { CreditStatus } from "@prisma/client";
 
 const STATUS_BADGE: Record<CreditStatus, string> = {
@@ -49,43 +50,41 @@ export default async function CreditsPage() {
   const totalAmount = credits.reduce((s, c) => s + Number(c.amount), 0);
 
   const overdueCount = credits.filter((c) => c.status === "OVERDUE").length;
-  const paidCount = credits.filter((c) => c.status === "PAID").length;
-
-  const recoveryRate =
-    totalAmount > 0 ? Math.round((paidAmount / totalAmount) * 100) : 0;
+  const paidCount    = credits.filter((c) => c.status === "PAID").length;
+  const recoveryRate = totalAmount > 0 ? Math.round((paidAmount / totalAmount) * 100) : 0;
 
   const statCards = [
     {
-      label: "Total Outstanding",
-      value: formatNaira(outstandingAmount),
-      icon: <DollarSign size={15} />,
+      label:  "Total Outstanding",
+      value:  formatNaira(outstandingAmount),
+      icon:   <DollarSign size={15} />,
       accent: "text-indigo-400",
       border: "border-indigo-500/20",
-      bg: "bg-indigo-500/[0.06]",
+      bg:     "bg-indigo-500/[0.06]",
     },
     {
-      label: "Overdue",
-      value: formatNaira(overdueAmount),
-      icon: <AlertCircle size={15} />,
+      label:  "Overdue",
+      value:  formatNaira(overdueAmount),
+      icon:   <AlertCircle size={15} />,
       accent: "text-rose-400",
       border: "border-rose-500/20",
-      bg: "bg-rose-500/[0.06]",
+      bg:     "bg-rose-500/[0.06]",
     },
     {
-      label: "Recovered",
-      value: formatNaira(paidAmount),
-      icon: <CheckCircle2 size={15} />,
+      label:  "Recovered",
+      value:  formatNaira(paidAmount),
+      icon:   <CheckCircle2 size={15} />,
       accent: "text-emerald-400",
       border: "border-emerald-500/20",
-      bg: "bg-emerald-500/[0.06]",
+      bg:     "bg-emerald-500/[0.06]",
     },
     {
-      label: "Recovery Rate",
-      value: `${recoveryRate}%`,
-      icon: <TrendingUp size={15} />,
+      label:  "Recovery Rate",
+      value:  `${recoveryRate}%`,
+      icon:   <TrendingUp size={15} />,
       accent: "text-vodium-gold",
       border: "border-vodium-gold/20",
-      bg: "bg-vodium-gold/[0.06]",
+      bg:     "bg-vodium-gold/[0.06]",
     },
   ] as const;
 
@@ -124,7 +123,7 @@ export default async function CreditsPage() {
         </div>
       </div>
 
-      {/* Quick stat cards */}
+      {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {statCards.map((s) => (
           <div
@@ -143,18 +142,18 @@ export default async function CreditsPage() {
       {/* Credits table */}
       <div className="bg-vodium-charcoal rounded-2xl border border-white/[0.06] overflow-hidden">
 
-        {/* Table header row */}
+        {/* Table header */}
         <div className="hidden md:grid grid-cols-12 px-6 py-3 border-b border-white/[0.06] text-[10px] font-semibold text-vodium-cream/25 uppercase tracking-widest">
           <span className="col-span-3">Student</span>
-          <span className="col-span-3">Description</span>
+          <span className="col-span-2">Description</span>
           <span className="col-span-2 text-right">Amount</span>
           <span className="col-span-2 text-right">Repaid</span>
           <span className="col-span-1 text-center">Due</span>
           <span className="col-span-1 text-center">Status</span>
+          <span className="col-span-1 text-center">Action</span>
         </div>
 
         {credits.length === 0 ? (
-          /* Dark empty state */
           <div className="px-6 py-20 text-center">
             <div className="w-14 h-14 rounded-2xl bg-vodium-gold/[0.08] border border-vodium-gold/15 flex items-center justify-center mx-auto mb-4">
               <CreditCard size={24} className="text-vodium-gold/40" />
@@ -171,6 +170,8 @@ export default async function CreditsPage() {
         ) : (
           credits.map((c) => {
             const isOverdue = c.status === "OVERDUE";
+            const isPaid    = c.status === "PAID" || c.status === "WRITTEN_OFF";
+
             return (
               <div
                 key={c.id}
@@ -186,11 +187,11 @@ export default async function CreditsPage() {
                 </div>
 
                 {/* Description */}
-                <div className="col-span-3 mb-1 md:mb-0">
+                <div className="col-span-2 mb-1 md:mb-0">
                   <p className="text-sm text-vodium-cream/40 truncate">{c.description ?? "—"}</p>
                 </div>
 
-                {/* Amount — serif gold for owed amounts */}
+                {/* Amount */}
                 <div className="col-span-2 text-right mb-1 md:mb-0">
                   <p className="font-serif text-sm text-vodium-gold">
                     {formatNaira(Number(c.amount))}
@@ -211,9 +212,20 @@ export default async function CreditsPage() {
                   </p>
                 </div>
 
-                {/* Status badge */}
-                <div className="col-span-1 flex justify-center">
+                {/* Status */}
+                <div className="col-span-1 flex justify-center mb-1 md:mb-0">
                   <span className={STATUS_BADGE[c.status]}>{STATUS_LABEL[c.status]}</span>
+                </div>
+
+                {/* Action */}
+                <div className="col-span-1 flex justify-center">
+                  <MarkPaidButton
+                    creditId={c.id}
+                    studentName={c.student.fullName}
+                    totalAmount={Number(c.amount)}
+                    amountRepaid={Number(c.amountRepaid)}
+                    isPaid={isPaid}
+                  />
                 </div>
               </div>
             );
