@@ -3,18 +3,15 @@ import { z } from "zod";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { getRedis, rateLimit } from "@/lib/redis";
+import { rateLimit } from "@/lib/redis";
 import { sendOtpEmail } from "@/lib/email/otp";
 import { setVendorSession, setAdminSession } from "@/lib/session";
-
-// ── Step 1: verify password, send OTP ────────────────────────────────────────
+import { setOtpCookie, verifyOtpCookie, clearOtpCookie } from "@/lib/otp-cookie";
 
 const requestSchema = z.object({
   email:    z.string().email(),
   password: z.string().min(1),
 });
-
-// ── Step 2: verify OTP, set session ──────────────────────────────────────────
 
 const verifySchema = z.object({
   email: z.string().email(),
@@ -23,15 +20,11 @@ const verifySchema = z.object({
 
 export async function POST(req: NextRequest) {
   const json = await req.json();
-
-  // ── Determine which step we're on ────────────────────────────────────────
-  if ("otp" in json) {
-    return handleVerify(json);
-  }
+  if ("otp" in json) return handleVerify(json);
   return handleRequest(json);
 }
 
-// ─── step 1 ───────────────────────────────────────────────────────────────────
+// ─── step 1: verify password, issue OTP ──────────────────────────────────────
 
 async function handleRequest(json: unknown) {
   const parsed = requestSchema.safeParse(json);
@@ -41,7 +34,7 @@ async function handleRequest(json: unknown) {
 
   const { email, password } = parsed.data;
 
-  // Rate-limit: max 5 login attempts per 15 min per email.
+  // Rate-limit: max 5 login attempts per 15 min per email (best-effort).
   const rl = await rateLimit(`rl:login:${email}`, 5, 900);
   if (!rl.ok) {
     return NextResponse.json(
@@ -60,19 +53,17 @@ async function handleRequest(json: unknown) {
     return NextResponse.json({ error: "Incorrect email or password" }, { status: 401 });
   }
 
-  // Generate and store OTP (10-min TTL).
-  const otp   = String(crypto.randomInt(100000, 999999));
-  const redis = getRedis();
-  if (redis) {
-    await redis.set(`otp:login:${email}`, otp, { ex: 600 });
-  }
+  const otp = String(crypto.randomInt(100000, 999999));
+
+  // Store OTP in a signed httpOnly cookie — no Redis dependency.
+  setOtpCookie("login", email, otp);
 
   await sendOtpEmail(email, otp, "login");
 
   return NextResponse.json({ ok: true, step: "otp" });
 }
 
-// ─── step 2 ───────────────────────────────────────────────────────────────────
+// ─── step 2: verify OTP, set session ─────────────────────────────────────────
 
 async function handleVerify(json: unknown) {
   const parsed = verifySchema.safeParse(json);
@@ -82,7 +73,7 @@ async function handleVerify(json: unknown) {
 
   const { email, otp } = parsed.data;
 
-  // Rate-limit: max 5 wrong OTP attempts per 10 min.
+  // Rate-limit OTP guesses (best-effort).
   const rl = await rateLimit(`rl:otp-verify:${email}`, 5, 600);
   if (!rl.ok) {
     return NextResponse.json(
@@ -91,22 +82,17 @@ async function handleVerify(json: unknown) {
     );
   }
 
-  const redis   = getRedis();
-  const stored  = redis ? await redis.get<string>(`otp:login:${email}`) : null;
-
-  if (!stored || stored !== otp) {
+  // Verify OTP against the signed cookie.
+  if (!verifyOtpCookie("login", email, otp)) {
     return NextResponse.json({ error: "Invalid or expired code" }, { status: 401 });
   }
-
-  // OTP is single-use — delete it immediately.
-  await redis?.del(`otp:login:${email}`);
+  clearOtpCookie("login");
 
   const vendor = await prisma.vendor.findUnique({ where: { email } });
   if (!vendor) {
     return NextResponse.json({ error: "Account not found" }, { status: 404 });
   }
 
-  // Set HMAC-signed session cookie.
   setVendorSession(vendor.phone);
 
   // Grant admin session if phone is in ADMIN_PHONES.

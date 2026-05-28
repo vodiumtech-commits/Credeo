@@ -3,11 +3,12 @@ import { z } from "zod";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { getRedis, rateLimit } from "@/lib/redis";
+import { rateLimit } from "@/lib/redis";
 import { normalisePhoneNG } from "@/lib/utils";
 import { parseUniversity } from "@/lib/university";
 import { sendOtpEmail } from "@/lib/email/otp";
 import { setVendorSession } from "@/lib/session";
+import { setOtpCookie, verifyOtpCookie, clearOtpCookie } from "@/lib/otp-cookie";
 
 // ─── shared form schema ───────────────────────────────────────────────────────
 
@@ -30,8 +31,6 @@ const formSchema = z.object({
 const verifySchema = formSchema.extend({
   otp: z.string().length(6).regex(/^\d{6}$/),
 });
-
-// parseUniversity is imported from @/lib/university
 
 // ─── route ────────────────────────────────────────────────────────────────────
 
@@ -74,7 +73,6 @@ async function handleRequest(json: unknown) {
     return NextResponse.json({ error: "Invalid phone number" }, { status: 400 });
   }
 
-  // Validate password strength early.
   if (password.length < 8) {
     return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
   }
@@ -90,7 +88,7 @@ async function handleRequest(json: unknown) {
     );
   }
 
-  // Rate-limit: max 3 OTP sends per email per 10 min.
+  // Rate-limit: max 3 OTP sends per email per 10 min (best-effort — no-ops if Redis is down).
   const rl = await rateLimit(`rl:register-otp:${email}`, 3, 600);
   if (!rl.ok) {
     return NextResponse.json(
@@ -99,12 +97,10 @@ async function handleRequest(json: unknown) {
     );
   }
 
-  // Generate OTP and store it.
-  const otp   = String(crypto.randomInt(100000, 999999));
-  const redis = getRedis();
-  if (redis) {
-    await redis.set(`otp:register:${email}`, otp, { ex: 600 });
-  }
+  const otp = String(crypto.randomInt(100000, 999999));
+
+  // Store OTP in a signed httpOnly cookie — no Redis dependency.
+  setOtpCookie("register", email, otp);
 
   await sendOtpEmail(email, otp, "register");
 
@@ -127,7 +123,7 @@ async function handleVerify(json: unknown) {
     ownerName, phone, email, password, otp,
   } = parsed.data;
 
-  // Rate-limit: max 5 OTP guesses per email per 10 min.
+  // Rate-limit OTP guesses (best-effort — no-ops if Redis is down).
   const rl = await rateLimit(`rl:register-verify:${email}`, 5, 600);
   if (!rl.ok) {
     return NextResponse.json(
@@ -136,16 +132,11 @@ async function handleVerify(json: unknown) {
     );
   }
 
-  // Verify OTP.
-  const redis  = getRedis();
-  const stored = redis ? await redis.get<string>(`otp:register:${email}`) : null;
-
-  if (!stored || stored !== otp) {
+  // Verify OTP against the signed cookie.
+  if (!verifyOtpCookie("register", email, otp)) {
     return NextResponse.json({ error: "Invalid or expired code" }, { status: 401 });
   }
-
-  // OTP is single-use.
-  await redis?.del(`otp:register:${email}`);
+  clearOtpCookie("register");
 
   const normalisedPhone = normalisePhoneNG(phone);
   if (!normalisedPhone) {
@@ -163,14 +154,14 @@ async function handleVerify(json: unknown) {
     );
   }
 
-  const passwordHash = await bcrypt.hash(password, 12); // cost=12 ≈ 400ms; fine for registration
+  const passwordHash = await bcrypt.hash(password, 12);
   const uniMeta      = parseUniversity(university);
 
   const uni = await prisma.university.upsert({
     where:  { name: uniMeta.name },
     update: {},
     create: {
-      name:      uniMeta.name,          // always lowercase
+      name:      uniMeta.name,
       shortName: uniMeta.shortName ?? null,
       city:      uniMeta.city,
       state:     uniMeta.state,
@@ -187,7 +178,7 @@ async function handleVerify(json: unknown) {
       phone:         normalisedPhone,
       email,
       passwordHash,
-      vendorType,          // Already validated as VendorType by z.enum
+      vendorType,
       universityId:  uni.id,
       campusLocation,
       status:        "ACTIVE",
