@@ -19,9 +19,14 @@ const verifySchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const json = await req.json();
-  if ("otp" in json) return handleVerify(json);
-  return handleRequest(json);
+  try {
+    const json = await req.json();
+    if ("otp" in json) return handleVerify(json);
+    return handleRequest(json);
+  } catch (err) {
+    console.error("[auth/login]", err);
+    return NextResponse.json({ error: "Something went wrong. Please try again." }, { status: 500 });
+  }
 }
 
 // ─── step 1: verify password, issue OTP ──────────────────────────────────────
