@@ -1,8 +1,9 @@
 import {
-  Search, Store, Users, MoreHorizontal,
+  Search, Store, Users,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { formatNaira } from "@/lib/utils";
+import { VendorRowMenu } from "@/components/ui/vendor-row-menu";
 
 export const dynamic = "force-dynamic";
 
@@ -215,9 +216,11 @@ export default async function AdminVendorsPage() {
                 </div>
 
                 <div className="col-span-1 flex justify-center">
-                  <button className="w-7 h-7 rounded-lg border border-white/[0.06] flex items-center justify-center text-vodium-cream/30 hover:text-vodium-gold hover:border-vodium-gold/30 transition-colors">
-                    <MoreHorizontal size={14} />
-                  </button>
+                  <VendorRowMenu
+                    vendorId={v.id}
+                    businessName={v.businessName}
+                    currentStatus={v.status}
+                  />
                 </div>
               </div>
             );
