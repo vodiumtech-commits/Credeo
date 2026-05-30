@@ -4,7 +4,7 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/redis";
-import { normalisePhoneNG } from "@/lib/utils";
+import { normalisePhone } from "@/lib/utils";
 import { parseUniversity } from "@/lib/university";
 import { sendOtpEmail } from "@/lib/email/otp";
 import { setVendorSession } from "@/lib/session";
@@ -68,7 +68,7 @@ async function handleRequest(json: unknown) {
 
   const { phone, email, password } = parsed.data;
 
-  const normalisedPhone = normalisePhoneNG(phone);
+  const normalisedPhone = normalisePhone(phone);
   if (!normalisedPhone) {
     return NextResponse.json({ error: "Invalid phone number" }, { status: 400 });
   }
@@ -138,7 +138,7 @@ async function handleVerify(json: unknown) {
   }
   clearOtpCookie("register");
 
-  const normalisedPhone = normalisePhoneNG(phone);
+  const normalisedPhone = normalisePhone(phone);
   if (!normalisedPhone) {
     return NextResponse.json({ error: "Invalid phone number" }, { status: 400 });
   }

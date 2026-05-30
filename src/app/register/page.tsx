@@ -7,7 +7,7 @@ import {
   ArrowLeft, ArrowRight, CheckCircle, Store, MapPin, Phone,
   MessageCircle, Building2, ShoppingBag, UtensilsCrossed,
   WashingMachine, Printer, Scissors, Sparkles, Pill, ShoppingCart, HelpCircle,
-  Shield, Zap, TrendingUp, Lock, Eye, EyeOff, Mail, RefreshCw,
+  Shield, Zap, TrendingUp, Lock, Eye, EyeOff, Mail, RefreshCw, ChevronDown,
 } from "lucide-react";
 import { ShimmerButton } from "@/components/ui/shimmer-button";
 import { Spotlight } from "@/components/ui/spotlight";
@@ -24,6 +24,13 @@ const VENDOR_TYPES = [
   { value: "MINI_MART",      label: "Mini Mart",       icon: ShoppingCart },
   { value: "OTHER",          label: "Other",           icon: HelpCircle },
 ];
+
+type PhoneCountry = "NG" | "US";
+
+const PHONE_COUNTRIES: Record<PhoneCountry, { flag: string; dial: string; placeholder: string; hint: string; minDigits: number }> = {
+  NG: { flag: "🇳🇬", dial: "+234", placeholder: "801 234 5678",    hint: "Your Nigerian WhatsApp number",   minDigits: 10 },
+  US: { flag: "🇺🇸", dial: "+1",   placeholder: "(415) 555-1234", hint: "Your US WhatsApp number",         minDigits: 10 },
+};
 
 type FormData = {
   businessName:   string;
@@ -55,6 +62,8 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [otp, setOtp]                 = useState(["", "", "", "", "", ""]);
   const [done, setDone]               = useState(false);
+  const [phoneCountry, setPhoneCountry] = useState<PhoneCountry>("NG");
+  const [countryOpen,  setCountryOpen]  = useState(false);
 
   useEffect(() => {
     if (resendCooldown <= 0) return;
@@ -77,12 +86,20 @@ export default function RegisterPage() {
     setError(null);
   }
 
+  const country = PHONE_COUNTRIES[phoneCountry];
+
+  // Build full E.164 phone: dial code + stripped digits
+  const fullPhone = (): string => {
+    const digits = form.phone.replace(/\D/g, "");
+    return `${country.dial}${digits}`;
+  };
+
   const canAdvance = () => {
     if (step === 1) return form.businessName.length > 1 && !!form.vendorType && form.campusLocation.length > 2;
     if (step === 2) return form.university.length > 1;
     if (step === 3) return (
       form.ownerName.length > 2 &&
-      form.phone.length >= 10 &&
+      form.phone.replace(/\D/g, "").length >= country.minDigits &&
       form.email.includes("@") &&
       form.password.length >= 8
     );
@@ -96,7 +113,7 @@ export default function RegisterPage() {
     campusLocation: form.campusLocation,
     university:     form.university,
     ownerName:      form.ownerName,
-    phone:          form.phone,
+    phone:          fullPhone(),   // always sent as +dialcode + digits
     email:          form.email,
     password:       form.password,
   });
@@ -420,21 +437,67 @@ export default function RegisterPage() {
                     />
                   </Field>
 
-                  <Field label="WhatsApp phone number" required hint="Used for the WhatsApp bot — must be your active WhatsApp number.">
-                    <div className="flex">
-                      <div className="flex items-center gap-2 px-3.5 bg-white border-y border-l border-border rounded-l-[10px] border-r-0 flex-shrink-0">
-                        <span className="text-base leading-none select-none">🇳🇬</span>
-                        <span className="text-sm text-vodium-black/70 font-medium">+234</span>
+                  <Field label="WhatsApp phone number" required hint={country.hint}>
+                    <div className="relative">
+                      <div className="flex">
+                        {/* Country selector */}
+                        <div className="relative flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setCountryOpen((v) => !v)}
+                            className="flex items-center gap-1.5 px-3 h-full bg-white border-y border-l border-border rounded-l-[10px] border-r-0 hover:bg-vodium-gold/5 transition-colors min-w-[88px]"
+                          >
+                            <span className="text-base leading-none select-none">{country.flag}</span>
+                            <span className="text-sm text-vodium-black/70 font-semibold">{country.dial}</span>
+                            <ChevronDown size={12} className={`text-vodium-black/35 transition-transform ${countryOpen ? "rotate-180" : ""}`} />
+                          </button>
+
+                          {/* Dropdown */}
+                          {countryOpen && (
+                            <div className="absolute top-full left-0 mt-1 z-20 w-48 bg-white border border-border rounded-xl shadow-lg overflow-hidden">
+                              {(Object.entries(PHONE_COUNTRIES) as [PhoneCountry, typeof country][]).map(([code, c]) => (
+                                <button
+                                  key={code}
+                                  type="button"
+                                  onClick={() => { setPhoneCountry(code); setCountryOpen(false); update("phone", ""); }}
+                                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors ${
+                                    phoneCountry === code
+                                      ? "bg-vodium-gold/10 text-vodium-black font-semibold"
+                                      : "hover:bg-vodium-gold/5 text-vodium-black/70"
+                                  }`}
+                                >
+                                  <span className="text-lg leading-none">{c.flag}</span>
+                                  <div className="text-left">
+                                    <p className="font-medium text-xs">{code === "NG" ? "Nigeria" : "United States"}</p>
+                                    <p className="text-[10px] text-muted-foreground">{c.dial}</p>
+                                  </div>
+                                  {phoneCountry === code && <span className="ml-auto text-vodium-gold text-xs">✓</span>}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Number input */}
+                        <input
+                          type="tel"
+                          inputMode="tel"
+                          placeholder={country.placeholder}
+                          value={form.phone}
+                          onChange={(e) => { update("phone", e.target.value); setCountryOpen(false); }}
+                          className="input-premium rounded-l-none border-l-0 focus:z-10 flex-1"
+                          style={{ borderRadius: "0 10px 10px 0" }}
+                        />
                       </div>
-                      <input
-                        type="tel"
-                        inputMode="tel"
-                        placeholder="801 234 5678"
-                        value={form.phone}
-                        onChange={(e) => update("phone", e.target.value)}
-                        className="input-premium rounded-l-none border-l-0 focus:z-10"
-                        style={{ borderRadius: "0 10px 10px 0" }}
-                      />
+
+                      {/* Preview of stored number */}
+                      {form.phone.replace(/\D/g, "").length >= country.minDigits && (
+                        <p className="text-[11px] text-vodium-black/40 mt-1.5 flex items-center gap-1">
+                          <Phone size={10} />
+                          Will be stored as{" "}
+                          <span className="font-mono font-medium text-vodium-black/60">{fullPhone()}</span>
+                        </p>
+                      )}
                     </div>
                   </Field>
 
