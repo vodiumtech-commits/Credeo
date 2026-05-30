@@ -3,10 +3,11 @@
  *
  * SECURITY MODEL
  * ──────────────
- * Vendor session:  cookie "vodium_sid"  = base64url(phone) + "." + HMAC-SHA256(secret, "v1:vendor:" + payload)
- * Admin session:   cookie "vodium_asid" = base36(issuedAt)  + "." + HMAC-SHA256(secret, "v1:admin:"  + iat36)
+ * Vendor session:  cookie "vodium_sid"  = base64url(phone) + "." + HMAC(secret, "v1:vendor:" + payload)
+ * Admin session:   cookie "vodium_asid" = base64url(JSON({id,role,iat})) + "." + HMAC(secret, "v2:admin:" + payload)
  *
- * An attacker who knows any phone number cannot forge a valid token without SESSION_SECRET.
+ * Admin token carries the role so middleware can enforce per-route permissions without a DB lookup.
+ * Super-admin password login uses id="__super__", role="SUPER_ADMIN".
  * All comparisons are constant-time to prevent timing-oracle attacks.
  */
 
@@ -19,6 +20,14 @@ import { VENDOR_COOKIE, ADMIN_COOKIE, VENDOR_COOKIE_AGE, ADMIN_COOKIE_AGE } from
 
 export type VendorWithSub = Vendor & { subscription: VendorSubscription | null };
 
+export type AdminRole = "SUPER_ADMIN" | "CFO" | "CUSTOMER_CARE" | "ANALYTICS";
+
+export interface AdminTokenPayload {
+  id:   string;   // DB AdminUser.id, or "__super__" for ADMIN_SECRET login
+  role: AdminRole;
+  iat:  number;
+}
+
 // ── Secret ───────────────────────────────────────────────────────────────────
 
 function getSecret(): string {
@@ -27,7 +36,6 @@ function getSecret(): string {
     if (process.env.NODE_ENV === "production") {
       throw new Error("[session] SESSION_SECRET env var is required in production");
     }
-    // Dev fallback — warn loudly
     console.warn("[session] ⚠ SESSION_SECRET not set — using insecure dev default");
     return "dev-only-secret-change-me-before-production";
   }
@@ -40,34 +48,23 @@ function hmac(secret: string, input: string): string {
   return crypto.createHmac("sha256", secret).update(input, "utf8").digest("base64url");
 }
 
-/** Constant-time string comparison to prevent timing-oracle attacks. */
 function safeEqual(a: string, b: string): boolean {
-  // Pad shorter string to prevent length-leak
   const maxLen = Math.max(a.length, b.length);
   const aBuf = Buffer.alloc(maxLen, 0);
   const bBuf = Buffer.alloc(maxLen, 0);
   aBuf.write(a, "utf8");
   bBuf.write(b, "utf8");
-  // timingSafeEqual requires equal-length buffers
   return crypto.timingSafeEqual(aBuf, bBuf) && a.length === b.length;
 }
 
 // ══ VENDOR SESSION ═══════════════════════════════════════════════════════════
 
-/**
- * Build a tamper-proof vendor session token.
- * Format: base64url(phone) + "." + HMAC-SHA256(secret, "v1:vendor:" + base64url(phone))
- */
 export function buildSessionToken(phone: string): string {
   const payload = Buffer.from(phone, "utf8").toString("base64url");
   const sig = hmac(getSecret(), `v1:vendor:${payload}`);
   return `${payload}.${sig}`;
 }
 
-/**
- * Verify a vendor session token.
- * Returns the E.164 phone on success, or null if the token is invalid or tampered.
- */
 export function verifySessionToken(token: string): string | null {
   try {
     const dot = token.lastIndexOf(".");
@@ -77,7 +74,6 @@ export function verifySessionToken(token: string): string | null {
     const expected = hmac(getSecret(), `v1:vendor:${payload}`);
     if (!safeEqual(incoming, expected)) return null;
     const phone = Buffer.from(payload, "base64url").toString("utf8");
-    // Basic sanity check — must look like an E.164 phone
     if (!/^\+\d{7,15}$/.test(phone)) return null;
     return phone;
   } catch {
@@ -85,7 +81,6 @@ export function verifySessionToken(token: string): string | null {
   }
 }
 
-/** Set the vendor session cookie after successful authentication. */
 export function setVendorSession(phone: string): void {
   cookies().set(VENDOR_COOKIE, buildSessionToken(phone), {
     httpOnly: true,
@@ -96,7 +91,6 @@ export function setVendorSession(phone: string): void {
   });
 }
 
-/** Expire the vendor session cookie. */
 export function clearVendorSession(): void {
   cookies().set(VENDOR_COOKIE, "", {
     httpOnly: true,
@@ -107,14 +101,12 @@ export function clearVendorSession(): void {
   });
 }
 
-/** Returns the verified E.164 phone from the session cookie, or null. */
 export function getSessionPhone(): string | null {
   const raw = cookies().get(VENDOR_COOKIE)?.value;
   if (!raw) return null;
   return verifySessionToken(raw);
 }
 
-/** Returns full Vendor + subscription from session, or null if unauthenticated. */
 export async function getVendorSession(): Promise<VendorWithSub | null> {
   const phone = getSessionPhone();
   if (!phone) return null;
@@ -124,45 +116,47 @@ export async function getVendorSession(): Promise<VendorWithSub | null> {
   });
 }
 
-// ══ ADMIN SESSION ═════════════════════════════════════════════════════════════
+// ══ ADMIN SESSION (v2 — role-aware) ══════════════════════════════════════════
 
 /**
- * Build a time-scoped admin session token (valid 8 hours).
- * Format: base36(Date.now()) + "." + HMAC-SHA256(secret, "v1:admin:" + iat36)
+ * Build a signed admin token carrying id + role.
+ * Format: base64url(JSON({id,role,iat})) + "." + HMAC(secret, "v2:admin:" + payload)
  */
-export function buildAdminToken(): string {
-  const iat36 = Date.now().toString(36);
-  const sig   = hmac(getSecret(), `v1:admin:${iat36}`);
-  return `${iat36}.${sig}`;
+export function buildAdminToken(id: string, role: AdminRole): string {
+  const payload = Buffer.from(
+    JSON.stringify({ id, role, iat: Date.now() })
+  ).toString("base64url");
+  const sig = hmac(getSecret(), `v2:admin:${payload}`);
+  return `${payload}.${sig}`;
 }
 
 /**
- * Verify an admin session token.
- * Returns true if the signature is valid and the token was issued within the last 8 hours.
+ * Verify an admin token.
+ * Returns the decoded payload on success (valid sig + within 8 hours), or null.
  */
-export function verifyAdminToken(token: string): boolean {
+export function verifyAdminToken(token: string): AdminTokenPayload | null {
   try {
     const dot = token.lastIndexOf(".");
-    if (dot === -1) return false;
-    const iat36    = token.slice(0, dot);
+    if (dot === -1) return null;
+    const payload  = token.slice(0, dot);
     const incoming = token.slice(dot + 1);
-    const expected = hmac(getSecret(), `v1:admin:${iat36}`);
-    if (!safeEqual(incoming, expected)) return false;
-    const iat = parseInt(iat36, 36);
-    if (isNaN(iat)) return false;
-    // Reject tokens older than 8 hours
-    return Date.now() - iat < ADMIN_COOKIE_AGE * 1000;
+    const expected = hmac(getSecret(), `v2:admin:${payload}`);
+    if (!safeEqual(incoming, expected)) return null;
+    const data = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as AdminTokenPayload;
+    if (!data.id || !data.role || !data.iat) return null;
+    if (Date.now() - data.iat > ADMIN_COOKIE_AGE * 1000) return null;
+    return data;
   } catch {
-    return false;
+    return null;
   }
 }
 
 /** Set the admin session cookie after a successful admin login. */
-export function setAdminSession(): void {
-  cookies().set(ADMIN_COOKIE, buildAdminToken(), {
+export function setAdminSession(id: string = "__super__", role: AdminRole = "SUPER_ADMIN"): void {
+  cookies().set(ADMIN_COOKIE, buildAdminToken(id, role), {
     httpOnly: true,
     secure:   process.env.NODE_ENV === "production",
-    sameSite: "strict",  // stricter for admin
+    sameSite: "strict",
     maxAge:   ADMIN_COOKIE_AGE,
     path:     "/",
   });
@@ -179,9 +173,14 @@ export function clearAdminSession(): void {
   });
 }
 
-/** Validate the admin session. Use in Server Components and Route Handlers. */
-export function isAdminSession(): boolean {
+/** Returns the decoded admin payload from cookie, or null. */
+export function getAdminSession(): AdminTokenPayload | null {
   const token = cookies().get(ADMIN_COOKIE)?.value;
-  if (!token) return false;
+  if (!token) return null;
   return verifyAdminToken(token);
+}
+
+/** Returns true if the current request has a valid admin session. */
+export function isAdminSession(): boolean {
+  return getAdminSession() !== null;
 }

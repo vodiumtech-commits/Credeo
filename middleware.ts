@@ -3,45 +3,37 @@
  *
  * SECURITY
  * ────────
- * • Vendor sessions: verifies HMAC-SHA256 signature of vodium_sid cookie
- * • Admin sessions:  verifies HMAC-SHA256 signature + 8-hour TTL of vodium_asid cookie
- * • All responses:   injects hardened security headers
+ * • Vendor sessions: HMAC-SHA256 signed vodium_sid cookie
+ * • Admin sessions:  HMAC-SHA256 signed vodium_asid cookie carrying {id, role, iat}
+ * • Role-based routing: each /admin/* route checks the role in the token
+ * • All responses: hardened security headers
  *
- * This runs in the Edge runtime — uses Web Crypto (crypto.subtle), not Node crypto.
+ * Edge runtime — uses Web Crypto (crypto.subtle), NOT Node crypto.
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { VENDOR_COOKIE, ADMIN_COOKIE, ADMIN_COOKIE_AGE } from "@/lib/session-cookies";
+import { VENDOR_COOKIE, ADMIN_COOKIE, ADMIN_COOKIE_AGE, ADMIN_ROUTE_ROLES } from "@/lib/session-cookies";
 
-// ── Web-Crypto HMAC verification (Edge-compatible) ───────────────────────────
+// ── Web-Crypto helpers ────────────────────────────────────────────────────────
 
 async function computeHmac(secret: string, input: string): Promise<string> {
-  const enc  = new TextEncoder();
-  const key  = await crypto.subtle.importKey(
-    "raw",
-    enc.encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
   );
-  const raw  = await crypto.subtle.sign("HMAC", key, enc.encode(input));
-  // Convert to base64url (same as Node's digest("base64url"))
+  const raw = await crypto.subtle.sign("HMAC", key, enc.encode(input));
   return btoa(String.fromCharCode(...new Uint8Array(raw)))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=/g, "");
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
 
-/** Constant-time string compare (Edge-compatible). */
 function timingSafeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let diff = 0;
-  for (let i = 0; i < a.length; i++) {
-    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return diff === 0;
 }
 
+// Verify vendor cookie (v1 format)
 async function isValidVendorCookie(token: string, secret: string): Promise<boolean> {
   try {
     const dot = token.lastIndexOf(".");
@@ -50,26 +42,25 @@ async function isValidVendorCookie(token: string, secret: string): Promise<boole
     const incoming = token.slice(dot + 1);
     const expected = await computeHmac(secret, `v1:vendor:${payload}`);
     return timingSafeEqual(incoming, expected);
-  } catch {
-    return false;
-  }
+  } catch { return false; }
 }
 
-async function isValidAdminCookie(token: string, secret: string): Promise<boolean> {
+interface AdminPayload { id: string; role: string; iat: number; }
+
+// Verify admin cookie (v2 format) and return payload, or null if invalid/expired
+async function getAdminPayload(token: string, secret: string): Promise<AdminPayload | null> {
   try {
     const dot = token.lastIndexOf(".");
-    if (dot === -1) return false;
-    const iat36    = token.slice(0, dot);
+    if (dot === -1) return null;
+    const payload  = token.slice(0, dot);
     const incoming = token.slice(dot + 1);
-    const expected = await computeHmac(secret, `v1:admin:${iat36}`);
-    if (!timingSafeEqual(incoming, expected)) return false;
-    // Check TTL
-    const iat = parseInt(iat36, 36);
-    if (isNaN(iat)) return false;
-    return Date.now() - iat < ADMIN_COOKIE_AGE * 1000;
-  } catch {
-    return false;
-  }
+    const expected = await computeHmac(secret, `v2:admin:${payload}`);
+    if (!timingSafeEqual(incoming, expected)) return null;
+    const data = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/"))) as AdminPayload;
+    if (!data.id || !data.role || !data.iat) return null;
+    if (Date.now() - data.iat > ADMIN_COOKIE_AGE * 1000) return null;
+    return data;
+  } catch { return null; }
 }
 
 // ── Security headers ──────────────────────────────────────────────────────────
@@ -99,55 +90,62 @@ function addSecurityHeaders(res: NextResponse): NextResponse {
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  const secret = process.env.SESSION_SECRET ?? "dev-only-secret-change-me-before-production";
 
-  const secret =
-    process.env.SESSION_SECRET ?? "dev-only-secret-change-me-before-production";
-
-  // ── Dashboard routes — require vendor session ────────────────────────────
+  // ── Vendor dashboard ────────────────────────────────────────────────────────
   if (pathname.startsWith("/dashboard")) {
     const token = req.cookies.get(VENDOR_COOKIE)?.value;
-
     if (!token || !(await isValidVendorCookie(token, secret))) {
       const url = req.nextUrl.clone();
       url.pathname = "/login";
       url.searchParams.set("next", pathname);
       const res = NextResponse.redirect(url);
-      // Clear any stale/forged cookie
-      if (token) {
-        res.cookies.set(VENDOR_COOKIE, "", { maxAge: 0, path: "/" });
-      }
+      if (token) res.cookies.set(VENDOR_COOKIE, "", { maxAge: 0, path: "/" });
       return addSecurityHeaders(res);
     }
   }
 
-  // ── Admin routes — require admin session (strict HMAC + TTL) ────────────
-  if (pathname.startsWith("/admin") && pathname !== "/admin/login") {
-    const token = req.cookies.get(ADMIN_COOKIE)?.value;
+  // ── Admin pages + API — skip login and invite pages ────────────────────────
+  const isAdminPath    = pathname.startsWith("/admin") || pathname.startsWith("/api/admin");
+  const isPublicAdmin  = pathname === "/admin/login" || pathname.startsWith("/admin/invite/");
 
-    if (!token || !(await isValidAdminCookie(token, secret))) {
+  if (isAdminPath && !isPublicAdmin) {
+    const token   = req.cookies.get(ADMIN_COOKIE)?.value;
+    const payload = token ? await getAdminPayload(token, secret) : null;
+
+    // Not authenticated → redirect to login
+    if (!payload) {
+      if (pathname.startsWith("/api/")) {
+        return addSecurityHeaders(NextResponse.json({ error: "Forbidden" }, { status: 403 }));
+      }
       const url = req.nextUrl.clone();
       url.pathname = "/admin/login";
       const res = NextResponse.redirect(url);
-      if (token) {
-        res.cookies.set(ADMIN_COOKIE, "", { maxAge: 0, path: "/" });
-      }
+      if (token) res.cookies.set(ADMIN_COOKIE, "", { maxAge: 0, path: "/" });
       return addSecurityHeaders(res);
     }
-  }
 
-  // ── API route hardening ──────────────────────────────────────────────────
-  // Block direct access to admin API routes without a verified admin session
-  if (pathname.startsWith("/api/admin/")) {
-    const token = req.cookies.get(ADMIN_COOKIE)?.value;
-    if (!token || !(await isValidAdminCookie(token, secret))) {
-      return addSecurityHeaders(
-        NextResponse.json({ error: "Forbidden" }, { status: 403 })
-      );
+    // Authenticated — check role for the specific route
+    const rule = ADMIN_ROUTE_ROLES.find((r) => pathname.startsWith(r.prefix));
+    if (rule && !rule.roles.includes(payload.role)) {
+      // Wrong role — redirect to their home or 403
+      if (pathname.startsWith("/api/")) {
+        return addSecurityHeaders(NextResponse.json({ error: "Forbidden" }, { status: 403 }));
+      }
+      // Redirect to the first allowed route for their role
+      const roleHome: Record<string, string> = {
+        CFO:           "/admin/finance",
+        CUSTOMER_CARE: "/admin/support",
+        ANALYTICS:     "/admin/analytics",
+        SUPER_ADMIN:   "/admin",
+      };
+      const url = req.nextUrl.clone();
+      url.pathname = roleHome[payload.role] ?? "/admin";
+      return addSecurityHeaders(NextResponse.redirect(url));
     }
   }
 
-  const res = NextResponse.next();
-  return addSecurityHeaders(res);
+  return addSecurityHeaders(NextResponse.next());
 }
 
 export const config = {
@@ -155,7 +153,6 @@ export const config = {
     "/dashboard/:path*",
     "/admin/:path*",
     "/api/admin/:path*",
-    // Exclude static assets and _next internals from middleware
     "/((?!_next/static|_next/image|favicon.ico|public/).*)",
   ],
 };

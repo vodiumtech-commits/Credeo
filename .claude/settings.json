@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p /home/oyinlola007/Credeo/src/app/api/admin/me /home/oyinlola007/Credeo/src/app/api/admin/team /home/oyinlola007/Credeo/src/app/api/admin/invite/\\\\[token\\\\])"
+    ],
+    "additionalDirectories": [
+      "/home/oyinlola007/Credeo/src/app/api/admin/invite/[token]"
+    ]
+  }
+}

@@ -255,6 +255,35 @@ enum WhatsAppState {
 }
 
 // ─────────────────────────────────────────────
+// ADMIN TEAM
+// ─────────────────────────────────────────────
+
+enum AdminRole {
+  SUPER_ADMIN
+  CFO
+  CUSTOMER_CARE
+  ANALYTICS
+}
+
+model AdminUser {
+  id             String    @id @default(cuid())
+  name           String
+  email          String    @unique
+  role           AdminRole
+  passwordHash   String?
+  inviteToken    String?   @unique
+  tokenExpiresAt DateTime?
+  activatedAt    DateTime?
+  lastLoginAt    DateTime?
+  invitedById    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([email])
+  @@index([inviteToken])
+}
+
+// ─────────────────────────────────────────────
 // AUDIT LOG
 // ─────────────────────────────────────────────
 
