@@ -56,7 +56,10 @@ async function getAdminPayload(token: string, secret: string): Promise<AdminPayl
     const incoming = token.slice(dot + 1);
     const expected = await computeHmac(secret, `v2:admin:${payload}`);
     if (!timingSafeEqual(incoming, expected)) return null;
-    const data = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/"))) as AdminPayload;
+    // base64url → standard base64 with padding (atob requires padding in strict runtimes)
+    const b64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = b64 + "==".slice(0, (4 - b64.length % 4) % 4);
+    const data = JSON.parse(atob(padded)) as AdminPayload;
     if (!data.id || !data.role || !data.iat) return null;
     if (Date.now() - data.iat > ADMIN_COOKIE_AGE * 1000) return null;
     return data;

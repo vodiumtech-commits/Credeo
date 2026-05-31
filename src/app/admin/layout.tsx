@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { getAdminSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { AdminShell } from "@/components/ui/admin-shell";
@@ -6,10 +5,12 @@ import { AdminShell } from "@/components/ui/admin-shell";
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = getAdminSession();
 
-  // Not authenticated — middleware should have caught this, but belt-and-suspenders
-  if (!session) redirect("/admin/login");
+  // No session → render the page as-is (login, invite pages).
+  // The middleware already redirects unauthenticated users away from protected
+  // routes, so we only reach here for /admin/login and /admin/invite/* without
+  // a session. Redirecting here too creates an infinite loop.
+  if (!session) return <>{children}</>;
 
-  // Resolve admin info without an extra HTTP round-trip
   let name  = "Super Admin";
   let email: string | null = null;
 
@@ -19,7 +20,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       select: { name: true, email: true },
     }).catch(() => null);
 
-    if (!admin) redirect("/admin/login");
+    // Stale / deleted account — return plain children so middleware can redirect
+    if (!admin) return <>{children}</>;
+
     name  = admin.name;
     email = admin.email;
   }
