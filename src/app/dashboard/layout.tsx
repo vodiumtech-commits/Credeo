@@ -8,6 +8,7 @@ import {
   MessageCircle, Menu, X, Plus, Bell, Store, ChevronRight,
 } from "lucide-react";
 import { NpsWidget } from "@/components/ui/nps-widget";
+import { NavProgress } from "@/components/ui/nav-progress";
 
 type VendorInfo = {
   businessName: string;
@@ -229,6 +230,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <main className="flex-1 overflow-auto">{children}</main>
       </div>
       <NpsWidget />
+      <NavProgress />
     </div>
   );
 }

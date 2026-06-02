@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { NavProgress } from "@/components/ui/nav-progress";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
@@ -220,6 +221,7 @@ export function AdminShell({ name, email: _email, role, children }: Props) {
 
         <main className="flex-1 text-vodium-cream">{children}</main>
       </div>
+      <NavProgress />
     </div>
   );
 }
