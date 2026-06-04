@@ -1,66 +1,49 @@
 /**
- * Vodium Ledger — SendPulse WhatsApp outbound messaging.
+ * Vodium Ledger — Meta Cloud API outbound messaging.
  *
- * SendPulse uses OAuth 2.0 (client_credentials). The access token is cached
- * in module scope so one cold-start = one token fetch per Vercel instance.
+ * Sends WhatsApp messages via Meta's Graph API (free tier: 1,000 conversations/month).
+ * Falls back to console.log in dev when WHATSAPP_ACCESS_TOKEN is not set.
+ *
+ * Required env vars:
+ *   WHATSAPP_ACCESS_TOKEN    — permanent token from Meta Business Suite
+ *   WHATSAPP_PHONE_NUMBER_ID — phone number ID shown in the Meta WhatsApp dashboard
  */
 
-// ─── token cache ──────────────────────────────────────────────────────────────
-
-let _token: string | null = null;
-let _tokenExpiresAt = 0;
-
-async function getAccessToken(): Promise<string> {
-  if (_token && Date.now() < _tokenExpiresAt) return _token;
-
-  const res = await fetch("https://api.sendpulse.com/oauth/access_token", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      grant_type:    "client_credentials",
-      client_id:     process.env.SENDPULSE_API_USER_ID,
-      client_secret: process.env.SENDPULSE_API_SECRET,
-    }),
-  });
-
-  if (!res.ok) throw new Error(`SendPulse token error: ${res.status}`);
-
-  const data = (await res.json()) as { access_token: string; expires_in: number };
-  _token          = data.access_token;
-  _tokenExpiresAt = Date.now() + (data.expires_in - 60) * 1000; // expire 1 min early
-  return _token;
-}
-
-// ─── public helper ────────────────────────────────────────────────────────────
+const META_API_VERSION = "v19.0";
 
 export async function sendWhatsAppMessage(to: string, body: string): Promise<void> {
-  const userId = process.env.SENDPULSE_API_USER_ID;
-  const secret = process.env.SENDPULSE_API_SECRET;
-  const botId  = process.env.SENDPULSE_WHATSAPP_BOT_ID;
+  const token   = process.env.WHATSAPP_ACCESS_TOKEN;
+  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
 
-  if (!userId || !secret || !botId) {
-    // Dev fallback — log to terminal instead of crashing.
+  if (!token || !phoneId) {
+    // Dev fallback — print to terminal instead of crashing.
     console.log(`\n[WhatsApp → ${to}]\n${body}\n`);
     return;
   }
 
-  const token = await getAccessToken();
+  // Normalise: Meta expects E.164 without the leading "+"
+  const recipient = to.replace(/^\+/, "").replace(/^whatsapp:/, "");
 
-  const res = await fetch("https://api.sendpulse.com/whatsapp/contacts/sendByPhone", {
-    method:  "POST",
-    headers: {
-      "Content-Type":  "application/json",
-      "Authorization": `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      phone:   to,
-      bot_id:  botId,
-      message: { type: "text", text: body },
-    }),
-  });
+  const res = await fetch(
+    `https://graph.facebook.com/${META_API_VERSION}/${phoneId}/messages`,
+    {
+      method:  "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type":  "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to:   recipient,
+        type: "text",
+        text: { body, preview_url: false },
+      }),
+    }
+  );
 
   if (!res.ok) {
     const err = await res.text();
-    console.error(`[WhatsApp outbound] SendPulse error ${res.status}: ${err}`);
+    console.error(`[WhatsApp outbound] Meta API error ${res.status}: ${err}`);
+    throw new Error(`WhatsApp send failed: ${res.status}`);
   }
 }

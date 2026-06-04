@@ -1,16 +1,14 @@
 /**
- * SendPulse WhatsApp webhook — POST /api/whatsapp
+ * Vodium Ledger — Meta Cloud API WhatsApp webhook
  *
- * SendPulse sends JSON payloads (not form-encoded like Twilio).
- * We return { ok: true } immediately and send the reply via SendPulse API.
+ * GET  /api/whatsapp  — webhook verification (Meta hub challenge)
+ * POST /api/whatsapp  — incoming message events
  *
- * Payload shape SendPulse delivers:
- * {
- *   event_name: "incoming message",
- *   bot:     { id: "bot_id", channel_type: "whatsapp" },
- *   contact: { id: "...", phone: "+2348012345678", name: "John" },
- *   message: { id: "...", type: "text", data: { text: "ADD" } }
- * }
+ * Required env vars:
+ *   WHATSAPP_VERIFY_TOKEN  — the string you set in Meta's Webhook configuration
+ *   WHATSAPP_APP_SECRET    — your Meta App Secret (for HMAC signature check)
+ *   WHATSAPP_ACCESS_TOKEN  — permanent access token (used by outbound.ts)
+ *   WHATSAPP_PHONE_NUMBER_ID — phone number ID from Meta dashboard
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -28,70 +26,108 @@ import {
 
 export const runtime = "nodejs";
 
-// ─── SendPulse webhook payload type ──────────────────────────────────────────
+// ── Meta webhook payload types ────────────────────────────────────────────────
 
-interface SendPulseWebhook {
-  event_name?: string;
-  bot?:        { id: string; channel_type: string };
-  contact?:    { id: string; phone: string; name?: string };
-  message?:    { id: string; type: string; data?: { text?: string } };
+interface MetaTextMessage {
+  from:      string;   // E.164 without "+"
+  id:        string;
+  timestamp: string;
+  type:      "text" | string;
+  text?:     { body: string };
 }
 
-// ─── webhook ──────────────────────────────────────────────────────────────────
+interface MetaWebhook {
+  object: string;
+  entry:  Array<{
+    id:      string;
+    changes: Array<{
+      field: string;
+      value: {
+        messaging_product: string;
+        metadata: { display_phone_number: string; phone_number_id: string };
+        contacts?: Array<{ profile: { name: string }; wa_id: string }>;
+        messages?: MetaTextMessage[];
+        statuses?: unknown[];
+      };
+    }>;
+  }>;
+}
+
+// ── GET — webhook verification ────────────────────────────────────────────────
+
+export async function GET(req: NextRequest) {
+  const { searchParams } = req.nextUrl;
+  const mode      = searchParams.get("hub.mode");
+  const token     = searchParams.get("hub.verify_token");
+  const challenge = searchParams.get("hub.challenge");
+
+  const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN;
+
+  if (mode === "subscribe" && token === verifyToken) {
+    // Return the challenge as plain text — Meta requires this exact response.
+    return new NextResponse(challenge ?? "", { status: 200, headers: { "Content-Type": "text/plain" } });
+  }
+
+  return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+}
+
+// ── POST — incoming messages ───────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-  // 1. Parse JSON body.
-  let payload: SendPulseWebhook;
+  // 1. Read raw body for HMAC verification.
+  const rawBody = await req.text();
+
+  // 2. Verify Meta's HMAC-SHA256 signature — FAIL CLOSED in production.
+  const appSecret = process.env.WHATSAPP_APP_SECRET;
+  if (!appSecret && process.env.NODE_ENV === "production") {
+    console.error("[whatsapp] WHATSAPP_APP_SECRET not set — rejecting all webhook traffic");
+    return NextResponse.json({ error: "Webhook not configured" }, { status: 503 });
+  }
+  if (appSecret) {
+    const sigHeader = req.headers.get("x-hub-signature-256") ?? "";
+    const expected  = "sha256=" + crypto.createHmac("sha256", appSecret).update(rawBody).digest("hex");
+    const sigA = Buffer.from(sigHeader.padEnd(expected.length));
+    const sigB = Buffer.from(expected.padEnd(sigHeader.length));
+    if (sigA.length !== sigB.length || !crypto.timingSafeEqual(sigA, sigB)) {
+      return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
+    }
+  }
+
+  // 3. Parse payload.
+  let payload: MetaWebhook;
   try {
-    payload = (await req.json()) as SendPulseWebhook;
+    payload = JSON.parse(rawBody) as MetaWebhook;
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  // 2. Verify webhook secret — FAIL CLOSED.
-  // If SENDPULSE_WEBHOOK_SECRET is not configured, all requests are rejected in production.
-  const webhookSecret = process.env.SENDPULSE_WEBHOOK_SECRET;
-  if (!webhookSecret && process.env.NODE_ENV === "production") {
-    console.error("[whatsapp] SENDPULSE_WEBHOOK_SECRET not set — rejecting all webhook traffic");
-    return NextResponse.json({ error: "Webhook not configured" }, { status: 503 });
-  }
-  if (webhookSecret) {
-    const incoming = req.headers.get("x-secret-token") ?? "";
-    // Constant-time compare to prevent timing oracle on the secret
-    const enc = new TextEncoder();
-    const a = enc.encode(incoming.padEnd(webhookSecret.length, "\0"));
-    const b = enc.encode(webhookSecret.padEnd(incoming.length, "\0"));
-    // Use Web Crypto for constant-time compare in edge-compatible way
-    let diff = 0;
-    for (let i = 0; i < Math.max(a.length, b.length); i++) {
-      diff |= (a[i] ?? 0) ^ (b[i] ?? 0);
-    }
-    if (diff !== 0 || incoming.length !== webhookSecret.length) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-  }
+  // 4. Extract message — Meta sends nested structure.
+  const change  = payload.entry?.[0]?.changes?.[0];
+  const value   = change?.value;
+  const message = value?.messages?.[0];
 
-  // 3. Only handle text messages — silently ack everything else.
-  const fromPhone   = payload.contact?.phone;
-  const messageText = payload.message?.data?.text?.trim();
-
-  if (!fromPhone || !messageText || payload.message?.type !== "text") {
+  // Silently ack status updates, delivery receipts, etc.
+  if (!message || message.type !== "text" || !message.text?.body) {
     return NextResponse.json({ ok: true });
   }
 
-  // 4. Load or create session (stored with E.164 phone, no prefix needed).
+  // Meta sends phone without "+"; normalise to E.164.
+  const fromPhone   = `+${message.from}`;
+  const messageText = message.text.body.trim();
+
+  // 5. Load or create session.
   const session = await prisma.whatsAppSession.upsert({
     where:  { phone: fromPhone },
     update: { lastInteractionAt: new Date() },
     create: { phone: fromPhone, state: "IDLE", context: {} },
   });
 
-  // 5. Resolve vendor — by linked session first, then by phone.
+  // 6. Resolve vendor.
   const vendor = session.vendorId
     ? await prisma.vendor.findUnique({ where: { id: session.vendorId } })
     : await prisma.vendor.findUnique({ where: { phone: fromPhone } });
 
-  // 6. Run state machine.
+  // 7. Run state machine.
   const sessionCtx: SessionContext = {
     state:    session.state,
     context:  (session.context as Record<string, unknown>) ?? {},
@@ -100,33 +136,27 @@ export async function POST(req: NextRequest) {
 
   const result = step(sessionCtx, { body: messageText, fromPhone });
 
-  // 7. Persist updated session.
+  // 8. Persist updated session.
   await prisma.whatsAppSession.update({
     where: { phone: fromPhone },
     data: {
-      state:   result.nextState,
+      state:    result.nextState,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      context: { ...sessionCtx.context, ...(result.contextPatch ?? {}) } as any,
+      context:  { ...sessionCtx.context, ...(result.contextPatch ?? {}) } as any,
       vendorId: vendor?.id,
     },
   });
 
-  // 8. Run side effects — each can override the reply.
+  // 9. Side effects.
   let finalReply    = result.reply;
   let linkedVendorId = vendor?.id;
 
   if (result.sideEffects?.length) {
     for (const effect of result.sideEffects) {
-      const { replyOverride, newVendorId } = await runSideEffect(
-        effect,
-        fromPhone,
-        vendor?.id
-      );
-      if (replyOverride !== undefined) finalReply   = replyOverride;
+      const { replyOverride, newVendorId } = await runSideEffect(effect, fromPhone, vendor?.id);
+      if (replyOverride !== undefined) finalReply    = replyOverride;
       if (newVendorId)                 linkedVendorId = newVendorId;
     }
-
-    // Link newly-created vendor to this session.
     if (linkedVendorId && linkedVendorId !== vendor?.id) {
       await prisma.whatsAppSession.update({
         where: { phone: fromPhone },
@@ -135,18 +165,14 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 9. Send reply via SendPulse API (not TwiML — that's Twilio only).
+  // 10. Send reply via Meta Cloud API.
   await sendWhatsAppMessage(fromPhone, finalReply);
 
+  // Meta requires 200 OK acknowledgement within 20s.
   return NextResponse.json({ ok: true });
 }
 
-// SendPulse pings GET to verify the endpoint.
-export async function GET() {
-  return NextResponse.json({ ok: true, service: "vodium-ledger-whatsapp" });
-}
-
-// ─── side-effect executor ─────────────────────────────────────────────────────
+// ── side-effect executor ──────────────────────────────────────────────────────
 
 interface SideEffectResult {
   replyOverride?: string;
@@ -160,11 +186,9 @@ async function runSideEffect(
 ): Promise<SideEffectResult> {
   switch (effect.type) {
 
-    // ── CREATE_VENDOR ──────────────────────────────────────────────────────
     case "CREATE_VENDOR": {
       const { name, businessName, universityShortName, phone } = effect.data;
-
-      const normalPhone = phone.replace(/^whatsapp:/, "");
+      const normalPhone = phone.startsWith("+") ? phone : `+${phone}`;
       const existing    = await prisma.vendor.findUnique({ where: { phone: normalPhone } });
       if (existing) return { newVendorId: existing.id };
 
@@ -172,13 +196,7 @@ async function runSideEffect(
       const university = await prisma.university.upsert({
         where:  { name: uniMeta.name },
         update: {},
-        create: {
-          name:      uniMeta.name,          // always lowercase
-          shortName: uniMeta.shortName ?? null,
-          city:      uniMeta.city,
-          state:     uniMeta.state,
-          status:    "PILOT",
-        },
+        create: { name: uniMeta.name, shortName: uniMeta.shortName ?? null, city: uniMeta.city, state: uniMeta.state, status: "PILOT" },
       });
 
       const placeholderEmail = `${normalPhone.replace("+", "")}@wa.vodiumledger.com`;
@@ -187,157 +205,72 @@ async function runSideEffect(
 
       const newVendor = await prisma.vendor.create({
         data: {
-          ownerName:    name,
-          businessName,
-          phone:        normalPhone,
-          email:        placeholderEmail,
-          passwordHash: placeholderHash,
-          universityId: university.id,
-          vendorType:   "OTHER",
-          status:       "ACTIVE",
-          subscription: {
-            create: {
-              plan:          "STARTER",
-              status:        "TRIAL",
-              trialEndsAt,
-              monthlyAmount: 2000,
-            },
-          },
+          ownerName: name, businessName, phone: normalPhone,
+          email: placeholderEmail, passwordHash: placeholderHash,
+          universityId: university.id, vendorType: "OTHER", status: "ACTIVE",
+          subscription: { create: { plan: "STARTER", status: "TRIAL", trialEndsAt, monthlyAmount: 2000 } },
         },
       });
-
       return { newVendorId: newVendor.id };
     }
 
-    // ── CREATE_CREDIT ──────────────────────────────────────────────────────
     case "CREATE_CREDIT": {
       if (!vendorId) return {};
       const { studentName, matric, amount, dueInDays } = effect.data;
-
       const pendingPhone = `pending:${studentName.toLowerCase().replace(/\s+/g, "-")}`;
       const student = await prisma.student.upsert({
         where:  { phone: pendingPhone },
         update: {},
-        create: {
-          fullName:     studentName,
-          phone:        pendingPhone,
-          ...(matric && { matricNumber: matric }),
-        },
+        create: { fullName: studentName, phone: pendingPhone, ...(matric && { matricNumber: matric }) },
       });
-
       const dueDate = new Date(Date.now() + dueInDays * 86_400_000);
-      await prisma.credit.create({
-        data: { vendorId, studentId: student.id, amount, dueDate, status: "OUTSTANDING" },
-      });
-
-      await prisma.creditScoreEvent.create({
-        data: { studentId: student.id, vendorId, eventType: "CREDIT_EXTENDED", amount, scoreDelta: 0 },
-      });
-
+      await prisma.credit.create({ data: { vendorId, studentId: student.id, amount, dueDate, status: "OUTSTANDING" } });
+      await prisma.creditScoreEvent.create({ data: { studentId: student.id, vendorId, eventType: "CREDIT_EXTENDED", amount, scoreDelta: 0 } });
       return {};
     }
 
-    // ── FETCH_LIST ─────────────────────────────────────────────────────────
     case "FETCH_LIST": {
       const credits = await prisma.credit.findMany({
-        where:   {
-          vendorId: effect.data.vendorId,
-          status:   { in: ["OUTSTANDING", "DUE_SOON", "OVERDUE", "PARTIALLY_PAID"] },
-        },
+        where: { vendorId: effect.data.vendorId, status: { in: ["OUTSTANDING", "DUE_SOON", "OVERDUE", "PARTIALLY_PAID"] } },
         include: { student: true },
         orderBy: { dueDate: "asc" },
       });
-
       if (!credits.length) return { replyOverride: messages.listEmpty() };
-
-      const now     = Date.now();
-      const entries = credits.map((c) => ({
-        studentName:  c.student.fullName,
-        amount:       Number(c.amount),
-        daysUntilDue: Math.ceil((c.dueDate.getTime() - now) / 86_400_000),
-      }));
-
-      return { replyOverride: messages.listFull(entries) };
+      const now = Date.now();
+      return { replyOverride: messages.listFull(credits.map((c) => ({ studentName: c.student.fullName, amount: Number(c.amount), daysUntilDue: Math.ceil((c.dueDate.getTime() - now) / 86_400_000) }))) };
     }
 
-    // ── MARK_PAID ──────────────────────────────────────────────────────────
     case "MARK_PAID": {
       if (!vendorId) return { replyOverride: messages.noVendorAccount() };
       const { studentName } = effect.data;
-
       const words   = studentName.split(/\s+/).filter(Boolean);
       const credits = await prisma.credit.findMany({
-        where: {
-          vendorId,
-          status:  { in: ["OUTSTANDING", "DUE_SOON", "OVERDUE", "PARTIALLY_PAID"] },
-          student: {
-            OR: words.map((w) => ({
-              fullName: { contains: w, mode: "insensitive" as const },
-            })),
-          },
-        },
-        include: { student: true },
-        orderBy: { dueDate: "asc" },
-        take:    1,
+        where: { vendorId, status: { in: ["OUTSTANDING", "DUE_SOON", "OVERDUE", "PARTIALLY_PAID"] }, student: { OR: words.map((w) => ({ fullName: { contains: w, mode: "insensitive" as const } })) } },
+        include: { student: true }, orderBy: { dueDate: "asc" }, take: 1,
       });
-
       if (!credits.length) return { replyOverride: messages.paidNotFound(studentName) };
-
       const credit  = credits[0];
       const amount  = Number(credit.amount);
       const student = credit.student;
       const now     = new Date();
-
       const paidOnTime = now <= credit.dueDate;
       const scoreDelta = paidOnTime ? 25 : -15;
       const eventType  = paidOnTime ? "PAID_ON_TIME" : "PAID_LATE" as const;
-
-      await prisma.credit.update({
-        where: { id: credit.id },
-        data:  { status: "PAID", amountRepaid: amount, closedAt: now },
-      });
-
-      await prisma.repayment.create({
-        data: { creditId: credit.id, amount, method: "CASH", receivedAt: now, recordedBy: vendorId },
-      });
-
-      await prisma.creditScoreEvent.create({
-        data: { studentId: student.id, vendorId, creditId: credit.id, eventType, amount, scoreDelta },
-      });
-
-      // Clamp score to [0, 1000] — never let raw increment push it out of range.
-      const currentScore = student.vodiumScore ?? 500;
-      const newScore = Math.min(1000, Math.max(0, currentScore + scoreDelta));
-      await prisma.student.update({
-        where: { id: student.id },
-        data:  { vodiumScore: newScore, scoreUpdatedAt: now },
-      });
-
+      await prisma.credit.update({ where: { id: credit.id }, data: { status: "PAID", amountRepaid: amount, closedAt: now } });
+      await prisma.repayment.create({ data: { creditId: credit.id, amount, method: "CASH", receivedAt: now, recordedBy: vendorId } });
+      await prisma.creditScoreEvent.create({ data: { studentId: student.id, vendorId, creditId: credit.id, eventType, amount, scoreDelta } });
+      const newScore = Math.min(1000, Math.max(0, (student.vodiumScore ?? 500) + scoreDelta));
+      await prisma.student.update({ where: { id: student.id }, data: { vodiumScore: newScore, scoreUpdatedAt: now } });
       return { replyOverride: messages.paidConfirmed(student.fullName, amount) };
     }
 
-    // ── FETCH_SCORE ────────────────────────────────────────────────────────
     case "FETCH_SCORE": {
       const { studentQuery } = effect.data;
       const words = studentQuery.split(/\s+/).filter(Boolean);
-
-      const byMatric = await prisma.student.findFirst({
-        where:   { matricNumber: { equals: studentQuery, mode: "insensitive" } },
-        include: { scoreEvents: { orderBy: { occurredAt: "asc" } } },
-      });
-
-      const student = byMatric ?? await prisma.student.findFirst({
-        where: {
-          OR: words.map((w) => ({ fullName: { contains: w, mode: "insensitive" as const } })),
-          NOT: { phone: { startsWith: "pending:" } },
-        },
-        include: { scoreEvents: { orderBy: { occurredAt: "asc" } } },
-        orderBy: { createdAt: "desc" },
-      });
-
+      const byMatric = await prisma.student.findFirst({ where: { matricNumber: { equals: studentQuery, mode: "insensitive" } }, include: { scoreEvents: { orderBy: { occurredAt: "asc" } } } });
+      const student = byMatric ?? await prisma.student.findFirst({ where: { OR: words.map((w) => ({ fullName: { contains: w, mode: "insensitive" as const } })), NOT: { phone: { startsWith: "pending:" } } }, include: { scoreEvents: { orderBy: { occurredAt: "asc" } } }, orderBy: { createdAt: "desc" } });
       if (!student)                    return { replyOverride: messages.scoreNotFound(studentQuery) };
       if (!student.scoreEvents.length) return { replyOverride: messages.scoreNoHistory(student.fullName) };
-
       const { score, summary } = computeScore(student.scoreEvents);
       return { replyOverride: messages.scoreReply(student.fullName, score, summary) };
     }
