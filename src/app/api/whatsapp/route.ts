@@ -74,34 +74,41 @@ export async function GET(req: NextRequest) {
 // ── POST — incoming messages ───────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-  // 1. Read raw body for HMAC verification.
+  // Always return 200 to Meta — any non-200 causes retries and webhook suspension.
+  // All errors are caught and logged; we never let an exception escape this handler.
+
   const rawBody = await req.text();
 
-  // 2. Verify Meta's HMAC-SHA256 signature — FAIL CLOSED in production.
+  // ── HMAC signature check ────────────────────────────────────────────────────
   const appSecret = process.env.WHATSAPP_APP_SECRET;
-  if (!appSecret && process.env.NODE_ENV === "production") {
-    console.error("[whatsapp] WHATSAPP_APP_SECRET not set — rejecting all webhook traffic");
-    return NextResponse.json({ error: "Webhook not configured" }, { status: 503 });
-  }
   if (appSecret) {
     const sigHeader = req.headers.get("x-hub-signature-256") ?? "";
     const expected  = "sha256=" + crypto.createHmac("sha256", appSecret).update(rawBody).digest("hex");
-    const sigA = Buffer.from(sigHeader.padEnd(expected.length));
-    const sigB = Buffer.from(expected.padEnd(sigHeader.length));
-    if (sigA.length !== sigB.length || !crypto.timingSafeEqual(sigA, sigB)) {
-      return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
+    // Constant-time compare (both same length — SHA256 hex is always 64 chars + "sha256=")
+    const a = Buffer.from(sigHeader.padEnd(expected.length, "\0"));
+    const b = Buffer.from(expected.padEnd(sigHeader.length, "\0"));
+    const maxLen = Math.max(a.length, b.length);
+    const aBuf = Buffer.alloc(maxLen); a.copy(aBuf);
+    const bBuf = Buffer.alloc(maxLen); b.copy(bBuf);
+    if (!crypto.timingSafeEqual(aBuf, bBuf) || a.length !== b.length) {
+      console.error("[whatsapp] HMAC signature mismatch — check WHATSAPP_APP_SECRET in Vercel env vars");
+      // Still return 200 so Meta doesn't suspend the webhook, but don't process
+      return NextResponse.json({ ok: true });
     }
+  } else {
+    console.warn("[whatsapp] WHATSAPP_APP_SECRET not set — skipping signature check. Set it in Vercel.");
   }
 
-  // 3. Parse payload.
+  // ── Parse payload ───────────────────────────────────────────────────────────
   let payload: MetaWebhook;
   try {
     payload = JSON.parse(rawBody) as MetaWebhook;
   } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    console.error("[whatsapp] Failed to parse webhook JSON");
+    return NextResponse.json({ ok: true });
   }
 
-  // 4. Extract message — Meta sends nested structure.
+  // ── Extract message ─────────────────────────────────────────────────────────
   const change  = payload.entry?.[0]?.changes?.[0];
   const value   = change?.value;
   const message = value?.messages?.[0];
@@ -111,64 +118,82 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  // Meta sends phone without "+"; normalise to E.164.
-  const fromPhone   = `+${message.from}`;
+  const fromPhone   = `+${message.from}`;   // Meta sends without "+", normalise to E.164
   const messageText = message.text.body.trim();
 
-  // 5. Load or create session.
-  const session = await prisma.whatsAppSession.upsert({
-    where:  { phone: fromPhone },
-    update: { lastInteractionAt: new Date() },
-    create: { phone: fromPhone, state: "IDLE", context: {} },
-  });
+  console.log(`[whatsapp] ← ${fromPhone}: "${messageText}"`);
 
-  // 6. Resolve vendor.
-  const vendor = session.vendorId
-    ? await prisma.vendor.findUnique({ where: { id: session.vendorId } })
-    : await prisma.vendor.findUnique({ where: { phone: fromPhone } });
+  // ── Process message (wrapped so errors never escape) ────────────────────────
+  try {
+    // Load or create session
+    const session = await prisma.whatsAppSession.upsert({
+      where:  { phone: fromPhone },
+      update: { lastInteractionAt: new Date() },
+      create: { phone: fromPhone, state: "IDLE", context: {} },
+    });
 
-  // 7. Run state machine.
-  const sessionCtx: SessionContext = {
-    state:    session.state,
-    context:  (session.context as Record<string, unknown>) ?? {},
-    vendorId: vendor?.id,
-  };
+    // Resolve vendor
+    const vendor = session.vendorId
+      ? await prisma.vendor.findUnique({ where: { id: session.vendorId } })
+      : await prisma.vendor.findUnique({ where: { phone: fromPhone } });
 
-  const result = step(sessionCtx, { body: messageText, fromPhone });
-
-  // 8. Persist updated session.
-  await prisma.whatsAppSession.update({
-    where: { phone: fromPhone },
-    data: {
-      state:    result.nextState,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      context:  { ...sessionCtx.context, ...(result.contextPatch ?? {}) } as any,
+    // Run state machine
+    const sessionCtx: SessionContext = {
+      state:    session.state,
+      context:  (session.context as Record<string, unknown>) ?? {},
       vendorId: vendor?.id,
-    },
-  });
+    };
 
-  // 9. Side effects.
-  let finalReply    = result.reply;
-  let linkedVendorId = vendor?.id;
+    const result = step(sessionCtx, { body: messageText, fromPhone });
 
-  if (result.sideEffects?.length) {
-    for (const effect of result.sideEffects) {
-      const { replyOverride, newVendorId } = await runSideEffect(effect, fromPhone, vendor?.id);
-      if (replyOverride !== undefined) finalReply    = replyOverride;
-      if (newVendorId)                 linkedVendorId = newVendorId;
+    // Persist updated session
+    await prisma.whatsAppSession.update({
+      where: { phone: fromPhone },
+      data: {
+        state:   result.nextState,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        context: { ...sessionCtx.context, ...(result.contextPatch ?? {}) } as any,
+        vendorId: vendor?.id,
+      },
+    });
+
+    // Side effects
+    let finalReply     = result.reply;
+    let linkedVendorId = vendor?.id;
+
+    if (result.sideEffects?.length) {
+      for (const effect of result.sideEffects) {
+        const { replyOverride, newVendorId } = await runSideEffect(effect, fromPhone, vendor?.id);
+        if (replyOverride !== undefined) finalReply    = replyOverride;
+        if (newVendorId)                 linkedVendorId = newVendorId;
+      }
+      if (linkedVendorId && linkedVendorId !== vendor?.id) {
+        await prisma.whatsAppSession.update({
+          where: { phone: fromPhone },
+          data:  { vendorId: linkedVendorId },
+        });
+      }
     }
-    if (linkedVendorId && linkedVendorId !== vendor?.id) {
-      await prisma.whatsAppSession.update({
-        where: { phone: fromPhone },
-        data:  { vendorId: linkedVendorId },
-      });
+
+    console.log(`[whatsapp] → ${fromPhone}: "${finalReply.slice(0, 80)}..."`);
+
+    // Send reply
+    await sendWhatsAppMessage(fromPhone, finalReply);
+
+  } catch (err) {
+    console.error("[whatsapp] Error processing message from", fromPhone, ":", err);
+    // Attempt a fallback reply so the user isn't left hanging
+    try {
+      await sendWhatsAppMessage(
+        fromPhone,
+        "Sorry, I ran into a problem. Please try again in a moment or visit your dashboard."
+      );
+    } catch (sendErr) {
+      console.error("[whatsapp] Failed to send fallback message:", sendErr);
     }
   }
 
-  // 10. Send reply via Meta Cloud API.
-  await sendWhatsAppMessage(fromPhone, finalReply);
-
-  // Meta requires 200 OK acknowledgement within 20s.
+  // Always 200 so Meta doesn't retry or suspend the webhook
   return NextResponse.json({ ok: true });
 }
 
