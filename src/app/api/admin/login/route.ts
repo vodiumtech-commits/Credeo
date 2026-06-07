@@ -52,6 +52,12 @@ export async function POST(req: NextRequest) {
       console.error("[admin/login] ADMIN_SECRET not set");
       return NextResponse.json({ error: "Admin login not configured" }, { status: 503 });
     }
+    // Refuse trivially weak secrets in production to prevent accidental deployment.
+    const WEAK_DEFAULTS = ["vodiumledger", "admin", "password", "secret", "changeme", "test"];
+    if (process.env.NODE_ENV === "production" && WEAK_DEFAULTS.includes(secret.toLowerCase())) {
+      console.error("[admin/login] ADMIN_SECRET is set to a default/weak value — refusing login in production");
+      return NextResponse.json({ error: "Admin login is not properly configured for production." }, { status: 503 });
+    }
 
     const incoming = Buffer.from(password, "utf8");
     const expected = Buffer.from(secret, "utf8");

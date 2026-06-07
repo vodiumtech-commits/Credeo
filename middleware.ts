@@ -69,21 +69,28 @@ async function getAdminPayload(token: string, secret: string): Promise<AdminPayl
 // ── Security headers ──────────────────────────────────────────────────────────
 
 function addSecurityHeaders(res: NextResponse): NextResponse {
-  res.headers.set("X-Content-Type-Options",  "nosniff");
-  res.headers.set("X-Frame-Options",         "DENY");
-  res.headers.set("X-XSS-Protection",        "1; mode=block");
-  res.headers.set("Referrer-Policy",         "strict-origin-when-cross-origin");
-  res.headers.set("Permissions-Policy",      "camera=(), microphone=(), geolocation=()");
+  res.headers.set("X-Content-Type-Options",              "nosniff");
+  res.headers.set("X-Frame-Options",                     "DENY");
+  res.headers.set("X-XSS-Protection",                    "1; mode=block");
+  res.headers.set("Referrer-Policy",                     "strict-origin-when-cross-origin");
+  res.headers.set("Permissions-Policy",                  "camera=(), microphone=(), geolocation=(), payment=()");
+  res.headers.set("Cross-Origin-Opener-Policy",          "same-origin-allow-popups");
+  res.headers.set("Cross-Origin-Resource-Policy",        "same-origin");
+  res.headers.set("X-Permitted-Cross-Domain-Policies",   "none");
+  res.headers.set("Strict-Transport-Security",           "max-age=31536000; includeSubDomains; preload");
   res.headers.set(
     "Content-Security-Policy",
     [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.paystack.co",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.paystack.co https://js.sentry-cdn.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: https:",
-      "connect-src 'self' https://api.paystack.co https://app.posthog.com https://eu.posthog.com https://*.ingest.de.sentry.io https://*.ingest.sentry.io https://innocent-teal-82236.upstash.io",
+      "font-src 'self' data: https://fonts.gstatic.com",
+      "img-src 'self' data: blob: https:",
+      "connect-src 'self' https://api.paystack.co https://app.posthog.com https://eu.posthog.com https://*.ingest.de.sentry.io https://*.ingest.sentry.io https://innocent-teal-82236.upstash.io https://graph.facebook.com",
       "frame-src https://js.paystack.co https://checkout.paystack.com",
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
     ].join("; ")
   );
   return res;

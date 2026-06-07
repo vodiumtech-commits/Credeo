@@ -1,7 +1,12 @@
 "use client";
 
+import { redirect } from "next/navigation";
 import * as Sentry from "@sentry/nextjs";
 import Head from "next/head";
+
+if (typeof window === "undefined" && process.env.NODE_ENV === "production") {
+  redirect("/");
+}
 import { useEffect, useState } from "react";
 
 class SentryExampleFrontendError extends Error {

@@ -194,6 +194,147 @@ export default function LandingPage() {
         </div>
       </div>
 
+      {/* ── Product visualization ───────────────────────────────────── */}
+      <section className="py-20 md:py-28 px-6 md:px-12 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_40%_at_50%_60%,rgba(201,169,97,0.05),transparent)] pointer-events-none" />
+        <div className="max-w-6xl mx-auto">
+          <motion.div {...fadeUp()} className="text-center mb-14">
+            <p className="text-vodium-gold text-xs tracking-[0.35em] uppercase mb-4">The platform</p>
+            <h2 className="font-serif text-4xl md:text-5xl max-w-2xl mx-auto leading-tight">
+              See everything.<br />
+              <span className="text-gradient-gold">From anywhere.</span>
+            </h2>
+            <p className="text-vodium-cream/50 mt-5 max-w-lg mx-auto text-sm leading-relaxed">
+              Your full credit book — live on any browser. Add from WhatsApp. Review on web. Send reminders with one tap.
+            </p>
+          </motion.div>
+
+          <motion.div {...fadeUp(0.12)} className="relative">
+            {/* Glow border wrapper */}
+            <div className="absolute -inset-px rounded-2xl bg-gradient-to-b from-vodium-gold/20 via-vodium-gold/5 to-transparent pointer-events-none z-10" />
+            <div className="relative bg-[#0D0D0D] rounded-2xl border border-white/[0.06] overflow-hidden shadow-[0_40px_120px_rgba(0,0,0,0.8)]">
+
+              {/* Mock browser bar */}
+              <div className="flex items-center gap-2.5 px-4 py-3 bg-[#111111] border-b border-white/[0.05]">
+                <div className="flex gap-1.5">
+                  <span className="w-3 h-3 rounded-full bg-[#FF5F57]" />
+                  <span className="w-3 h-3 rounded-full bg-[#FEBC2E]" />
+                  <span className="w-3 h-3 rounded-full bg-[#28C840]" />
+                </div>
+                <div className="flex-1 mx-3 bg-[#1A1A1A] rounded-md h-6 flex items-center px-3 gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full border border-white/[0.12] flex-shrink-0" />
+                  <span className="text-[11px] text-vodium-cream/20">app.vodium.co/dashboard</span>
+                </div>
+              </div>
+
+              {/* Mock dashboard */}
+              <div className="flex min-h-[420px]">
+                {/* Sidebar */}
+                <div className="w-14 xl:w-[180px] bg-[#080808] border-r border-white/[0.04] flex flex-col p-2 flex-shrink-0">
+                  {/* Logo */}
+                  <div className="h-10 flex items-center justify-center xl:justify-start xl:px-2 mb-4">
+                    <div className="w-7 h-7 rounded-lg bg-vodium-charcoal border border-vodium-gold/30 flex items-center justify-center flex-shrink-0">
+                      <span className="font-serif text-vodium-gold text-xs">V</span>
+                    </div>
+                    <span className="hidden xl:block ml-2 font-serif text-[10px] tracking-[0.2em] text-vodium-gold">VODIUM</span>
+                  </div>
+                  {/* Nav items */}
+                  {[
+                    { label: "Overview", active: true },
+                    { label: "Credits",  active: false },
+                    { label: "Customers",active: false },
+                    { label: "Settings", active: false },
+                  ].map((item) => (
+                    <div key={item.label} className={`h-8 rounded-md mb-1 flex items-center gap-2.5 px-2 transition-colors ${item.active ? "bg-vodium-gold/10 border-l-2 border-vodium-gold" : "opacity-40"}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${item.active ? "bg-vodium-gold" : "bg-vodium-cream/30"}`} />
+                      <span className={`hidden xl:block text-[11px] font-medium ${item.active ? "text-vodium-gold" : "text-vodium-cream/40"}`}>{item.label}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Main content */}
+                <div className="flex-1 p-4 md:p-6 space-y-4 overflow-hidden">
+                  {/* Header row */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-serif text-sm text-vodium-cream">Mama Taiwo&apos;s Provisions</p>
+                      <p className="text-[10px] text-vodium-cream/30 mt-0.5">UNILAG Campus</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                        <span className="text-[10px] font-medium text-emerald-400">● Growth Plan</span>
+                      </div>
+                      <div className="w-7 h-7 rounded-lg bg-vodium-gold/10 border border-vodium-gold/20 flex items-center justify-center">
+                        <span className="text-vodium-gold text-xs font-bold font-serif">M</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Stats strip */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                    {[
+                      { label: "Total owed", value: "₦142,500", color: "text-vodium-cream", ring: "ring-white/[0.06]" },
+                      { label: "Paid this month", value: "₦38,000", color: "text-emerald-400", ring: "ring-emerald-500/15" },
+                      { label: "Overdue", value: "7 credits", color: "text-rose-400", ring: "ring-rose-500/15" },
+                      { label: "Recovery rate", value: "71%", color: "text-vodium-gold", ring: "ring-vodium-gold/15" },
+                    ].map((s) => (
+                      <div key={s.label} className={`bg-vodium-charcoal/60 rounded-xl p-3 ring-1 ${s.ring}`}>
+                        <p className="text-[9px] text-vodium-cream/35 uppercase tracking-wider mb-1">{s.label}</p>
+                        <p className={`font-serif text-base leading-none ${s.color}`}>{s.value}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Table */}
+                  <div className="bg-vodium-charcoal/40 rounded-xl border border-white/[0.05] overflow-hidden">
+                    <div className="px-4 py-2 border-b border-white/[0.04]">
+                      <p className="text-[11px] font-semibold text-vodium-cream/50 uppercase tracking-wider">Overdue credits</p>
+                    </div>
+                    {[
+                      { name: "Tunde Adesanya",  matric: "100L/ECO/23", amount: "₦4,500",  days: "5 days" },
+                      { name: "Bimpe Olawale",   matric: "200L/LAW/22", amount: "₦2,000",  days: "3 days" },
+                      { name: "Emeka Chukwu",    matric: "300L/MED/21", amount: "₦8,750",  days: "12 days" },
+                    ].map((row) => (
+                      <div key={row.name} className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.03] last:border-0">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-6 h-6 rounded-full bg-rose-500/15 border border-rose-500/20 flex items-center justify-center flex-shrink-0">
+                            <span className="text-rose-400 text-[10px] font-bold">{row.name[0]}</span>
+                          </div>
+                          <div>
+                            <p className="text-[11px] font-medium text-vodium-cream">{row.name}</p>
+                            <p className="text-[9px] text-vodium-cream/30">{row.matric}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-[10px] text-rose-400/70">{row.days} overdue</span>
+                          <span className="font-serif text-sm text-rose-400">{row.amount}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom fade overlay */}
+            <div className="absolute bottom-0 inset-x-0 h-16 bg-gradient-to-t from-vodium-black to-transparent pointer-events-none rounded-b-2xl" />
+          </motion.div>
+
+          {/* Caption row */}
+          <motion.div {...fadeUp(0.2)} className="flex flex-col sm:flex-row items-center justify-center gap-6 mt-10 text-sm text-vodium-cream/40">
+            {[
+              "Live repayment data",
+              "Auto-reminder delivery",
+              "Zero manual chasing",
+            ].map((t) => (
+              <span key={t} className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-vodium-gold/60" /> {t}
+              </span>
+            ))}
+          </motion.div>
+        </div>
+      </section>
+
       {/* ── How it works ─────────────────────────────────────────────── */}
       <section id="how-it-works" className="py-24 md:py-32 px-6 md:px-12">
         <div className="max-w-6xl mx-auto">
@@ -549,7 +690,7 @@ export default function LandingPage() {
                 { label: "How it works", href: "#how-it-works" },
                 { label: "Features",     href: "#features" },
                 { label: "Pricing",      href: "#pricing" },
-                { label: "WhatsApp bot", href: "#" },
+                { label: "WhatsApp bot", href: "/whatsapp" },
               ]}
             />
 
@@ -557,9 +698,9 @@ export default function LandingPage() {
             <FooterLinks
               title="Company"
               links={[
-                { label: "About",   href: "#" },
-                { label: "Blog",    href: "#" },
-                { label: "Careers", href: "#" },
+                { label: "About",   href: "/about" },
+                { label: "Blog",    href: "/blog" },
+                { label: "Careers", href: "/careers" },
               ]}
             />
 
@@ -567,9 +708,9 @@ export default function LandingPage() {
             <FooterLinks
               title="Legal"
               links={[
-                { label: "Privacy policy",   href: "#" },
-                { label: "Terms of service", href: "#" },
-                { label: "NDPR compliance",  href: "#" },
+                { label: "Privacy policy",   href: "/privacy" },
+                { label: "Terms of service", href: "/terms" },
+                { label: "NDPR compliance",  href: "/privacy#your-rights-ndpr" },
               ]}
             />
           </div>

@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(mkdir -p /home/oyinlola007/Credeo/src/app/api/admin/me /home/oyinlola007/Credeo/src/app/api/admin/team /home/oyinlola007/Credeo/src/app/api/admin/invite/\\\\[token\\\\])"
+      "Bash(mkdir -p /home/oyinlola007/Credeo/src/app/api/admin/me /home/oyinlola007/Credeo/src/app/api/admin/team /home/oyinlola007/Credeo/src/app/api/admin/invite/\\\\[token\\\\])",
+      "Read(//usr/bin/**)",
+      "Read(//opt/**)"
     ],
     "additionalDirectories": [
       "/home/oyinlola007/Credeo/src/app/api/admin/invite/[token]"

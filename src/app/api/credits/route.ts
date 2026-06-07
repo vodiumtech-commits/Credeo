@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getSessionPhone } from "@/lib/session";
+import { rateLimit } from "@/lib/redis";
 import { normalisePhoneNG } from "@/lib/utils";
 import { getStudentLimit, isPlanActive } from "@/lib/plan";
 import type { CreditStatus } from "@prisma/client";
@@ -62,6 +63,13 @@ const createSchema = z.object({
 export async function POST(req: NextRequest) {
   const phone = getSessionPhone();
   if (!phone) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // IP-based rate limit: 60 credits per hour per IP (prevents automated abuse)
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const { ok: rlOk } = await rateLimit(`rl:credits:${ip}`, 60, 3600);
+  if (!rlOk) {
+    return NextResponse.json({ error: "Too many requests. Please slow down." }, { status: 429 });
+  }
 
   const vendor = await prisma.vendor.findUnique({
     where: { phone },
