@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { getVendorSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { formatNaira } from "@/lib/utils";
 import { CreditsClient } from "@/components/ui/credits-client";
 import type { CreditStatus } from "@prisma/client";
 
@@ -57,5 +56,5 @@ export default async function CreditsPage() {
     totalCount: credits.length,
   };
 
-  return <CreditsClient credits={serialised} stats={stats} formatNaira={formatNaira} />;
+  return <CreditsClient credits={serialised} stats={stats} />;
 }

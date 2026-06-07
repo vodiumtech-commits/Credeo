@@ -89,7 +89,7 @@ export default function WhatsAppPage() {
                 you&apos;re tracking.
               </p>
               <a
-                href="https://wa.me/2348000000000?text=HELP"
+                href="https://wa.me/2347019575717?text=HELP"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2.5 btn-gold px-6 py-3 rounded-xl text-sm font-semibold"
@@ -221,7 +221,7 @@ export default function WhatsAppPage() {
             Message HELP to get started. No signup required — just WhatsApp.
           </p>
           <a
-            href="https://wa.me/2348000000000?text=HELP"
+            href="https://wa.me/2347019575717?text=HELP"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2.5 btn-gold px-7 py-3.5 rounded-xl text-sm font-semibold"

@@ -150,7 +150,7 @@ export default function NewCreditPage() {
             </code>
             <div className="mt-4">
               <a
-                href="https://wa.me/2348012345678?text=ADD"
+                href="https://wa.me/2347019575717?text=ADD"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 text-xs text-vodium-cream/35 hover:text-vodium-gold transition-colors"

@@ -3,7 +3,9 @@
     "allow": [
       "Bash(mkdir -p /home/oyinlola007/Credeo/src/app/api/admin/me /home/oyinlola007/Credeo/src/app/api/admin/team /home/oyinlola007/Credeo/src/app/api/admin/invite/\\\\[token\\\\])",
       "Read(//usr/bin/**)",
-      "Read(//opt/**)"
+      "Read(//opt/**)",
+      "Bash(sed -i 's|wa.me/2348012345678|wa.me/2347019575717|g' /home/oyinlola007/Credeo/src/app/dashboard/page.tsx /home/oyinlola007/Credeo/src/app/dashboard/credit/new/page.tsx)",
+      "Bash(sed -i 's|wa.me/2348000000000|wa.me/2347019575717|g' /home/oyinlola007/Credeo/src/app/whatsapp/page.tsx)"
     ],
     "additionalDirectories": [
       "/home/oyinlola007/Credeo/src/app/api/admin/invite/[token]"

@@ -129,7 +129,7 @@ export default async function AdminVendorsPage() {
       </div>
 
       {/* Interactive vendor table */}
-      <AdminVendorsClient vendors={rows} formatNaira={formatNaira} />
+      <AdminVendorsClient vendors={rows} />
     </div>
   );
 }

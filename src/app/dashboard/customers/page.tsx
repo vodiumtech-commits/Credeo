@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { getVendorSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { formatNaira } from "@/lib/utils";
 import { CustomersClient } from "@/components/ui/customers-client";
 
 export const dynamic = "force-dynamic";
@@ -45,5 +44,5 @@ export default async function CustomersPage() {
     };
   });
 
-  return <CustomersClient rows={rows} formatNaira={formatNaira} />;
+  return <CustomersClient rows={rows} />;
 }

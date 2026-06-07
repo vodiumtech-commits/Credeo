@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Search, Store, Users, X, ExternalLink } from "lucide-react";
 import { VendorRowMenu } from "@/components/ui/vendor-row-menu";
+import { formatNaira } from "@/lib/utils";
 import type { VendorStatus } from "@prisma/client";
 
 export interface AdminVendorRow {
@@ -35,10 +36,8 @@ type Filter = "All" | "Active" | "Trial" | "Inactive";
 
 export function AdminVendorsClient({
   vendors,
-  formatNaira,
 }: {
-  vendors:     AdminVendorRow[];
-  formatNaira: (n: number) => string;
+  vendors: AdminVendorRow[];
 }) {
   const [search,    setSearch]    = useState("");
   const [activeTab, setActiveTab] = useState<Filter>("All");

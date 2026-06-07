@@ -210,7 +210,7 @@ export default async function DashboardPage() {
                   external: false,
                 },
                 {
-                  href: "https://wa.me/2348012345678?text=LIST",
+                  href: "https://wa.me/2347019575717?text=LIST",
                   icon: <MessageCircle size={16} className="text-vodium-gold" />,
                   label: "WhatsApp bot",
                   external: true,

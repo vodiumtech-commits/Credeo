@@ -683,7 +683,7 @@ function Field({ label, required, hint, children }: { label: string; required?: 
 
 function SuccessScreen({ name, business, onDashboard }: { name: string; business: string; onDashboard: () => void }) {
   const firstName = name.split(" ")[0];
-  const waPhone = "+2348012345678";
+  const waPhone = "+2347019575717";
   return (
     <div className="min-h-screen bg-vodium-black flex items-center justify-center px-6 py-12">
       <div className="max-w-md w-full text-center">

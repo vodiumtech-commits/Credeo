@@ -8,6 +8,7 @@ import {
   CreditCard, ArrowUpDown, ChevronDown,
 } from "lucide-react";
 import { MarkPaidButton } from "@/components/ui/mark-paid-button";
+import { formatNaira } from "@/lib/utils";
 import type { CreditStatus } from "@prisma/client";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -62,11 +63,9 @@ const FILTER_TABS: Array<{ key: CreditStatus | "ALL"; label: string }> = [
 export function CreditsClient({
   credits,
   stats,
-  formatNaira,
 }: {
-  credits:     CreditRow[];
-  stats:       Stats;
-  formatNaira: (n: number) => string;
+  credits: CreditRow[];
+  stats:   Stats;
 }) {
   const [search,     setSearch]     = useState("");
   const [filterTab,  setFilterTab]  = useState<CreditStatus | "ALL">("ALL");

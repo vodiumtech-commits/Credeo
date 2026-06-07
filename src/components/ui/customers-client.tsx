@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Plus, Search, X, Users, ArrowRight } from "lucide-react";
+import { formatNaira } from "@/lib/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -38,10 +39,8 @@ const FILTERS = ["All", "Overdue", "Owing", "Settled"] as const;
 
 export function CustomersClient({
   rows,
-  formatNaira,
 }: {
-  rows:        CustomerRow[];
-  formatNaira: (n: number) => string;
+  rows: CustomerRow[];
 }) {
   const [search,    setSearch]    = useState("");
   const [activeTab, setActiveTab] = useState<typeof FILTERS[number]>("All");
