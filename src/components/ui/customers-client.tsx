@@ -104,7 +104,7 @@ export function CustomersClient({
       {/* ── Controls ─────────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 min-w-0">
-          <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-vodium-cream/30 pointer-events-none" />
+          <Search size={14} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-vodium-cream/30 pointer-events-none" />
           <input
             type="text"
             placeholder="Search by name or matric number…"

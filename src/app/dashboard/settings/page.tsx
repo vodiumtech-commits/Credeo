@@ -3,8 +3,16 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import {
-  CheckCircle, Store, Phone, Mail, MapPin, Bell, Shield,
-  CreditCard, Lock, X,
+  CheckCircle,
+  Store,
+  Phone,
+  Mail,
+  MapPin,
+  Bell,
+  Shield,
+  CreditCard,
+  Lock,
+  X,
 } from "lucide-react";
 import { GlowBadge } from "@/components/ui/glow-badge";
 import { AnimatedBorder } from "@/components/ui/animated-border";
@@ -74,28 +82,28 @@ export default function SettingsPage() {
     v?.subscription?.plan === "STARTER"
       ? "Starter"
       : v?.subscription?.plan === "GROWTH"
-      ? "Growth"
-      : v?.subscription?.plan === "CAMPUS_PRO"
-      ? "Campus Pro"
-      : "Starter";
+        ? "Growth"
+        : v?.subscription?.plan === "CAMPUS_PRO"
+          ? "Campus Pro"
+          : "Starter";
 
   const planPrice =
     v?.subscription?.plan === "STARTER"
       ? "₦2,000 / month"
       : v?.subscription?.plan === "GROWTH"
-      ? "₦5,000 / month"
-      : v?.subscription?.plan === "CAMPUS_PRO"
-      ? "₦10,000 / month"
-      : "₦2,000 / month";
+        ? "₦5,000 / month"
+        : v?.subscription?.plan === "CAMPUS_PRO"
+          ? "₦10,000 / month"
+          : "₦2,000 / month";
 
   const planDesc =
     v?.subscription?.plan === "STARTER"
       ? "Up to 50 students"
       : v?.subscription?.plan === "GROWTH"
-      ? "Up to 200 students"
-      : v?.subscription?.plan === "CAMPUS_PRO"
-      ? "Unlimited students"
-      : "Up to 50 students";
+        ? "Up to 200 students"
+        : v?.subscription?.plan === "CAMPUS_PRO"
+          ? "Unlimited students"
+          : "Up to 50 students";
 
   const subStatus = v?.subscription?.status ?? "TRIAL";
 
@@ -127,7 +135,9 @@ export default function SettingsPage() {
       <div className="max-w-5xl mx-auto space-y-8">
         {/* Page header */}
         <div>
-          <h1 className="font-serif text-2xl md:text-3xl text-vodium-cream">Settings</h1>
+          <h1 className="font-serif text-2xl md:text-3xl text-vodium-cream">
+            Settings
+          </h1>
           <p className="text-vodium-cream/40 text-sm mt-1">
             Manage your shop profile, notifications, and subscription.
           </p>
@@ -145,8 +155,12 @@ export default function SettingsPage() {
                     <Store size={16} className="text-vodium-gold" />
                   </div>
                   <div>
-                    <h2 className="font-semibold text-vodium-cream text-sm">Business profile</h2>
-                    <p className="text-xs text-vodium-cream/35">How your shop appears to students</p>
+                    <h2 className="font-semibold text-vodium-cream text-sm">
+                      Business profile
+                    </h2>
+                    <p className="text-xs text-vodium-cream/35">
+                      How your shop appears to students
+                    </p>
                   </div>
                 </div>
 
@@ -174,7 +188,7 @@ export default function SettingsPage() {
                     <div className="relative">
                       <MapPin
                         size={15}
-                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-vodium-cream/30 pointer-events-none"
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-vodium-cream/30 pointer-events-none"
                       />
                       <input
                         name="campusLocation"
@@ -190,7 +204,7 @@ export default function SettingsPage() {
                       <div className="relative">
                         <Lock
                           size={14}
-                          className="absolute left-3.5 top-1/2 -translate-y-1/2 text-vodium-cream/30 pointer-events-none"
+                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-vodium-cream/30 pointer-events-none"
                         />
                         <input
                           type="tel"
@@ -207,7 +221,7 @@ export default function SettingsPage() {
                       <div className="relative">
                         <Mail
                           size={15}
-                          className="absolute left-3.5 top-1/2 -translate-y-1/2 text-vodium-cream/30 pointer-events-none"
+                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-vodium-cream/30 pointer-events-none"
                         />
                         <input
                           name="email"
@@ -239,18 +253,43 @@ export default function SettingsPage() {
                   <Bell size={16} className="text-vodium-gold" />
                 </div>
                 <div>
-                  <h2 className="font-semibold text-vodium-cream text-sm">Notifications</h2>
-                  <p className="text-xs text-vodium-cream/35">WhatsApp and SMS alert preferences</p>
+                  <h2 className="font-semibold text-vodium-cream text-sm">
+                    Notifications
+                  </h2>
+                  <p className="text-xs text-vodium-cream/35">
+                    WhatsApp and SMS alert preferences
+                  </p>
                 </div>
               </div>
               <div className="space-y-1">
                 {[
-                  { label: "Auto-reminders to students",  sub: "2 days before due date",            defaultOn: true },
-                  { label: "Overdue alerts to you",        sub: "When a credit passes its due date", defaultOn: true },
-                  { label: "Payment confirmations",        sub: "When a student marks credit paid",  defaultOn: true },
-                  { label: "Weekly summary report",        sub: "Every Monday — overview of your book", defaultOn: false },
+                  {
+                    label: "Auto-reminders to students",
+                    sub: "2 days before due date",
+                    defaultOn: true,
+                  },
+                  {
+                    label: "Overdue alerts to you",
+                    sub: "When a credit passes its due date",
+                    defaultOn: true,
+                  },
+                  {
+                    label: "Payment confirmations",
+                    sub: "When a student marks credit paid",
+                    defaultOn: true,
+                  },
+                  {
+                    label: "Weekly summary report",
+                    sub: "Every Monday — overview of your book",
+                    defaultOn: false,
+                  },
                 ].map((n) => (
-                  <Toggle key={n.label} label={n.label} sub={n.sub} defaultChecked={n.defaultOn} />
+                  <Toggle
+                    key={n.label}
+                    label={n.label}
+                    sub={n.sub}
+                    defaultChecked={n.defaultOn}
+                  />
                 ))}
               </div>
             </div>
@@ -262,8 +301,12 @@ export default function SettingsPage() {
                   <Shield size={16} className="text-vodium-gold" />
                 </div>
                 <div>
-                  <h2 className="font-semibold text-vodium-cream text-sm">Security & privacy</h2>
-                  <p className="text-xs text-vodium-cream/35">Account protection settings</p>
+                  <h2 className="font-semibold text-vodium-cream text-sm">
+                    Security & privacy
+                  </h2>
+                  <p className="text-xs text-vodium-cream/35">
+                    Account protection settings
+                  </p>
                 </div>
               </div>
               <div className="space-y-0">
@@ -292,8 +335,12 @@ export default function SettingsPage() {
                     className={`flex items-center justify-between py-3.5 ${i < arr.length - 1 ? "border-b border-white/[0.06]" : ""}`}
                   >
                     <div>
-                      <p className="text-sm font-medium text-vodium-cream">{row.label}</p>
-                      <p className="text-xs text-vodium-cream/35 mt-0.5">{row.sub}</p>
+                      <p className="text-sm font-medium text-vodium-cream">
+                        {row.label}
+                      </p>
+                      <p className="text-xs text-vodium-cream/35 mt-0.5">
+                        {row.sub}
+                      </p>
                     </div>
                     <GlowBadge color={row.color}>{row.badge}</GlowBadge>
                   </div>
@@ -303,10 +350,12 @@ export default function SettingsPage() {
 
             {/* Danger zone */}
             <div className="border border-rose-500/20 rounded-2xl p-6">
-              <h2 className="font-semibold text-rose-400 mb-2 text-sm">Danger zone</h2>
+              <h2 className="font-semibold text-rose-400 mb-2 text-sm">
+                Danger zone
+              </h2>
               <p className="text-sm text-vodium-cream/35 mb-4 leading-relaxed">
-                Deleting your account will permanently remove all your credit records and customer
-                data. This cannot be undone.
+                Deleting your account will permanently remove all your credit
+                records and customer data. This cannot be undone.
               </p>
               <button className="text-sm text-rose-400 border border-rose-500/25 px-4 py-2 rounded-lg hover:bg-rose-500/5 transition-colors">
                 Request account deletion
@@ -322,8 +371,12 @@ export default function SettingsPage() {
                   <CreditCard size={16} className="text-vodium-gold" />
                 </div>
                 <div>
-                  <h2 className="font-semibold text-vodium-cream text-sm">Subscription</h2>
-                  <p className="text-xs text-vodium-cream/35">Your current plan & billing</p>
+                  <h2 className="font-semibold text-vodium-cream text-sm">
+                    Subscription
+                  </h2>
+                  <p className="text-xs text-vodium-cream/35">
+                    Your current plan & billing
+                  </p>
                 </div>
               </div>
 
@@ -333,11 +386,29 @@ export default function SettingsPage() {
                   <GlowBadge color="gold" className="mb-3">
                     {planLabel} Plan
                   </GlowBadge>
-                  <p className="font-serif text-xl text-vodium-cream mt-2">{planPrice}</p>
-                  <p className="text-xs text-vodium-cream/40 mt-0.5">{planDesc}</p>
+                  <p className="font-serif text-xl text-vodium-cream mt-2">
+                    {planPrice}
+                  </p>
+                  <p className="text-xs text-vodium-cream/40 mt-0.5">
+                    {planDesc}
+                  </p>
                 </div>
-                <GlowBadge color={subStatus === "ACTIVE" ? "green" : subStatus === "PAST_DUE" || subStatus === "CANCELLED" ? "red" : "blue"}>
-                  {subStatus === "ACTIVE" ? "Active" : subStatus === "PAST_DUE" ? "Past due" : subStatus === "CANCELLED" ? "Cancelled" : "Trial"}
+                <GlowBadge
+                  color={
+                    subStatus === "ACTIVE"
+                      ? "green"
+                      : subStatus === "PAST_DUE" || subStatus === "CANCELLED"
+                        ? "red"
+                        : "blue"
+                  }
+                >
+                  {subStatus === "ACTIVE"
+                    ? "Active"
+                    : subStatus === "PAST_DUE"
+                      ? "Past due"
+                      : subStatus === "CANCELLED"
+                        ? "Cancelled"
+                        : "Trial"}
                 </GlowBadge>
               </div>
 
@@ -347,11 +418,14 @@ export default function SettingsPage() {
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-vodium-cream/40">Trial ends</span>
                     <span className="text-vodium-cream/70 font-medium">
-                      {new Date(v.subscription.trialEndsAt).toLocaleDateString("en-NG", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      })}
+                      {new Date(v.subscription.trialEndsAt).toLocaleDateString(
+                        "en-NG",
+                        {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        },
+                      )}
                     </span>
                   </div>
                 )}
@@ -359,7 +433,9 @@ export default function SettingsPage() {
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-vodium-cream/40">Period start</span>
                     <span className="text-vodium-cream/70 font-medium">
-                      {new Date(v.subscription.currentPeriodStart).toLocaleDateString("en-NG", {
+                      {new Date(
+                        v.subscription.currentPeriodStart,
+                      ).toLocaleDateString("en-NG", {
                         day: "numeric",
                         month: "short",
                         year: "numeric",
@@ -371,7 +447,9 @@ export default function SettingsPage() {
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-vodium-cream/40">Next billing</span>
                     <span className="text-vodium-cream/70 font-medium">
-                      {new Date(v.subscription.currentPeriodEnd).toLocaleDateString("en-NG", {
+                      {new Date(
+                        v.subscription.currentPeriodEnd,
+                      ).toLocaleDateString("en-NG", {
                         day: "numeric",
                         month: "short",
                         year: "numeric",
@@ -380,7 +458,9 @@ export default function SettingsPage() {
                   </div>
                 )}
                 {!v?.subscription && (
-                  <p className="text-xs text-vodium-cream/35">60-day free trial • No card required</p>
+                  <p className="text-xs text-vodium-cream/35">
+                    60-day free trial • No card required
+                  </p>
                 )}
               </div>
 
@@ -404,10 +484,13 @@ export default function SettingsPage() {
 
             {/* Vodium tip */}
             <div className="glass-gold rounded-2xl p-5">
-              <p className="text-xs font-semibold text-vodium-gold mb-2">Pro tip</p>
+              <p className="text-xs font-semibold text-vodium-gold mb-2">
+                Pro tip
+              </p>
               <p className="text-xs text-vodium-cream/50 leading-relaxed">
-                Campus Pro vendors recover up to 3× more credit. Unlimited students, priority
-                WhatsApp delivery, and weekly recovery reports.
+                Campus Pro vendors recover up to 3× more credit. Unlimited
+                students, priority WhatsApp delivery, and weekly recovery
+                reports.
               </p>
             </div>
           </div>
@@ -426,7 +509,9 @@ function DarkField({
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-vodium-cream/70 mb-1.5">{label}</label>
+      <label className="block text-sm font-medium text-vodium-cream/70 mb-1.5">
+        {label}
+      </label>
       {children}
     </div>
   );
