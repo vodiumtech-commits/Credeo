@@ -4,8 +4,16 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Eye, EyeOff, Lock, Mail, Shield, Zap, MessageCircle,
-  TrendingUp, ArrowLeft, RefreshCw,
+  Eye,
+  EyeOff,
+  Lock,
+  Mail,
+  Shield,
+  Zap,
+  MessageCircle,
+  TrendingUp,
+  ArrowLeft,
+  RefreshCw,
 } from "lucide-react";
 import { Spotlight } from "@/components/ui/spotlight";
 import { ShimmerButton } from "@/components/ui/shimmer-button";
@@ -13,18 +21,18 @@ import { ShimmerButton } from "@/components/ui/shimmer-button";
 type Screen = "credentials" | "otp";
 
 export default function LoginPage() {
-  const router    = useRouter();
-  const [screen, setScreen]           = useState<Screen>("credentials");
-  const [email, setEmail]             = useState("");
-  const [password, setPassword]       = useState("");
+  const router = useRouter();
+  const [screen, setScreen] = useState<Screen>("credentials");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [otp, setOtp]                 = useState(["", "", "", "", "", ""]);
-  const [loading, setLoading]         = useState(false);
-  const [resending, setResending]     = useState(false);
+  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+  const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
-  const [error, setError]             = useState<string | null>(null);
-  const submitting                    = useRef(false);
-  const otpRefs                       = useRef<(HTMLInputElement | null)[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const submitting = useRef(false);
+  const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // Countdown for resend button
   useEffect(() => {
@@ -43,10 +51,10 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const res  = await fetch("/api/auth/login", {
-        method:  "POST",
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
 
@@ -76,10 +84,10 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const res  = await fetch("/api/auth/login", {
-        method:  "POST",
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ email, otp: code }),
+        body: JSON.stringify({ email, otp: code }),
       });
       const data = await res.json();
 
@@ -101,10 +109,10 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const res  = await fetch("/api/auth/login", {
-        method:  "POST",
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -120,7 +128,7 @@ export default function LoginPage() {
 
   function handleOtpInput(index: number, value: string) {
     const digit = value.replace(/\D/g, "").slice(-1);
-    const next  = [...otp];
+    const next = [...otp];
     next[index] = digit;
     setOtp(next);
     setError(null);
@@ -135,10 +143,12 @@ export default function LoginPage() {
 
   function handleOtpPaste(e: React.ClipboardEvent) {
     e.preventDefault();
-    const text   = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    const text = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
     const digits = text.split("");
-    const next   = [...otp];
-    digits.forEach((d, i) => { if (i < 6) next[i] = d; });
+    const next = [...otp];
+    digits.forEach((d, i) => {
+      if (i < 6) next[i] = d;
+    });
     setOtp(next);
     otpRefs.current[Math.min(digits.length, 5)]?.focus();
   }
@@ -155,33 +165,61 @@ export default function LoginPage() {
 
       <Link href="/" className="relative z-10 flex items-center gap-3 group">
         <div className="w-10 h-10 rounded-full bg-vodium-charcoal border border-vodium-gold/40 flex items-center justify-center group-hover:border-vodium-gold/70 transition-colors">
-          <span className="font-serif text-vodium-gold text-xl leading-none">V</span>
+          <span className="font-serif text-vodium-gold text-xl leading-none">
+            V
+          </span>
         </div>
-        <span className="font-serif tracking-[0.18em] text-vodium-gold text-sm">VODIUM LEDGER</span>
+        <span className="font-serif tracking-[0.18em] text-vodium-gold text-sm">
+          VODIUM LEDGER
+        </span>
       </Link>
 
       <div className="flex-1 flex flex-col justify-center relative z-10">
-        <p className="text-vodium-gold text-xs tracking-[0.35em] uppercase mb-6">Welcome back</p>
+        <p className="text-vodium-gold text-xs tracking-[0.35em] uppercase mb-6">
+          Welcome back
+        </p>
         <h2 className="font-serif text-4xl text-vodium-cream leading-tight mb-6">
-          Your credit<br />ledger<br />
+          Your credit
+          <br />
+          ledger
+          <br />
           <em className="text-gradient-gold not-italic">awaits.</em>
         </h2>
         <p className="text-vodium-cream/45 leading-relaxed max-w-sm text-sm mb-12">
-          Sign in to track credits, send reminders, and view your repayment dashboard.
+          Sign in to track credits, send reminders, and view your repayment
+          dashboard.
         </p>
         <div className="space-y-4">
           {[
-            { icon: <Zap size={15} />,          label: "Instant access",    sub: "Your full dashboard in seconds" },
-            { icon: <MessageCircle size={15} />, label: "WhatsApp-first",    sub: "Record credits right from WhatsApp" },
-            { icon: <Shield size={15} />,        label: "Secure by default", sub: "Password + email code, every login" },
-            { icon: <TrendingUp size={15} />,    label: "Recovery insights", sub: "See which students owe and how much" },
+            {
+              icon: <Zap size={15} />,
+              label: "Instant access",
+              sub: "Your full dashboard in seconds",
+            },
+            {
+              icon: <MessageCircle size={15} />,
+              label: "WhatsApp-first",
+              sub: "Record credits right from WhatsApp",
+            },
+            {
+              icon: <Shield size={15} />,
+              label: "Secure by default",
+              sub: "Password + email code, every login",
+            },
+            {
+              icon: <TrendingUp size={15} />,
+              label: "Recovery insights",
+              sub: "See which students owe and how much",
+            },
           ].map((b) => (
             <div key={b.label} className="flex items-start gap-3">
               <div className="w-7 h-7 rounded-lg bg-vodium-gold/10 border border-vodium-gold/20 flex items-center justify-center text-vodium-gold flex-shrink-0 mt-0.5">
                 {b.icon}
               </div>
               <div>
-                <p className="text-vodium-cream text-sm font-medium">{b.label}</p>
+                <p className="text-vodium-cream text-sm font-medium">
+                  {b.label}
+                </p>
                 <p className="text-vodium-cream/35 text-xs mt-0.5">{b.sub}</p>
               </div>
             </div>
@@ -217,13 +255,20 @@ export default function LoginPage() {
             <div className="w-9 h-9 rounded-full bg-vodium-black border border-vodium-gold/40 flex items-center justify-center">
               <span className="font-serif text-vodium-gold text-lg">V</span>
             </div>
-            <span className="font-serif tracking-[0.18em] text-vodium-black text-sm">VODIUM LEDGER</span>
+            <span className="font-serif tracking-[0.18em] text-vodium-black text-sm">
+              VODIUM LEDGER
+            </span>
           </Link>
 
           <div className="hidden md:flex justify-end mb-6">
-            <Link href="/register" className="text-sm text-vodium-black/50 hover:text-vodium-black transition-colors">
+            <Link
+              href="/register"
+              className="text-sm text-vodium-black/50 hover:text-vodium-black transition-colors"
+            >
               No account?{" "}
-              <span className="text-vodium-black font-semibold hover:text-vodium-gold transition-colors">Sign up free</span>
+              <span className="text-vodium-black font-semibold hover:text-vodium-gold transition-colors">
+                Sign up free
+              </span>
             </Link>
           </div>
 
@@ -233,23 +278,34 @@ export default function LoginPage() {
                 <div className="w-11 h-11 rounded-2xl bg-vodium-gold/10 border border-vodium-gold/25 flex items-center justify-center mb-5">
                   <Lock size={20} className="text-vodium-gold" />
                 </div>
-                <h1 className="font-serif text-3xl text-vodium-black mb-2">Sign in</h1>
+                <h1 className="font-serif text-3xl text-vodium-black mb-2">
+                  Sign in
+                </h1>
                 <p className="text-muted-foreground text-sm">
-                  Enter your credentials — we&apos;ll send a verification code to your email.
+                  Enter your credentials we&apos;ll send a verification code to
+                  your email.
                 </p>
               </div>
 
               <form onSubmit={handleCredentials} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-vodium-black mb-1.5">Email address</label>
+                  <label className="block text-sm font-medium text-vodium-black mb-1.5">
+                    Email address
+                  </label>
                   <div className="relative">
-                    <Mail size={15} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                    <Mail
+                      size={15}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                    />
                     <input
                       type="email"
                       autoComplete="email"
-                      placeholder="you@example.com"
+                      placeholder="jeff@vodiumledger.com"
                       value={email}
-                      onChange={(e) => { setEmail(e.target.value); setError(null); }}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        setError(null);
+                      }}
                       required
                       className="input-premium pr-9 w-full"
                       autoFocus
@@ -258,15 +314,23 @@ export default function LoginPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-vodium-black mb-1.5">Password</label>
+                  <label className="block text-sm font-medium text-vodium-black mb-1.5">
+                    Password
+                  </label>
                   <div className="relative">
-                    <Lock size={15} className="absolute right-10 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                    <Lock
+                      size={15}
+                      className="absolute right-10 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                    />
                     <input
                       type={showPassword ? "text" : "password"}
                       autoComplete="current-password"
                       placeholder="••••••••"
                       value={password}
-                      onChange={(e) => { setPassword(e.target.value); setError(null); }}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        setError(null);
+                      }}
                       required
                       className="input-premium pr-10 w-full"
                     />
@@ -297,7 +361,10 @@ export default function LoginPage() {
 
               <p className="mt-8 text-center text-sm text-muted-foreground md:hidden">
                 No account?{" "}
-                <Link href="/register" className="text-vodium-black font-semibold hover:text-vodium-gold transition-colors">
+                <Link
+                  href="/register"
+                  className="text-vodium-black font-semibold hover:text-vodium-gold transition-colors"
+                >
                   Sign up free
                 </Link>
               </p>
@@ -317,7 +384,11 @@ export default function LoginPage() {
         <div className="flex-1 flex flex-col justify-center">
           <div className="max-w-sm mx-auto w-full">
             <button
-              onClick={() => { setScreen("credentials"); setOtp(["", "", "", "", "", ""]); setError(null); }}
+              onClick={() => {
+                setScreen("credentials");
+                setOtp(["", "", "", "", "", ""]);
+                setError(null);
+              }}
               className="flex items-center gap-2 text-sm text-muted-foreground hover:text-vodium-black transition-colors mb-8"
             >
               <ArrowLeft size={16} /> Back
@@ -327,23 +398,31 @@ export default function LoginPage() {
               <div className="w-11 h-11 rounded-2xl bg-vodium-gold/10 border border-vodium-gold/25 flex items-center justify-center mb-5">
                 <Shield size={20} className="text-vodium-gold" />
               </div>
-              <h1 className="font-serif text-3xl text-vodium-black mb-2">Check your email</h1>
+              <h1 className="font-serif text-3xl text-vodium-black mb-2">
+                Check your email
+              </h1>
               <p className="text-muted-foreground text-sm">
                 We sent a 6-digit code to{" "}
-                <span className="text-vodium-black font-semibold">{email}</span>.
-                <br />It expires in 10 minutes.
+                <span className="text-vodium-black font-semibold">{email}</span>
+                .
+                <br />
+                It expires in 10 minutes.
               </p>
             </div>
 
             <form onSubmit={handleOtp} className="space-y-6">
               {/* 6-box OTP input */}
               <div>
-                <label className="block text-sm font-medium text-vodium-black mb-3">Verification code</label>
+                <label className="block text-sm font-medium text-vodium-black mb-3">
+                  Verification code
+                </label>
                 <div className="flex gap-2">
                   {otp.map((digit, i) => (
                     <input
                       key={i}
-                      ref={(el) => { otpRefs.current[i] = el; }}
+                      ref={(el) => {
+                        otpRefs.current[i] = el;
+                      }}
                       type="text"
                       inputMode="numeric"
                       maxLength={1}
@@ -368,7 +447,7 @@ export default function LoginPage() {
 
               <ShimmerButton
                 type="submit"
-                className={`w-full h-11 text-sm ${(otp.join("").length < 6 || loading) ? "opacity-40 pointer-events-none" : ""}`}
+                className={`w-full h-11 text-sm ${otp.join("").length < 6 || loading ? "opacity-40 pointer-events-none" : ""}`}
               >
                 {loading ? "Verifying…" : "Verify & Sign in"}
               </ShimmerButton>
@@ -380,8 +459,13 @@ export default function LoginPage() {
                 disabled={resendCooldown > 0 || resending}
                 className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-vodium-black transition-colors disabled:opacity-40 disabled:pointer-events-none"
               >
-                <RefreshCw size={14} className={resending ? "animate-spin" : ""} />
-                {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend code"}
+                <RefreshCw
+                  size={14}
+                  className={resending ? "animate-spin" : ""}
+                />
+                {resendCooldown > 0
+                  ? `Resend in ${resendCooldown}s`
+                  : "Resend code"}
               </button>
             </div>
           </div>

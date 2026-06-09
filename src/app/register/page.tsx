@@ -499,7 +499,7 @@ export default function RegisterPage() {
                     <div className="relative">
                       <MapPin
                         size={15}
-                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
                       />
                       <input
                         type="text"
@@ -540,7 +540,7 @@ export default function RegisterPage() {
                   <div className="relative">
                     <Building2
                       size={15}
-                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
                     />
                     <input
                       type="text"
@@ -697,7 +697,8 @@ export default function RegisterPage() {
                               ⚠ {getPhoneError()}
                             </p>
                           ) : (
-                            form.phone.replace(/\D/g, "").length >= country.minDigits && (
+                            form.phone.replace(/\D/g, "").length >=
+                              country.minDigits && (
                               <p className="text-[11px] text-vodium-black/40 mt-1.5 flex items-center gap-1">
                                 <Phone size={10} />
                                 Will be stored as{" "}
@@ -716,7 +717,7 @@ export default function RegisterPage() {
                     <div className="relative">
                       <Mail
                         size={15}
-                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
                       />
                       <input
                         type="email"
@@ -733,7 +734,7 @@ export default function RegisterPage() {
                     <div className="relative">
                       <Lock
                         size={15}
-                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
                       />
                       <input
                         type={showPassword ? "text" : "password"}
@@ -746,7 +747,7 @@ export default function RegisterPage() {
                       <button
                         type="button"
                         onClick={() => setShowPassword((v) => !v)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-vodium-black transition-colors"
+                        className="absolute right-6 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-vodium-black transition-colors"
                       >
                         {showPassword ? (
                           <EyeOff size={15} />
