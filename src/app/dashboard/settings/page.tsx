@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import {
   CheckCircle, Store, Phone, Mail, MapPin, Bell, Shield,
   CreditCard, Lock, X,
@@ -387,10 +388,18 @@ export default function SettingsPage() {
               <div className="h-px bg-white/[0.06] mb-6" />
 
               {/* Upgrade / manage billing */}
-              <SubscriptionActions
-                currentPlan={v?.subscription?.plan ?? "STARTER"}
-                currentStatus={v?.subscription?.status ?? "TRIAL"}
-              />
+              <div className="space-y-3">
+                <Link
+                  href="/dashboard/upgrade"
+                  className="btn-gold w-full py-2.5 rounded-xl text-sm flex items-center justify-center gap-2"
+                >
+                  View all plans
+                </Link>
+                <SubscriptionActions
+                  currentPlan={v?.subscription?.plan ?? "STARTER"}
+                  currentStatus={v?.subscription?.status ?? "TRIAL"}
+                />
+              </div>
             </div>
 
             {/* Vodium tip */}

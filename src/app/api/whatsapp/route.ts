@@ -260,6 +260,17 @@ async function runSideEffect(
       const dueDate = new Date(Date.now() + dueInDays * 86_400_000);
       await prisma.credit.create({ data: { vendorId, studentId: student.id, amount, dueDate, status: "OUTSTANDING" } });
       await prisma.creditScoreEvent.create({ data: { studentId: student.id, vendorId, eventType: "CREDIT_EXTENDED", amount, scoreDelta: 0 } });
+
+      // Notify vendor on web dashboard
+      await prisma.notification.create({
+        data: {
+          vendorId,
+          title: "New Credit Added",
+          message: `₦${Number(amount).toLocaleString()} credit recorded for ${studentName} via WhatsApp.`,
+          type: "INFO",
+        },
+      });
+
       return {};
     }
 
@@ -295,6 +306,17 @@ async function runSideEffect(
       await prisma.creditScoreEvent.create({ data: { studentId: student.id, vendorId, creditId: credit.id, eventType, amount, scoreDelta } });
       const newScore = Math.min(1000, Math.max(0, (student.vodiumScore ?? 500) + scoreDelta));
       await prisma.student.update({ where: { id: student.id }, data: { vodiumScore: newScore, scoreUpdatedAt: now } });
+
+      // Notify vendor on web dashboard
+      await prisma.notification.create({
+        data: {
+          vendorId,
+          title: "Credit Paid",
+          message: `${student.fullName} paid ₦${amount.toLocaleString()} via WhatsApp.`,
+          type: "SUCCESS",
+        },
+      });
+
       return { replyOverride: messages.paidConfirmed(student.fullName, amount) };
     }
 

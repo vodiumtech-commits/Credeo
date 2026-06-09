@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { NpsWidget } from "@/components/ui/nps-widget";
 import { NavProgress } from "@/components/ui/nav-progress";
+import { NotificationBell } from "@/components/ui/notification-bell";
 
 type VendorInfo = {
   businessName: string;
@@ -266,10 +267,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               {planLabel}
             </span>
             {/* Notification bell */}
-            <button className="relative w-8 h-8 rounded-lg border border-white/[0.07] flex items-center justify-center text-vodium-cream/35 hover:text-vodium-cream hover:border-vodium-gold/30 transition-all">
-              <Bell size={14} />
-              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-rose-500 rounded-full shadow-[0_0_4px_rgba(239,68,68,0.6)]" />
-            </button>
+            <NotificationBell />
             {/* Add credit */}
             <Link
               href="/dashboard/credit/new"

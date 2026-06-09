@@ -52,6 +52,7 @@ model Vendor {
   credits       Credit[]
   subscription  VendorSubscription?
   scoreEvents   CreditScoreEvent[]
+  notifications Notification[]
 
   @@index([universityId])
   @@index([phone])
@@ -252,6 +253,32 @@ enum WhatsAppState {
   ADDING_CREDIT_DUE
   MARKING_PAID
   LOOKING_UP_SCORE
+}
+
+// ─────────────────────────────────────────────
+// NOTIFICATIONS
+// ─────────────────────────────────────────────
+
+model Notification {
+  id          String   @id @default(cuid())
+  vendorId    String
+  vendor      Vendor   @relation(fields: [vendorId], references: [id])
+  title       String
+  message     String
+  type        NotificationType @default(INFO)
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([vendorId])
+  @@index([read])
+  @@index([createdAt])
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  DANGER
 }
 
 // ─────────────────────────────────────────────

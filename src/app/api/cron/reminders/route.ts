@@ -52,6 +52,7 @@ export async function GET(req: NextRequest) {
 
   let sent = 0;
   let failed = 0;
+  const vendorSentCount: Record<string, number> = {};
 
   for (const credit of credits) {
     const student  = credit.student;
@@ -79,11 +80,24 @@ export async function GET(req: NextRequest) {
         data:  { reminderSentAt: now, status: "DUE_SOON" },
       });
 
+      vendorSentCount[credit.vendorId] = (vendorSentCount[credit.vendorId] || 0) + 1;
       sent++;
     } catch (err) {
       console.error(`[cron/reminders] failed for credit ${credit.id}:`, err);
       failed++;
     }
+  }
+
+  // Notify vendors about the sent reminders
+  for (const [vendorId, count] of Object.entries(vendorSentCount)) {
+    await prisma.notification.create({
+      data: {
+        vendorId,
+        title: "Reminders Sent",
+        message: `We automatically sent WhatsApp reminders to ${count} students owing you today.`,
+        type: "INFO",
+      },
+    });
   }
 
   console.log(`[cron/reminders] sent=${sent} failed=${failed} total=${credits.length}`);

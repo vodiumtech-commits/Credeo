@@ -53,5 +53,15 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  // Notify vendor on web dashboard
+  await prisma.notification.create({
+    data: {
+      vendorId: vendor.id,
+      title: isPaidFull ? "Payment Received" : "Partial Payment",
+      message: `₦${amount.toLocaleString()} recorded for credit #${creditId.slice(-4)}.`,
+      type: "SUCCESS",
+    },
+  });
+
   return NextResponse.json({ ok: true, repayment }, { status: 201 });
 }

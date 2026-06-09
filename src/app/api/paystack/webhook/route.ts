@@ -46,14 +46,27 @@ export async function POST(req: NextRequest) {
       const nextPaymentDate = data.next_payment_date ? new Date(data.next_payment_date) : null;
 
       if (paystackCode && customerId) {
-        await prisma.vendorSubscription.updateMany({
+        const sub = await prisma.vendorSubscription.findFirst({
           where: { paystackCustomerId: customerId },
-          data: {
-            paystackSubscriptionCode: paystackCode,
-            status: "ACTIVE",
-            ...(nextPaymentDate ? { currentPeriodEnd: nextPaymentDate } : {}),
-          },
         });
+        if (sub) {
+          await prisma.vendorSubscription.update({
+            where: { id: sub.id },
+            data: {
+              paystackSubscriptionCode: paystackCode,
+              status: "ACTIVE",
+              ...(nextPaymentDate ? { currentPeriodEnd: nextPaymentDate } : {}),
+            },
+          });
+          await prisma.notification.create({
+            data: {
+              vendorId: sub.vendorId,
+              title: "Subscription Active",
+              message: `Your ${sub.plan} plan is now active. Thank you for choosing Vodium!`,
+              type: "SUCCESS",
+            },
+          });
+        }
       }
       break;
     }
@@ -65,14 +78,27 @@ export async function POST(req: NextRequest) {
       nextMonth.setMonth(nextMonth.getMonth() + 1);
 
       if (customerId) {
-        await prisma.vendorSubscription.updateMany({
+        const sub = await prisma.vendorSubscription.findFirst({
           where: { paystackCustomerId: customerId },
-          data: {
-            status: "ACTIVE",
-            currentPeriodStart: paidAt,
-            currentPeriodEnd: nextMonth,
-          },
         });
+        if (sub) {
+          await prisma.vendorSubscription.update({
+            where: { id: sub.id },
+            data: {
+              status: "ACTIVE",
+              currentPeriodStart: paidAt,
+              currentPeriodEnd: nextMonth,
+            },
+          });
+          await prisma.notification.create({
+            data: {
+              vendorId: sub.vendorId,
+              title: "Payment Successful",
+              message: "Your monthly subscription payment was processed successfully.",
+              type: "SUCCESS",
+            },
+          });
+        }
       }
       break;
     }
@@ -80,10 +106,23 @@ export async function POST(req: NextRequest) {
     case "subscription.disable": {
       const paystackCode = data.subscription_code;
       if (paystackCode) {
-        await prisma.vendorSubscription.updateMany({
+        const sub = await prisma.vendorSubscription.findFirst({
           where: { paystackSubscriptionCode: paystackCode },
-          data: { status: "CANCELLED" },
         });
+        if (sub) {
+          await prisma.vendorSubscription.update({
+            where: { id: sub.id },
+            data: { status: "CANCELLED" },
+          });
+          await prisma.notification.create({
+            data: {
+              vendorId: sub.vendorId,
+              title: "Subscription Cancelled",
+              message: "Your subscription has been disabled. You'll lose access to premium features soon.",
+              type: "WARNING",
+            },
+          });
+        }
       }
       break;
     }
@@ -91,10 +130,23 @@ export async function POST(req: NextRequest) {
     case "invoice.payment_failed": {
       const paystackCode = data.subscription?.subscription_code;
       if (paystackCode) {
-        await prisma.vendorSubscription.updateMany({
+        const sub = await prisma.vendorSubscription.findFirst({
           where: { paystackSubscriptionCode: paystackCode },
-          data: { status: "PAST_DUE" },
         });
+        if (sub) {
+          await prisma.vendorSubscription.update({
+            where: { id: sub.id },
+            data: { status: "PAST_DUE" },
+          });
+          await prisma.notification.create({
+            data: {
+              vendorId: sub.vendorId,
+              title: "Payment Failed",
+              message: "We couldn't process your monthly payment. Please update your billing info.",
+              type: "DANGER",
+            },
+          });
+        }
       }
       break;
     }
