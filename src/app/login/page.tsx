@@ -243,7 +243,7 @@ export default function LoginPage() {
                 <div>
                   <label className="block text-sm font-medium text-vodium-black mb-1.5">Email address</label>
                   <div className="relative">
-                    <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                    <Mail size={15} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                     <input
                       type="email"
                       autoComplete="email"
@@ -251,7 +251,7 @@ export default function LoginPage() {
                       value={email}
                       onChange={(e) => { setEmail(e.target.value); setError(null); }}
                       required
-                      className="input-premium pl-9 w-full"
+                      className="input-premium pr-9 w-full"
                       autoFocus
                     />
                   </div>
@@ -260,7 +260,7 @@ export default function LoginPage() {
                 <div>
                   <label className="block text-sm font-medium text-vodium-black mb-1.5">Password</label>
                   <div className="relative">
-                    <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                    <Lock size={15} className="absolute right-10 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                     <input
                       type={showPassword ? "text" : "password"}
                       autoComplete="current-password"
@@ -268,7 +268,7 @@ export default function LoginPage() {
                       value={password}
                       onChange={(e) => { setPassword(e.target.value); setError(null); }}
                       required
-                      className="input-premium pl-9 pr-10 w-full"
+                      className="input-premium pr-10 w-full"
                     />
                     <button
                       type="button"

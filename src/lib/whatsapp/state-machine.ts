@@ -44,7 +44,7 @@ export type SideEffect =
   | { type: "CREATE_CREDIT";  data: { vendorId: string; studentName: string; matric?: string; amount: number; dueInDays: number } }
   | { type: "MARK_PAID";      data: { vendorId: string; studentName: string } }
   | { type: "FETCH_LIST";     data: { vendorId: string } }
-  | { type: "FETCH_SCORE";    data: { studentQuery: string } };
+  | { type: "FETCH_SCORE";    data: { studentQuery: string; fromPhone: string } };
 
 // ─── intent detection ─────────────────────────────────────────────────────────
 
@@ -159,7 +159,7 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
       return {
         reply: "Looking up score…",
         nextState: "IDLE",
-        sideEffects: [{ type: "FETCH_SCORE", data: { studentQuery: body } }],
+        sideEffects: [{ type: "FETCH_SCORE", data: { studentQuery: body, fromPhone: msg.fromPhone } }],
       };
   }
 
@@ -206,7 +206,7 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
         return {
           reply: "Looking up score…",
           nextState: "IDLE",
-          sideEffects: [{ type: "FETCH_SCORE", data: { studentQuery: queryAfterScore } }],
+          sideEffects: [{ type: "FETCH_SCORE", data: { studentQuery: queryAfterScore, fromPhone: msg.fromPhone } }],
         };
       }
       return { reply: messages.scoreLookupAsk(), nextState: "LOOKING_UP_SCORE" };

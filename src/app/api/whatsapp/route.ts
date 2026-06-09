@@ -132,10 +132,19 @@ export async function POST(req: NextRequest) {
       create: { phone: fromPhone, state: "IDLE", context: {} },
     });
 
-    // Resolve vendor
+    // Resolve vendor — restrict BOT to registered vendors only
     const vendor = session.vendorId
       ? await prisma.vendor.findUnique({ where: { id: session.vendorId } })
       : await prisma.vendor.findUnique({ where: { phone: fromPhone } });
+
+    if (!vendor) {
+      console.log(`[whatsapp] Rejected: unregistered user ${fromPhone}`);
+      await sendWhatsAppMessage(
+        fromPhone,
+        "You are not registered as a vendor on Vodium Ledger. Please sign up at vodium.ng or contact support."
+      );
+      return NextResponse.json({ ok: true });
+    }
 
     // Run state machine
     const sessionCtx: SessionContext = {
@@ -290,12 +299,21 @@ async function runSideEffect(
     }
 
     case "FETCH_SCORE": {
-      const { studentQuery } = effect.data;
+      const { studentQuery, fromPhone } = effect.data;
       const words = studentQuery.split(/\s+/).filter(Boolean);
       const byMatric = await prisma.student.findFirst({ where: { matricNumber: { equals: studentQuery, mode: "insensitive" } }, include: { scoreEvents: { orderBy: { occurredAt: "asc" } } } });
       const student = byMatric ?? await prisma.student.findFirst({ where: { OR: words.map((w) => ({ fullName: { contains: w, mode: "insensitive" as const } })), NOT: { phone: { startsWith: "pending:" } } }, include: { scoreEvents: { orderBy: { occurredAt: "asc" } } }, orderBy: { createdAt: "desc" } });
       if (!student)                    return { replyOverride: messages.scoreNotFound(studentQuery) };
       if (!student.scoreEvents.length) return { replyOverride: messages.scoreNoHistory(student.fullName) };
+
+      // Capture student's WhatsApp phone for reminders (only if phone is pending or not set)
+      if (student.phone?.startsWith("pending:")) {
+        await prisma.student.update({
+          where: { id: student.id },
+          data: { phone: fromPhone },
+        });
+      }
+
       const { score, summary } = computeScore(student.scoreEvents);
       return { replyOverride: messages.scoreReply(student.fullName, score, summary) };
     }

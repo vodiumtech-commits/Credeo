@@ -4,43 +4,85 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, ArrowRight, CheckCircle, Store, MapPin, Phone,
-  MessageCircle, Building2, ShoppingBag, UtensilsCrossed,
-  WashingMachine, Printer, Scissors, Sparkles, Pill, ShoppingCart, HelpCircle,
-  Shield, Zap, TrendingUp, Lock, Eye, EyeOff, Mail, RefreshCw, ChevronDown,
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle,
+  Store,
+  MapPin,
+  Phone,
+  MessageCircle,
+  Building2,
+  ShoppingBag,
+  UtensilsCrossed,
+  WashingMachine,
+  Printer,
+  Scissors,
+  Sparkles,
+  Pill,
+  ShoppingCart,
+  HelpCircle,
+  Shield,
+  Zap,
+  TrendingUp,
+  Lock,
+  Eye,
+  EyeOff,
+  Mail,
+  RefreshCw,
+  ChevronDown,
 } from "lucide-react";
 import { ShimmerButton } from "@/components/ui/shimmer-button";
 import { Spotlight } from "@/components/ui/spotlight";
 
-
 const VENDOR_TYPES = [
-  { value: "PROVISION_SHOP", label: "Provision Shop",  icon: ShoppingBag },
-  { value: "FOOD_CANTEEN",   label: "Food Canteen",    icon: UtensilsCrossed },
-  { value: "LAUNDRY",        label: "Laundry",         icon: WashingMachine },
-  { value: "PRINTING",       label: "Printing",        icon: Printer },
-  { value: "BARBING_SALON",  label: "Barbing Salon",   icon: Scissors },
-  { value: "HAIR_SALON",     label: "Hair Salon",      icon: Sparkles },
-  { value: "PHARMACY",       label: "Pharmacy",        icon: Pill },
-  { value: "MINI_MART",      label: "Mini Mart",       icon: ShoppingCart },
-  { value: "OTHER",          label: "Other",           icon: HelpCircle },
+  { value: "PROVISION_SHOP", label: "Provision Shop", icon: ShoppingBag },
+  { value: "FOOD_CANTEEN", label: "Food Canteen", icon: UtensilsCrossed },
+  { value: "LAUNDRY", label: "Laundry", icon: WashingMachine },
+  { value: "PRINTING", label: "Printing", icon: Printer },
+  { value: "BARBING_SALON", label: "Barbing Salon", icon: Scissors },
+  { value: "HAIR_SALON", label: "Hair Salon", icon: Sparkles },
+  { value: "PHARMACY", label: "Pharmacy", icon: Pill },
+  { value: "MINI_MART", label: "Mini Mart", icon: ShoppingCart },
+  { value: "OTHER", label: "Other", icon: HelpCircle },
 ];
 
 type PhoneCountry = "NG" | "US";
 
-const PHONE_COUNTRIES: Record<PhoneCountry, { flag: string; dial: string; placeholder: string; hint: string; minDigits: number }> = {
-  NG: { flag: "🇳🇬", dial: "+234", placeholder: "801 234 5678",    hint: "Your Nigerian WhatsApp number",   minDigits: 10 },
-  US: { flag: "🇺🇸", dial: "+1",   placeholder: "(415) 555-1234", hint: "Your US WhatsApp number",         minDigits: 10 },
+const PHONE_COUNTRIES: Record<
+  PhoneCountry,
+  {
+    flag: string;
+    dial: string;
+    placeholder: string;
+    hint: string;
+    minDigits: number;
+  }
+> = {
+  NG: {
+    flag: "🇳🇬",
+    dial: "+234",
+    placeholder: "801 234 5678",
+    hint: "Your Nigerian WhatsApp number",
+    minDigits: 10,
+  },
+  US: {
+    flag: "🇺🇸",
+    dial: "+1",
+    placeholder: "(415) 555-1234",
+    hint: "Your US WhatsApp number",
+    minDigits: 10,
+  },
 };
 
 type FormData = {
-  businessName:   string;
-  vendorType:     string;
+  businessName: string;
+  vendorType: string;
   campusLocation: string;
-  university:     string;
-  ownerName:      string;
-  phone:          string;
-  email:          string;
-  password:       string;
+  university: string;
+  ownerName: string;
+  phone: string;
+  email: string;
+  password: string;
 };
 
 const STEPS = [
@@ -52,18 +94,18 @@ const STEPS = [
 
 export default function RegisterPage() {
   const router = useRouter();
-  const submitting  = useRef(false);
-  const otpRefs     = useRef<(HTMLInputElement | null)[]>([]);
-  const [step, setStep]               = useState(1);
-  const [loading, setLoading]         = useState(false);
-  const [resending, setResending]     = useState(false);
+  const submitting = useRef(false);
+  const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const [step, setStep] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
-  const [error, setError]             = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-  const [otp, setOtp]                 = useState(["", "", "", "", "", ""]);
-  const [done, setDone]               = useState(false);
+  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+  const [done, setDone] = useState(false);
   const [phoneCountry, setPhoneCountry] = useState<PhoneCountry>("NG");
-  const [countryOpen,  setCountryOpen]  = useState(false);
+  const [countryOpen, setCountryOpen] = useState(false);
 
   useEffect(() => {
     if (resendCooldown <= 0) return;
@@ -71,14 +113,14 @@ export default function RegisterPage() {
     return () => clearTimeout(t);
   }, [resendCooldown]);
   const [form, setForm] = useState<FormData>({
-    businessName:   "",
-    vendorType:     "",
+    businessName: "",
+    vendorType: "",
     campusLocation: "",
-    university:     "",
-    ownerName:      "",
-    phone:          "",
-    email:          "",
-    password:       "",
+    university: "",
+    ownerName: "",
+    phone: "",
+    email: "",
+    password: "",
   });
 
   function update(field: keyof FormData, value: string) {
@@ -94,28 +136,62 @@ export default function RegisterPage() {
     return `${country.dial}${digits}`;
   };
 
+  // Validate phone number format for selected country
+  const isValidPhoneFormat = (): boolean => {
+    const digits = form.phone.replace(/\D/g, "");
+    if (phoneCountry === "NG") {
+      // Nigeria: 10-11 digits (with or without leading 0)
+      return digits.length === 10 || digits.length === 11;
+    }
+    if (phoneCountry === "US") {
+      // US: exactly 10 digits
+      return digits.length === 10;
+    }
+    return false;
+  };
+
+  const getPhoneError = (): string | null => {
+    if (!form.phone) return null;
+    const digits = form.phone.replace(/\D/g, "");
+    if (digits.length === 0) return null;
+    if (!isValidPhoneFormat()) {
+      if (phoneCountry === "NG") {
+        return "Nigerian numbers must be 10–11 digits";
+      }
+      return "US numbers must be exactly 10 digits";
+    }
+    return null;
+  };
+
   const canAdvance = () => {
-    if (step === 1) return form.businessName.length > 1 && !!form.vendorType && form.campusLocation.length > 2;
+    if (step === 1)
+      return (
+        form.businessName.length > 1 &&
+        !!form.vendorType &&
+        form.campusLocation.length > 2
+      );
     if (step === 2) return form.university.length > 1;
-    if (step === 3) return (
-      form.ownerName.length > 2 &&
-      form.phone.replace(/\D/g, "").length >= country.minDigits &&
-      form.email.includes("@") &&
-      form.password.length >= 8
-    );
+    if (step === 3)
+      return (
+        form.ownerName.length > 2 &&
+        form.phone.replace(/\D/g, "").length >= country.minDigits &&
+        isValidPhoneFormat() &&
+        form.email.includes("@") &&
+        form.password.length >= 8
+      );
     if (step === 4) return otp.join("").length === 6;
     return false;
   };
 
   const formPayload = () => ({
-    businessName:   form.businessName,
-    vendorType:     form.vendorType,
+    businessName: form.businessName,
+    vendorType: form.vendorType,
     campusLocation: form.campusLocation,
-    university:     form.university,
-    ownerName:      form.ownerName,
-    phone:          fullPhone(),   // always sent as +dialcode + digits
-    email:          form.email,
-    password:       form.password,
+    university: form.university,
+    ownerName: form.ownerName,
+    phone: fullPhone(), // always sent as +dialcode + digits
+    email: form.email,
+    password: form.password,
   });
 
   // Step 3 → send OTP
@@ -125,10 +201,10 @@ export default function RegisterPage() {
     setLoading(true);
     setError(null);
     try {
-      const res  = await fetch("/api/vendor/register", {
-        method:  "POST",
+      const res = await fetch("/api/vendor/register", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify(formPayload()),
+        body: JSON.stringify(formPayload()),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Could not send code");
@@ -151,10 +227,10 @@ export default function RegisterPage() {
     setLoading(true);
     setError(null);
     try {
-      const res  = await fetch("/api/vendor/register", {
-        method:  "POST",
+      const res = await fetch("/api/vendor/register", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ ...formPayload(), otp: code }),
+        body: JSON.stringify({ ...formPayload(), otp: code }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Invalid code");
@@ -174,10 +250,10 @@ export default function RegisterPage() {
     setResending(true);
     setError(null);
     try {
-      const res  = await fetch("/api/vendor/register", {
-        method:  "POST",
+      const res = await fetch("/api/vendor/register", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify(formPayload()),
+        body: JSON.stringify(formPayload()),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -193,7 +269,7 @@ export default function RegisterPage() {
 
   function handleOtpInput(index: number, value: string) {
     const digit = value.replace(/\D/g, "").slice(-1);
-    const next  = [...otp];
+    const next = [...otp];
     next[index] = digit;
     setOtp(next);
     setError(null);
@@ -208,15 +284,24 @@ export default function RegisterPage() {
 
   function handleOtpPaste(e: React.ClipboardEvent) {
     e.preventDefault();
-    const text   = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    const text = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
     const digits = text.split("");
-    const next   = [...otp];
-    digits.forEach((d, i) => { if (i < 6) next[i] = d; });
+    const next = [...otp];
+    digits.forEach((d, i) => {
+      if (i < 6) next[i] = d;
+    });
     setOtp(next);
     otpRefs.current[Math.min(digits.length, 5)]?.focus();
   }
 
-  if (done) return <SuccessScreen name={form.ownerName} business={form.businessName} onDashboard={() => router.push("/dashboard")} />;
+  if (done)
+    return (
+      <SuccessScreen
+        name={form.ownerName}
+        business={form.businessName}
+        onDashboard={() => router.push("/dashboard")}
+      />
+    );
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row">
@@ -230,34 +315,61 @@ export default function RegisterPage() {
 
         <Link href="/" className="relative z-10 flex items-center gap-3 group">
           <div className="w-10 h-10 rounded-full bg-vodium-charcoal border border-vodium-gold/40 flex items-center justify-center group-hover:border-vodium-gold/70 transition-colors">
-            <span className="font-serif text-vodium-gold text-xl leading-none">V</span>
+            <span className="font-serif text-vodium-gold text-xl leading-none">
+              V
+            </span>
           </div>
-          <span className="font-serif tracking-[0.18em] text-vodium-gold text-sm">VODIUM LEDGER</span>
+          <span className="font-serif tracking-[0.18em] text-vodium-gold text-sm">
+            VODIUM LEDGER
+          </span>
         </Link>
 
         <div className="flex-1 flex flex-col justify-center relative z-10">
-          <p className="text-vodium-gold text-xs tracking-[0.35em] uppercase mb-6">For campus vendors</p>
+          <p className="text-vodium-gold text-xs tracking-[0.35em] uppercase mb-6">
+            For campus vendors
+          </p>
           <h2 className="font-serif text-4xl text-vodium-cream leading-tight mb-6">
-            Start tracking<br />credit in<br />
+            Start tracking
+            <br />
+            credit in
+            <br />
             <em className="text-gradient-gold not-italic">minutes.</em>
           </h2>
           <p className="text-vodium-cream/45 leading-relaxed max-w-sm text-sm mb-12">
-            Join hundreds of campus vendors who&rsquo;ve stopped losing money to defaults.
-            Set up your ledger in under 3 minutes — no card needed.
+            Join hundreds of campus vendors who&rsquo;ve stopped losing money to
+            defaults. Set up your ledger in under 3 minutes — no card needed.
           </p>
           <div className="space-y-4">
             {[
-              { icon: <Zap size={15} />,           label: "No card needed",    sub: "60-day free trial, cancel anytime" },
-              { icon: <MessageCircle size={15} />,  label: "WhatsApp-first",   sub: "Record credits right from WhatsApp" },
-              { icon: <Shield size={15} />,         label: "Private by design", sub: "Students only see their own balance" },
-              { icon: <TrendingUp size={15} />,     label: "Recover more",      sub: "Vendors recover 3× more on average" },
+              {
+                icon: <Zap size={15} />,
+                label: "No card needed",
+                sub: "60-day free trial, cancel anytime",
+              },
+              {
+                icon: <MessageCircle size={15} />,
+                label: "WhatsApp-first",
+                sub: "Record credits right from WhatsApp",
+              },
+              {
+                icon: <Shield size={15} />,
+                label: "Private by design",
+                sub: "Students only see their own balance",
+              },
+              {
+                icon: <TrendingUp size={15} />,
+                label: "Recover more",
+                sub: "Vendors recover 3× more on average",
+              },
             ].map((b) => (
               <div key={b.label} className="flex items-start gap-3">
                 <div className="w-7 h-7 rounded-lg bg-vodium-gold/10 border border-vodium-gold/20 flex items-center justify-center text-vodium-gold flex-shrink-0 mt-0.5">
                   {b.icon}
                 </div>
                 <div>
-                  <p className="text-vodium-cream text-sm font-medium">{b.label}</p>
+                  <p className="text-vodium-cream text-sm font-medium">
+                    {b.label}
+                  </p>
                   <p className="text-vodium-cream/35 text-xs mt-0.5">{b.sub}</p>
                 </div>
               </div>
@@ -268,12 +380,14 @@ export default function RegisterPage() {
         <div className="relative z-10 border-t border-white/[0.07] pt-8">
           <div className="grid grid-cols-3 gap-6">
             {[
-              { value: "127+",  label: "Active vendors" },
+              { value: "127+", label: "Active vendors" },
               { value: "₦47M+", label: "Credit tracked" },
-              { value: "73%",   label: "Repayment rate" },
+              { value: "73%", label: "Repayment rate" },
             ].map((s) => (
               <div key={s.label}>
-                <p className="font-serif text-2xl text-vodium-gold">{s.value}</p>
+                <p className="font-serif text-2xl text-vodium-gold">
+                  {s.value}
+                </p>
                 <p className="text-vodium-cream/35 text-xs mt-0.5">{s.label}</p>
               </div>
             ))}
@@ -287,26 +401,34 @@ export default function RegisterPage() {
           <div className="w-9 h-9 rounded-full bg-vodium-black border border-vodium-gold/40 flex items-center justify-center">
             <span className="font-serif text-vodium-gold text-lg">V</span>
           </div>
-          <span className="font-serif tracking-[0.18em] text-vodium-black text-sm">VODIUM LEDGER</span>
+          <span className="font-serif tracking-[0.18em] text-vodium-black text-sm">
+            VODIUM LEDGER
+          </span>
         </Link>
 
         <div className="hidden md:flex justify-end mb-6">
-          <Link href="/login" className="text-sm text-vodium-black/50 hover:text-vodium-black transition-colors">
+          <Link
+            href="/login"
+            className="text-sm text-vodium-black/50 hover:text-vodium-black transition-colors"
+          >
             Already have an account?{" "}
-            <span className="text-vodium-black font-semibold hover:text-vodium-gold transition-colors">Sign in</span>
+            <span className="text-vodium-black font-semibold hover:text-vodium-gold transition-colors">
+              Sign in
+            </span>
           </Link>
         </div>
 
         <div className="flex-1 flex flex-col justify-center">
           <div className="max-w-sm mx-auto w-full">
-
             {/* Step progress */}
             <div className="flex items-center gap-2 mb-10">
               {STEPS.map((s) => (
                 <div
                   key={s.id}
                   className={`h-1.5 rounded-full transition-all duration-300 ${
-                    step >= s.id ? "bg-vodium-gold w-8" : "bg-vodium-black/10 w-4"
+                    step >= s.id
+                      ? "bg-vodium-gold w-8"
+                      : "bg-vodium-black/10 w-4"
                   }`}
                 />
               ))}
@@ -319,8 +441,12 @@ export default function RegisterPage() {
                   <div className="w-11 h-11 rounded-2xl bg-vodium-gold/10 border border-vodium-gold/25 flex items-center justify-center mb-5">
                     <Store size={20} className="text-vodium-gold" />
                   </div>
-                  <h1 className="font-serif text-3xl text-vodium-black mb-2">Tell us about your shop</h1>
-                  <p className="text-muted-foreground text-sm">This is how your business will appear to students.</p>
+                  <h1 className="font-serif text-3xl text-vodium-black mb-2">
+                    Tell us about your shop
+                  </h1>
+                  <p className="text-muted-foreground text-sm">
+                    This is how your business will appear to students.
+                  </p>
                 </div>
                 <div className="space-y-4">
                   <Field label="Business name" required>
@@ -349,21 +475,39 @@ export default function RegisterPage() {
                                 : "border-border text-muted-foreground hover:border-vodium-gold/40 hover:text-vodium-black"
                             }`}
                           >
-                            <Icon size={16} className={sel ? "text-vodium-gold" : "text-muted-foreground"} />
-                            <span className="text-[10px] font-medium leading-tight">{t.label}</span>
+                            <Icon
+                              size={16}
+                              className={
+                                sel
+                                  ? "text-vodium-gold"
+                                  : "text-muted-foreground"
+                              }
+                            />
+                            <span className="text-[10px] font-medium leading-tight">
+                              {t.label}
+                            </span>
                           </button>
                         );
                       })}
                     </div>
                   </Field>
-                  <Field label="Campus location" required hint="Where on campus can students find you?">
+                  <Field
+                    label="Campus location"
+                    required
+                    hint="Where on campus can students find you?"
+                  >
                     <div className="relative">
-                      <MapPin size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                      <MapPin
+                        size={15}
+                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                      />
                       <input
                         type="text"
                         placeholder="e.g. Faculty of Arts Complex, Block C"
                         value={form.campusLocation}
-                        onChange={(e) => update("campusLocation", e.target.value)}
+                        onChange={(e) =>
+                          update("campusLocation", e.target.value)
+                        }
                         className="input-premium pl-9"
                       />
                     </div>
@@ -379,15 +523,25 @@ export default function RegisterPage() {
                   <div className="w-11 h-11 rounded-2xl bg-vodium-gold/10 border border-vodium-gold/25 flex items-center justify-center mb-5">
                     <Building2 size={20} className="text-vodium-gold" />
                   </div>
-                  <h1 className="font-serif text-3xl text-vodium-black mb-2">Which campus?</h1>
+                  <h1 className="font-serif text-3xl text-vodium-black mb-2">
+                    Which campus?
+                  </h1>
                   <p className="text-muted-foreground text-sm">
-                    Type your university name exactly as you know it — abbreviation or full name both work.
+                    Type your university name exactly as you know it —
+                    abbreviation or full name both work.
                   </p>
                 </div>
 
-                <Field label="University / campus name" required hint="e.g. Dominion University, UNILAG, Covenant University">
+                <Field
+                  label="University / campus name"
+                  required
+                  hint="e.g. Dominion University, UNILAG, Covenant University"
+                >
                   <div className="relative">
-                    <Building2 size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                    <Building2
+                      size={15}
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                    />
                     <input
                       type="text"
                       placeholder="e.g. Dominion University"
@@ -403,11 +557,17 @@ export default function RegisterPage() {
                 {/* Live normalisation preview — shows exactly what will be stored */}
                 {form.university.trim().length > 1 && (
                   <div className="mt-3 flex items-center gap-2 px-3.5 py-2.5 bg-vodium-gold/5 border border-vodium-gold/20 rounded-xl">
-                    <CheckCircle size={13} className="text-vodium-gold flex-shrink-0" />
+                    <CheckCircle
+                      size={13}
+                      className="text-vodium-gold flex-shrink-0"
+                    />
                     <p className="text-xs text-vodium-black/60">
                       Will be saved as{" "}
                       <span className="font-semibold text-vodium-black font-mono">
-                        {form.university.trim().replace(/\s+/g, " ").toLowerCase()}
+                        {form.university
+                          .trim()
+                          .replace(/\s+/g, " ")
+                          .toLowerCase()}
                       </span>
                     </p>
                   </div>
@@ -422,8 +582,12 @@ export default function RegisterPage() {
                   <div className="w-11 h-11 rounded-2xl bg-vodium-gold/10 border border-vodium-gold/25 flex items-center justify-center mb-5">
                     <Phone size={20} className="text-vodium-gold" />
                   </div>
-                  <h1 className="font-serif text-3xl text-vodium-black mb-2">Your details</h1>
-                  <p className="text-muted-foreground text-sm">Set up your login credentials.</p>
+                  <h1 className="font-serif text-3xl text-vodium-black mb-2">
+                    Your details
+                  </h1>
+                  <p className="text-muted-foreground text-sm">
+                    Set up your login credentials.
+                  </p>
                 </div>
                 <div className="space-y-4">
                   <Field label="Your full name" required>
@@ -437,7 +601,11 @@ export default function RegisterPage() {
                     />
                   </Field>
 
-                  <Field label="WhatsApp phone number" required hint={country.hint}>
+                  <Field
+                    label="WhatsApp phone number"
+                    required
+                    hint={country.hint}
+                  >
                     <div className="relative">
                       <div className="flex">
                         {/* Country selector */}
@@ -447,31 +615,59 @@ export default function RegisterPage() {
                             onClick={() => setCountryOpen((v) => !v)}
                             className="flex items-center gap-1.5 px-3 h-full bg-white border-y border-l border-border rounded-l-[10px] border-r-0 hover:bg-vodium-gold/5 transition-colors min-w-[88px]"
                           >
-                            <span className="text-base leading-none select-none">{country.flag}</span>
-                            <span className="text-sm text-vodium-black/70 font-semibold">{country.dial}</span>
-                            <ChevronDown size={12} className={`text-vodium-black/35 transition-transform ${countryOpen ? "rotate-180" : ""}`} />
+                            <span className="text-base leading-none select-none">
+                              {country.flag}
+                            </span>
+                            <span className="text-sm text-vodium-black/70 font-semibold">
+                              {country.dial}
+                            </span>
+                            <ChevronDown
+                              size={12}
+                              className={`text-vodium-black/35 transition-transform ${countryOpen ? "rotate-180" : ""}`}
+                            />
                           </button>
 
                           {/* Dropdown */}
                           {countryOpen && (
                             <div className="absolute top-full left-0 mt-1 z-20 w-48 bg-white border border-border rounded-xl shadow-lg overflow-hidden">
-                              {(Object.entries(PHONE_COUNTRIES) as [PhoneCountry, typeof country][]).map(([code, c]) => (
+                              {(
+                                Object.entries(PHONE_COUNTRIES) as [
+                                  PhoneCountry,
+                                  typeof country,
+                                ][]
+                              ).map(([code, c]) => (
                                 <button
                                   key={code}
                                   type="button"
-                                  onClick={() => { setPhoneCountry(code); setCountryOpen(false); update("phone", ""); }}
+                                  onClick={() => {
+                                    setPhoneCountry(code);
+                                    setCountryOpen(false);
+                                    update("phone", "");
+                                  }}
                                   className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors ${
                                     phoneCountry === code
                                       ? "bg-vodium-gold/10 text-vodium-black font-semibold"
                                       : "hover:bg-vodium-gold/5 text-vodium-black/70"
                                   }`}
                                 >
-                                  <span className="text-lg leading-none">{c.flag}</span>
+                                  <span className="text-lg leading-none">
+                                    {c.flag}
+                                  </span>
                                   <div className="text-left">
-                                    <p className="font-medium text-xs">{code === "NG" ? "Nigeria" : "United States"}</p>
-                                    <p className="text-[10px] text-muted-foreground">{c.dial}</p>
+                                    <p className="font-medium text-xs">
+                                      {code === "NG"
+                                        ? "Nigeria"
+                                        : "United States"}
+                                    </p>
+                                    <p className="text-[10px] text-muted-foreground">
+                                      {c.dial}
+                                    </p>
                                   </div>
-                                  {phoneCountry === code && <span className="ml-auto text-vodium-gold text-xs">✓</span>}
+                                  {phoneCountry === code && (
+                                    <span className="ml-auto text-vodium-gold text-xs">
+                                      ✓
+                                    </span>
+                                  )}
                                 </button>
                               ))}
                             </div>
@@ -484,26 +680,44 @@ export default function RegisterPage() {
                           inputMode="tel"
                           placeholder={country.placeholder}
                           value={form.phone}
-                          onChange={(e) => { update("phone", e.target.value); setCountryOpen(false); }}
+                          onChange={(e) => {
+                            update("phone", e.target.value);
+                            setCountryOpen(false);
+                          }}
                           className="input-premium rounded-l-none border-l-0 focus:z-10 flex-1"
                           style={{ borderRadius: "0 10px 10px 0" }}
                         />
                       </div>
 
-                      {/* Preview of stored number */}
-                      {form.phone.replace(/\D/g, "").length >= country.minDigits && (
-                        <p className="text-[11px] text-vodium-black/40 mt-1.5 flex items-center gap-1">
-                          <Phone size={10} />
-                          Will be stored as{" "}
-                          <span className="font-mono font-medium text-vodium-black/60">{fullPhone()}</span>
-                        </p>
+                      {/* Preview of stored number or validation error */}
+                      {form.phone.replace(/\D/g, "").length > 0 && (
+                        <>
+                          {getPhoneError() ? (
+                            <p className="text-[11px] text-danger mt-1.5 flex items-center gap-1">
+                              ⚠ {getPhoneError()}
+                            </p>
+                          ) : (
+                            form.phone.replace(/\D/g, "").length >= country.minDigits && (
+                              <p className="text-[11px] text-vodium-black/40 mt-1.5 flex items-center gap-1">
+                                <Phone size={10} />
+                                Will be stored as{" "}
+                                <span className="font-mono font-medium text-vodium-black/60">
+                                  {fullPhone()}
+                                </span>
+                              </p>
+                            )
+                          )}
+                        </>
                       )}
                     </div>
                   </Field>
 
                   <Field label="Email address" required>
                     <div className="relative">
-                      <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                      <Mail
+                        size={15}
+                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                      />
                       <input
                         type="email"
                         autoComplete="email"
@@ -517,7 +731,10 @@ export default function RegisterPage() {
 
                   <Field label="Password" required hint="Minimum 8 characters.">
                     <div className="relative">
-                      <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                      <Lock
+                        size={15}
+                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                      />
                       <input
                         type={showPassword ? "text" : "password"}
                         autoComplete="new-password"
@@ -531,11 +748,19 @@ export default function RegisterPage() {
                         onClick={() => setShowPassword((v) => !v)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-vodium-black transition-colors"
                       >
-                        {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                        {showPassword ? (
+                          <EyeOff size={15} />
+                        ) : (
+                          <Eye size={15} />
+                        )}
                       </button>
                     </div>
                     {form.password.length > 0 && form.password.length < 8 && (
-                      <p className="text-xs text-danger mt-1.5">Password too short — needs {8 - form.password.length} more character{8 - form.password.length !== 1 ? "s" : ""}.</p>
+                      <p className="text-xs text-danger mt-1.5">
+                        Password too short — needs {8 - form.password.length}{" "}
+                        more character
+                        {8 - form.password.length !== 1 ? "s" : ""}.
+                      </p>
                     )}
                   </Field>
                 </div>
@@ -549,21 +774,31 @@ export default function RegisterPage() {
                   <div className="w-11 h-11 rounded-2xl bg-vodium-gold/10 border border-vodium-gold/25 flex items-center justify-center mb-5">
                     <Shield size={20} className="text-vodium-gold" />
                   </div>
-                  <h1 className="font-serif text-3xl text-vodium-black mb-2">Verify your email</h1>
+                  <h1 className="font-serif text-3xl text-vodium-black mb-2">
+                    Verify your email
+                  </h1>
                   <p className="text-muted-foreground text-sm">
                     We sent a 6-digit code to{" "}
-                    <span className="text-vodium-black font-semibold">{form.email}</span>.
-                    <br />It expires in 10 minutes.
+                    <span className="text-vodium-black font-semibold">
+                      {form.email}
+                    </span>
+                    .
+                    <br />
+                    It expires in 10 minutes.
                   </p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-vodium-black mb-3">Verification code</label>
+                  <label className="block text-sm font-medium text-vodium-black mb-3">
+                    Verification code
+                  </label>
                   <div className="flex gap-2">
                     {otp.map((digit, i) => (
                       <input
                         key={i}
-                        ref={(el) => { otpRefs.current[i] = el; }}
+                        ref={(el) => {
+                          otpRefs.current[i] = el;
+                        }}
                         type="text"
                         inputMode="numeric"
                         maxLength={1}
@@ -585,8 +820,13 @@ export default function RegisterPage() {
                       disabled={resendCooldown > 0 || resending}
                       className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-vodium-black transition-colors disabled:opacity-40 disabled:pointer-events-none"
                     >
-                      <RefreshCw size={14} className={resending ? "animate-spin" : ""} />
-                      {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend code"}
+                      <RefreshCw
+                        size={14}
+                        className={resending ? "animate-spin" : ""}
+                      />
+                      {resendCooldown > 0
+                        ? `Resend in ${resendCooldown}s`
+                        : "Resend code"}
                     </button>
                   </div>
                 </div>
@@ -605,20 +845,30 @@ export default function RegisterPage() {
             <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
               {step > 1 && step < 4 ? (
                 <button
-                  onClick={() => { setStep(step - 1); setError(null); }}
+                  onClick={() => {
+                    setStep(step - 1);
+                    setError(null);
+                  }}
                   className="flex items-center gap-2 text-sm text-muted-foreground hover:text-vodium-black transition-colors"
                 >
                   <ArrowLeft size={16} /> Back
                 </button>
               ) : step === 4 ? (
                 <button
-                  onClick={() => { setStep(3); setOtp(["", "", "", "", "", ""]); setError(null); }}
+                  onClick={() => {
+                    setStep(3);
+                    setOtp(["", "", "", "", "", ""]);
+                    setError(null);
+                  }}
                   className="flex items-center gap-2 text-sm text-muted-foreground hover:text-vodium-black transition-colors"
                 >
                   <ArrowLeft size={16} /> Back
                 </button>
               ) : (
-                <Link href="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-vodium-black transition-colors">
+                <Link
+                  href="/"
+                  className="flex items-center gap-2 text-sm text-muted-foreground hover:text-vodium-black transition-colors"
+                >
                   <ArrowLeft size={16} /> Back to home
                 </Link>
               )}
@@ -637,7 +887,13 @@ export default function RegisterPage() {
                   onClick={handleRequestOtp}
                   className={`px-6 h-11 text-sm gap-2 ${!canAdvance() || loading ? "opacity-40 pointer-events-none" : ""}`}
                 >
-                  {loading ? "Sending code…" : <><span>Continue</span> <ArrowRight size={15} /></>}
+                  {loading ? (
+                    "Sending code…"
+                  ) : (
+                    <>
+                      <span>Continue</span> <ArrowRight size={15} />
+                    </>
+                  )}
                 </ShimmerButton>
               )}
 
@@ -646,30 +902,62 @@ export default function RegisterPage() {
                   onClick={handleVerifyOtp}
                   className={`px-6 h-11 text-sm gap-2 ${!canAdvance() || loading ? "opacity-40 pointer-events-none" : ""}`}
                 >
-                  {loading ? "Creating account…" : <><span>Create account</span> <ArrowRight size={15} /></>}
+                  {loading ? (
+                    "Creating account…"
+                  ) : (
+                    <>
+                      <span>Create account</span> <ArrowRight size={15} />
+                    </>
+                  )}
                 </ShimmerButton>
               )}
             </div>
 
             <p className="mt-8 text-center text-sm text-muted-foreground md:hidden">
               Already have an account?{" "}
-              <Link href="/login" className="text-vodium-black font-semibold hover:text-vodium-gold transition-colors">Sign in</Link>
+              <Link
+                href="/login"
+                className="text-vodium-black font-semibold hover:text-vodium-gold transition-colors"
+              >
+                Sign in
+              </Link>
             </p>
           </div>
         </div>
 
         <p className="text-center text-xs text-muted-foreground mt-8">
           By creating an account you agree to Vodium&rsquo;s{" "}
-          <a href="#" className="underline underline-offset-2 hover:text-vodium-black transition-colors">Terms</a>{" "}
+          <a
+            href="#"
+            className="underline underline-offset-2 hover:text-vodium-black transition-colors"
+          >
+            Terms
+          </a>{" "}
           and{" "}
-          <a href="#" className="underline underline-offset-2 hover:text-vodium-black transition-colors">Privacy Policy</a>.
+          <a
+            href="#"
+            className="underline underline-offset-2 hover:text-vodium-black transition-colors"
+          >
+            Privacy Policy
+          </a>
+          .
         </p>
       </div>
     </div>
   );
 }
 
-function Field({ label, required, hint, children }: { label: string; required?: boolean; hint?: string; children: React.ReactNode }) {
+function Field({
+  label,
+  required,
+  hint,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  hint?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div>
       <label className="block text-sm font-medium text-vodium-black mb-1.5">
@@ -681,7 +969,15 @@ function Field({ label, required, hint, children }: { label: string; required?: 
   );
 }
 
-function SuccessScreen({ name, business, onDashboard }: { name: string; business: string; onDashboard: () => void }) {
+function SuccessScreen({
+  name,
+  business,
+  onDashboard,
+}: {
+  name: string;
+  business: string;
+  onDashboard: () => void;
+}) {
   const firstName = name.split(" ")[0];
   const waPhone = "+2347019575717";
   return (
@@ -690,11 +986,15 @@ function SuccessScreen({ name, business, onDashboard }: { name: string; business
         <div className="w-20 h-20 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto mb-8">
           <CheckCircle size={36} className="text-emerald-400" />
         </div>
-        <p className="text-vodium-gold text-xs tracking-[0.3em] uppercase mb-4">You&rsquo;re in</p>
-        <h1 className="font-serif text-4xl text-vodium-cream mb-4">Welcome, {firstName}!</h1>
+        <p className="text-vodium-gold text-xs tracking-[0.3em] uppercase mb-4">
+          You&rsquo;re in
+        </p>
+        <h1 className="font-serif text-4xl text-vodium-cream mb-4">
+          Welcome, {firstName}!
+        </h1>
         <p className="text-vodium-cream/50 mb-10 leading-relaxed">
-          <span className="text-vodium-cream font-semibold">{business}</span> is now on Vodium Ledger.
-          Your 60-day free trial has started.
+          <span className="text-vodium-cream font-semibold">{business}</span> is
+          now on Vodium Ledger. Your 60-day free trial has started.
         </p>
         <div className="space-y-3">
           <a
