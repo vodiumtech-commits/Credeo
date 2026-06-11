@@ -70,7 +70,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const plan         = vendor?.subscription?.plan ?? "STARTER";
   const planLabel    = PLAN_LABELS[plan] ?? plan;
   const planColor    = PLAN_COLORS[plan] ?? PLAN_COLORS.STARTER;
-  const isTrial      = vendor?.subscription?.status === "TRIAL" || !vendor?.subscription;
+  const sub          = vendor?.subscription;
+  const trialEndsAt  = sub?.trialEndsAt ? new Date(sub.trialEndsAt) : null;
+  const isTrial      = sub?.status === "TRIAL" || !sub;
+  const isExpired    = sub?.status === "EXPIRED" || (isTrial && trialEndsAt && trialEndsAt < new Date());
+  const daysLeft     = trialEndsAt ? Math.max(0, Math.ceil((trialEndsAt.getTime() - Date.now()) / 86_400_000)) : null;
 
   const currentTitle =
     PAGE_TITLES[pathname] ??
@@ -149,18 +153,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="px-3 pb-4 pt-2 space-y-2">
           <div className="h-px bg-white/[0.05] mb-3" />
 
-          {/* Trial banner */}
-          {isTrial && (
+          {/* Subscription banner */}
+          {isExpired ? (
+            <div className="flex items-start gap-2.5 rounded-xl bg-rose-500/[0.05] border border-rose-500/20 px-3 py-2.5 mb-2 shadow-[0_2px_10px_rgba(244,63,94,0.05)]">
+              <X size={13} className="text-rose-400 flex-shrink-0 mt-0.5" />
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold text-rose-400 leading-tight">Trial expired</p>
+                <Link href="/dashboard/upgrade" className="text-[10px] text-rose-400/60 hover:text-rose-400 transition-colors mt-0.5 block font-medium underline underline-offset-2">
+                  Renew subscription →
+                </Link>
+              </div>
+            </div>
+          ) : isTrial ? (
             <div className="flex items-start gap-2.5 rounded-xl bg-vodium-gold/[0.05] border border-vodium-gold/15 px-3 py-2.5 mb-2">
               <Zap size={13} className="text-vodium-gold flex-shrink-0 mt-0.5" />
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold text-vodium-gold leading-tight">60-day free trial</p>
-                <Link href="/dashboard/settings" className="text-[10px] text-vodium-gold/50 hover:text-vodium-gold transition-colors mt-0.5 block">
+                <p className="text-[11px] font-semibold text-vodium-gold leading-tight">
+                  {daysLeft !== null ? `${daysLeft} days left in trial` : "60-day free trial"}
+                </p>
+                <Link href="/dashboard/upgrade" className="text-[10px] text-vodium-gold/50 hover:text-vodium-gold transition-colors mt-0.5 block">
                   Upgrade plan →
                 </Link>
               </div>
             </div>
-          )}
+          ) : null}
 
           {/* Vendor info */}
           <div className="rounded-xl bg-white/[0.02] border border-white/[0.05] px-3 py-3">

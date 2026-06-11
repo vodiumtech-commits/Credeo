@@ -39,10 +39,9 @@ export async function POST(req: NextRequest) {
 
   switch (event.event) {
     case "subscription.create": {
-      // data.customer.email or data.plan.name may help identify vendor
       const paystackCode = data.subscription_code;
       const customerId = data.customer?.id?.toString();
-      const planCode = data.plan?.plan_code;
+      const planFromMetadata = data.metadata?.plan as string | undefined;
       const nextPaymentDate = data.next_payment_date ? new Date(data.next_payment_date) : null;
 
       if (paystackCode && customerId) {
@@ -55,6 +54,7 @@ export async function POST(req: NextRequest) {
             data: {
               paystackSubscriptionCode: paystackCode,
               status: "ACTIVE",
+              ...(planFromMetadata ? { plan: planFromMetadata as any } : {}),
               ...(nextPaymentDate ? { currentPeriodEnd: nextPaymentDate } : {}),
             },
           });
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
             data: {
               vendorId: sub.vendorId,
               title: "Subscription Active",
-              message: `Your ${sub.plan} plan is now active. Thank you for choosing Vodium!`,
+              message: `Your ${planFromMetadata || sub.plan} plan is now active. Thank you for choosing Vodium!`,
               type: "SUCCESS",
             },
           });

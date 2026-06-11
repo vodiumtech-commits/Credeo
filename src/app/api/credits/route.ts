@@ -79,9 +79,8 @@ export async function POST(req: NextRequest) {
 
   // ── Subscription status check ────────────────────────────────────────────
   const sub = vendor.subscription;
-  const status = sub?.status ?? "TRIAL";
 
-  if (!isPlanActive(status)) {
+  if (!isPlanActive(sub)) {
     return NextResponse.json(
       { error: "Your subscription has expired. Please renew to continue adding credits." },
       { status: 403 }
