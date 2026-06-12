@@ -58,7 +58,6 @@ export default async function FinancePage() {
   const activeSubs   = subs.filter((s) => s.status === "ACTIVE");
   const trialSubs    = subs.filter((s) => s.status === "TRIAL");
   const pastDueSubs  = subs.filter((s) => s.status === "PAST_DUE");
-  const cancelledSubs = subs.filter((s) => s.status === "CANCELLED");
 
   const mrr = activeSubs.reduce((s, sub) => s + Number(sub.monthlyAmount), 0);
   const arr = mrr * 12;

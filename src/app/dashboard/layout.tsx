@@ -16,7 +16,11 @@ type VendorInfo = {
   ownerName: string;
   campusLocation: string | null;
   university: { shortName: string | null } | null;
-  subscription: { plan: string; status: string } | null;
+  subscription: { 
+    plan: string; 
+    status: string;
+    trialEndsAt: string | null;
+  } | null;
 };
 
 const NAV_ITEMS = [

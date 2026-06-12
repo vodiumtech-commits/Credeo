@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionPhone } from "@/lib/session";
 
 // GET /api/credits/export — returns a CSV of all credits for the authenticated vendor
-export async function GET(_req: NextRequest) {
+export async function GET() {
   const phone = getSessionPhone();
   if (!phone) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

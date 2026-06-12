@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Search, Phone, Mail, AlertCircle, Clock, CheckCircle2, Building2, Loader2, ExternalLink, RefreshCw } from "lucide-react";
-import { formatNaira } from "@/lib/utils";
+import { Search, Phone, Mail, AlertCircle, CheckCircle2, Building2, Loader2, ExternalLink, RefreshCw } from "lucide-react";
 
 interface VendorRow {
   id:           string;

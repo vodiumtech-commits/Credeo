@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
-import { Inter, Playfair_Display } from "next/font/google";
+// import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
 
+const inter = { variable: "font-inter" };
+const playfair = { variable: "font-playfair" };
+
+/*
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
@@ -13,6 +17,7 @@ const playfair = Playfair_Display({
   variable: "--font-playfair",
   display: "swap",
 });
+*/
 
 export const metadata: Metadata = {
   title: "Vodium Ledger — Africa's credit infrastructure layer",
