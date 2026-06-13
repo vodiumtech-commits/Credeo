@@ -12,23 +12,21 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!session) return <>{children}</>;
 
   let name  = "Super Admin";
-  let email: string | null = null;
 
   if (session.id !== "__super__") {
     const admin = await prisma.adminUser.findUnique({
       where:  { id: session.id },
-      select: { name: true, email: true },
+      select: { name: true },
     }).catch(() => null);
 
     // Stale / deleted account — return plain children so middleware can redirect
     if (!admin) return <>{children}</>;
 
     name  = admin.name;
-    email = admin.email;
   }
 
   return (
-    <AdminShell name={name} email={email} role={session.role}>
+    <AdminShell name={name} role={session.role}>
       {children}
     </AdminShell>
   );
