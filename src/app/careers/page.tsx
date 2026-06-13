@@ -1,14 +1,22 @@
 import Link from "next/link";
 import {
-  ArrowLeft, MapPin, Briefcase, ArrowRight,
-  Heart, Wifi, Shield, Zap, Globe, Users,
+  ArrowLeft,
+  MapPin,
+  Briefcase,
+  ArrowRight,
+  Heart,
+  Wifi,
+  Shield,
+  Zap,
+  Globe,
+  Users,
 } from "lucide-react";
 import { AnimatedBorder } from "@/components/ui/animated-border";
 import { MagicCard } from "@/components/ui/magic-card";
 import { GlowBadge } from "@/components/ui/glow-badge";
 
 export const metadata = {
-  title: "Careers — Vodium Ledger",
+  title: "Careers : Vodium Ledger",
   description: "Join us in building Africa's credit infrastructure.",
 };
 
@@ -35,7 +43,8 @@ const jobs: JobPost[] = [
     type: "Full-time",
     description:
       "Sign Vodium's first 500 paying vendors. Build the playbook. Own the pipeline. Work directly with the CEO on market expansion across Nigerian universities.",
-    mailto: "careers@vodium.co?subject=Application: Growth %26 Partnerships Manager",
+    mailto:
+      "careers@vodium.co?subject=Application: Growth %26 Partnerships Manager",
   },
   {
     title: "Customer Success Lead",
@@ -72,15 +81,25 @@ export default function CareersPage() {
         <div className="max-w-6xl mx-auto px-6 md:px-12 flex items-center justify-between h-16">
           <Link href="/" className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-vodium-charcoal border border-vodium-gold/40 flex items-center justify-center">
-              <span className="font-serif text-vodium-gold text-lg leading-none">V</span>
+              <span className="font-serif text-vodium-gold text-lg leading-none">
+                V
+              </span>
             </div>
-            <span className="font-serif tracking-[0.18em] text-vodium-gold text-sm">VODIUM LEDGER</span>
+            <span className="font-serif tracking-[0.18em] text-vodium-gold text-sm">
+              VODIUM LEDGER
+            </span>
           </Link>
           <div className="flex items-center gap-4">
-            <Link href="/" className="text-sm text-vodium-cream/50 hover:text-vodium-gold transition-colors flex items-center gap-1.5">
+            <Link
+              href="/"
+              className="text-sm text-vodium-cream/50 hover:text-vodium-gold transition-colors flex items-center gap-1.5"
+            >
               <ArrowLeft size={14} /> Home
             </Link>
-            <Link href="/register" className="inline-flex items-center gap-1.5 btn-gold px-5 py-2.5 rounded-xl text-sm font-semibold hover:shadow-[0_0_20px_rgba(201,169,97,0.3)] transition-all">
+            <Link
+              href="/register"
+              className="inline-flex items-center gap-1.5 btn-gold px-5 py-2.5 rounded-xl text-sm font-semibold hover:shadow-[0_0_20px_rgba(201,169,97,0.3)] transition-all"
+            >
               Get started <ArrowRight size={13} />
             </Link>
           </div>
@@ -92,14 +111,16 @@ export default function CareersPage() {
         <section className="mesh-bg bg-dots relative overflow-hidden">
           <div className="max-w-6xl mx-auto px-6 md:px-12 pt-28 pb-24">
             <div className="max-w-3xl">
-              <GlowBadge color="gold" className="mb-6">Careers at Vodium</GlowBadge>
+              <GlowBadge color="gold" className="mb-6">
+                Careers at Vodium
+              </GlowBadge>
               <h1 className="font-serif text-5xl md:text-6xl lg:text-7xl text-vodium-cream leading-[1.05] mb-6">
                 Build Africa&apos;s{" "}
                 <span className="text-gradient-gold">financial future.</span>
               </h1>
               <p className="text-vodium-cream/55 text-xl leading-relaxed max-w-2xl">
-                We&apos;re a small team with an audacious goal. If you want your work to matter —
-                this is it.
+                We&apos;re a small team with an audacious goal. If you want your
+                work to matter this is it.
               </p>
             </div>
           </div>
@@ -131,10 +152,18 @@ export default function CareersPage() {
                       </span>
                     </div>
                     <div className="flex flex-wrap items-center gap-4 mb-4 text-xs text-vodium-cream/40">
-                      <span className="flex items-center gap-1.5"><MapPin size={11} />{job.location}</span>
-                      <span className="flex items-center gap-1.5"><Briefcase size={11} />{job.type}</span>
+                      <span className="flex items-center gap-1.5">
+                        <MapPin size={11} />
+                        {job.location}
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <Briefcase size={11} />
+                        {job.type}
+                      </span>
                     </div>
-                    <p className="text-vodium-cream/55 text-sm leading-relaxed max-w-2xl">{job.description}</p>
+                    <p className="text-vodium-cream/55 text-sm leading-relaxed max-w-2xl">
+                      {job.description}
+                    </p>
                   </div>
                   <div className="flex-shrink-0">
                     <a
@@ -168,7 +197,9 @@ export default function CareersPage() {
                     <div className="w-10 h-10 rounded-lg bg-vodium-gold/10 border border-vodium-gold/20 flex items-center justify-center flex-shrink-0">
                       <Icon size={16} className="text-vodium-gold" />
                     </div>
-                    <span className="text-vodium-cream/70 text-sm font-medium">{label}</span>
+                    <span className="text-vodium-cream/70 text-sm font-medium">
+                      {label}
+                    </span>
                   </div>
                 </MagicCard>
               ))}
@@ -184,11 +215,13 @@ export default function CareersPage() {
               <span className="text-gradient-gold">No bureaucracy.</span>
             </h2>
             <p className="text-vodium-cream/55 text-lg leading-relaxed">
-              We move fast. You&apos;ll own your work from day one. No long hiring pipelines — if
-              you&apos;re good, we move in days.
+              We move fast. You&apos;ll own your work from day one. No long
+              hiring pipelines if you&apos;re good, we move in days.
             </p>
             <div className="brand-divider my-10" />
-            <p className="text-vodium-cream/50 text-sm mb-4">Questions? Reach us at</p>
+            <p className="text-vodium-cream/50 text-sm mb-4">
+              Questions? Reach us at
+            </p>
             <a
               href="mailto:careers@vodium.co"
               className="text-vodium-gold hover:text-vodium-gold/80 transition-colors font-medium"
@@ -204,9 +237,24 @@ export default function CareersPage() {
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-vodium-cream/30">
           <span>© 2026 Vodium. Lagos, Nigeria.</span>
           <div className="flex gap-6">
-            <Link href="/privacy" className="hover:text-vodium-gold transition-colors">Privacy</Link>
-            <Link href="/terms" className="hover:text-vodium-gold transition-colors">Terms</Link>
-            <Link href="/about" className="hover:text-vodium-gold transition-colors">About</Link>
+            <Link
+              href="/privacy"
+              className="hover:text-vodium-gold transition-colors"
+            >
+              Privacy
+            </Link>
+            <Link
+              href="/terms"
+              className="hover:text-vodium-gold transition-colors"
+            >
+              Terms
+            </Link>
+            <Link
+              href="/about"
+              className="hover:text-vodium-gold transition-colors"
+            >
+              About
+            </Link>
           </div>
         </div>
       </footer>

@@ -6,7 +6,6 @@ import {
   Plus,
   Download,
   Search,
-  Filter,
   X,
   TrendingUp,
   AlertCircle,

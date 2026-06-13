@@ -4,8 +4,12 @@ import { useState } from "react";
 import { MessageCircle, CheckCircle, Loader2 } from "lucide-react";
 
 export function BulkRemindButton({ overdueCount }: { overdueCount: number }) {
-  const [state, setState] = useState<"idle" | "loading" | "done" | "error">("idle");
-  const [result, setResult] = useState<{ sent: number; failed: number } | null>(null);
+  const [state, setState] = useState<"idle" | "loading" | "done" | "error">(
+    "idle",
+  );
+  const [result, setResult] = useState<{ sent: number; failed: number } | null>(
+    null,
+  );
 
   if (overdueCount === 0) return null;
 
@@ -30,13 +34,19 @@ export function BulkRemindButton({ overdueCount }: { overdueCount: number }) {
       <span className="flex items-center gap-1.5 text-xs text-emerald-400 font-medium">
         <CheckCircle size={13} />
         {result.sent} reminder{result.sent !== 1 ? "s" : ""} sent
-        {result.failed > 0 && <span className="text-rose-400">({result.failed} failed)</span>}
+        {result.failed > 0 && (
+          <span className="text-rose-400">({result.failed} failed)</span>
+        )}
       </span>
     );
   }
 
   if (state === "error") {
-    return <span className="text-xs text-rose-400">Failed to send reminders — try again.</span>;
+    return (
+      <span className="text-xs text-rose-400">
+        Failed to send reminders try again.
+      </span>
+    );
   }
 
   return (
@@ -50,7 +60,9 @@ export function BulkRemindButton({ overdueCount }: { overdueCount: number }) {
       ) : (
         <MessageCircle size={14} />
       )}
-      {state === "loading" ? "Sending…" : `Remind all overdue (${overdueCount})`}
+      {state === "loading"
+        ? "Sending…"
+        : `Remind all overdue (${overdueCount})`}
     </button>
   );
 }

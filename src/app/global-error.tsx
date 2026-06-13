@@ -18,7 +18,7 @@ export default function GlobalError({
         <div className="text-center">
           <h1 className="text-2xl font-serif mb-2">Something went wrong</h1>
           <p className="text-sm text-vodium-black/50">
-            We've been notified and are looking into it.
+            We&apos;ve been notified and are looking into it.
           </p>
           <button 
             onClick={() => window.location.reload()}

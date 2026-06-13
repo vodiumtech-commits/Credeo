@@ -1,6 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
+import type { SubscriptionPlan } from "@prisma/client";
+
+interface PaystackData {
+  subscription_code?: string;
+  customer?: { id: number | string };
+  metadata?: { plan?: string };
+  next_payment_date?: string;
+  paid_at?: string;
+  subscription?: { subscription_code: string };
+}
+
+interface PaystackEvent {
+  event: string;
+  data: PaystackData;
+}
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
@@ -28,20 +43,20 @@ export async function POST(req: NextRequest) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
-  let event: Record<string, any>;
+  let event: PaystackEvent;
   try {
     event = JSON.parse(body);
   } catch {
     return new NextResponse("Bad JSON", { status: 400 });
   }
 
-  const data = event.data ?? {};
+  const data = event.data || {};
 
   switch (event.event) {
     case "subscription.create": {
       const paystackCode = data.subscription_code;
       const customerId = data.customer?.id?.toString();
-      const planFromMetadata = data.metadata?.plan as string | undefined;
+      const planFromMetadata = data.metadata?.plan;
       const nextPaymentDate = data.next_payment_date ? new Date(data.next_payment_date) : null;
 
       if (paystackCode && customerId) {
@@ -54,7 +69,7 @@ export async function POST(req: NextRequest) {
             data: {
               paystackSubscriptionCode: paystackCode,
               status: "ACTIVE",
-              ...(planFromMetadata ? { plan: planFromMetadata as any } : {}),
+              ...(planFromMetadata ? { plan: planFromMetadata as SubscriptionPlan } : {}),
               ...(nextPaymentDate ? { currentPeriodEnd: nextPaymentDate } : {}),
             },
           });

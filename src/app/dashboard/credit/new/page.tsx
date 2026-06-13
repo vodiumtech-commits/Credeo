@@ -3,17 +3,22 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
-  ArrowLeft, CheckCircle, MessageCircle, User, Banknote,
-  Calendar, AlertCircle,
+  ArrowLeft,
+  CheckCircle,
+  MessageCircle,
+  User,
+  Banknote,
+  Calendar,
+  AlertCircle,
 } from "lucide-react";
 import { formatNaira } from "@/lib/utils";
 import { ShimmerButton } from "@/components/ui/shimmer-button";
 
 const DURATION_OPTIONS = [
-  { label: "3 days",        days: 3 },
-  { label: "1 week",        days: 7 },
-  { label: "2 weeks",       days: 14 },
-  { label: "End of month",  days: 30 },
+  { label: "3 days", days: 3 },
+  { label: "1 week", days: 7 },
+  { label: "2 weeks", days: 14 },
+  { label: "End of month", days: 30 },
 ];
 
 // Step order: 1 = student, 2 = credit details, 3 = confirm
@@ -51,16 +56,28 @@ export default function NewCreditPage() {
     if (!days) return "—";
     const d = new Date();
     d.setDate(d.getDate() + days);
-    return d.toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" });
+    return d.toLocaleDateString("en-NG", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
   };
 
   const isStep1Valid = form.studentName.length > 1;
   const isStep2Valid =
     parseFloat(form.amount) > 0 &&
-    (form.dueDays === "custom" ? parseInt(form.customDue) > 0 : form.dueDays !== "");
+    (form.dueDays === "custom"
+      ? parseInt(form.customDue) > 0
+      : form.dueDays !== "");
 
   const currentStepNum =
-    step === "student" ? 1 : step === "details" ? 2 : step === "confirm" ? 3 : 3;
+    step === "student"
+      ? 1
+      : step === "details"
+        ? 2
+        : step === "confirm"
+          ? 3
+          : 3;
 
   async function handleSubmit() {
     setLoading(true);
@@ -106,11 +123,18 @@ export default function NewCreditPage() {
             <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center mx-auto mb-6">
               <CheckCircle size={30} className="text-emerald-400" />
             </div>
-            <h2 className="font-serif text-2xl text-vodium-cream mb-2">Credit recorded</h2>
+            <h2 className="font-serif text-2xl text-vodium-cream mb-2">
+              Credit recorded
+            </h2>
             <p className="text-vodium-cream/50 text-sm mb-1">
-              <span className="text-vodium-cream font-semibold">{form.studentName}</span> owes you{" "}
-              <span className="text-vodium-gold font-semibold">{formatNaira(parseFloat(form.amount))}</span>,
-              due {dueDate()}.
+              <span className="text-vodium-cream font-semibold">
+                {form.studentName}
+              </span>{" "}
+              owes you{" "}
+              <span className="text-vodium-gold font-semibold">
+                {formatNaira(parseFloat(form.amount))}
+              </span>
+              , due {dueDate()}.
             </p>
             <p className="text-xs text-vodium-cream/30 mb-8">
               A polite reminder will be sent 2 days before the due date.
@@ -144,9 +168,12 @@ export default function NewCreditPage() {
 
           {/* WhatsApp tip */}
           <div className="bg-vodium-charcoal border border-vodium-gold/15 rounded-2xl p-5 text-center">
-            <p className="text-vodium-cream/40 text-xs mb-3">You can also add credits via WhatsApp:</p>
+            <p className="text-vodium-cream/40 text-xs mb-3">
+              You can also add credits via WhatsApp:
+            </p>
             <code className="text-vodium-gold font-mono text-sm">
-              ADD {form.studentName.split(" ")[0]?.toUpperCase() || "NAME"} {form.amount}
+              ADD {form.studentName.split(" ")[0]?.toUpperCase() || "NAME"}{" "}
+              {form.amount}
             </code>
             <div className="mt-4">
               <a
@@ -177,7 +204,9 @@ export default function NewCreditPage() {
 
         {/* Page title */}
         <div className="mb-8">
-          <h1 className="font-serif text-2xl md:text-3xl text-vodium-cream">Add a credit</h1>
+          <h1 className="font-serif text-2xl md:text-3xl text-vodium-cream">
+            Add a credit
+          </h1>
           <p className="text-vodium-cream/35 text-sm mt-1">
             Record money you&rsquo;ve extended to a student.
           </p>
@@ -189,22 +218,27 @@ export default function NewCreditPage() {
             const isCompleted = currentStepNum > s.id;
             const isActive = currentStepNum === s.id;
             return (
-              <div key={s.id} className="flex items-center flex-1 last:flex-none">
+              <div
+                key={s.id}
+                className="flex items-center flex-1 last:flex-none"
+              >
                 <div className="flex flex-col items-center gap-1.5">
                   <div
                     className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${
                       isCompleted
                         ? "bg-vodium-gold text-vodium-black"
                         : isActive
-                        ? "bg-vodium-gold text-vodium-black shadow-[0_0_16px_rgba(201,169,97,0.4)]"
-                        : "bg-white/[0.06] text-vodium-cream/25 border border-white/[0.08]"
+                          ? "bg-vodium-gold text-vodium-black shadow-[0_0_16px_rgba(201,169,97,0.4)]"
+                          : "bg-white/[0.06] text-vodium-cream/25 border border-white/[0.08]"
                     }`}
                   >
                     {isCompleted ? <CheckCircle size={13} /> : s.id}
                   </div>
                   <span
                     className={`text-[11px] transition-colors ${
-                      isActive || isCompleted ? "text-vodium-cream/60" : "text-vodium-cream/20"
+                      isActive || isCompleted
+                        ? "text-vodium-cream/60"
+                        : "text-vodium-cream/20"
                     }`}
                   >
                     {s.label}
@@ -213,7 +247,9 @@ export default function NewCreditPage() {
                 {idx < STEP_META.length - 1 && (
                   <div
                     className={`flex-1 h-px mx-3 mb-5 transition-colors ${
-                      currentStepNum > s.id ? "bg-vodium-gold/50" : "bg-white/[0.08]"
+                      currentStepNum > s.id
+                        ? "bg-vodium-gold/50"
+                        : "bg-white/[0.08]"
                     }`}
                   />
                 )}
@@ -230,8 +266,12 @@ export default function NewCreditPage() {
                 <User size={15} className="text-vodium-gold" />
               </div>
               <div>
-                <h2 className="font-semibold text-vodium-cream">Student details</h2>
-                <p className="text-xs text-vodium-cream/35">Who are you extending credit to?</p>
+                <h2 className="font-semibold text-vodium-cream">
+                  Student details
+                </h2>
+                <p className="text-xs text-vodium-cream/35">
+                  Who are you extending credit to?
+                </p>
               </div>
             </div>
 
@@ -246,7 +286,10 @@ export default function NewCreditPage() {
               />
             </StepField>
 
-            <StepField label="Matric number" hint="Optional — helps identify the student.">
+            <StepField
+              label="Matric number"
+              hint="Optional : helps identify the student."
+            >
               <input
                 type="text"
                 placeholder="e.g. 2019/0123"
@@ -256,7 +299,10 @@ export default function NewCreditPage() {
               />
             </StepField>
 
-            <StepField label="WhatsApp number" hint="For sending automated reminders.">
+            <StepField
+              label="WhatsApp number"
+              hint="For sending automated reminders."
+            >
               <input
                 type="tel"
                 inputMode="tel"
@@ -287,8 +333,12 @@ export default function NewCreditPage() {
                 <Banknote size={15} className="text-vodium-gold" />
               </div>
               <div>
-                <h2 className="font-semibold text-vodium-cream">Credit details</h2>
-                <p className="text-xs text-vodium-cream/35">Amount and repayment timeline</p>
+                <h2 className="font-semibold text-vodium-cream">
+                  Credit details
+                </h2>
+                <p className="text-xs text-vodium-cream/35">
+                  Amount and repayment timeline
+                </p>
               </div>
             </div>
 
@@ -330,7 +380,10 @@ export default function NewCreditPage() {
                   <button
                     key={o.days}
                     type="button"
-                    onClick={() => { update("dueDays", String(o.days)); update("customDue", ""); }}
+                    onClick={() => {
+                      update("dueDays", String(o.days));
+                      update("customDue", "");
+                    }}
                     className={`px-3 py-2.5 text-sm rounded-xl border transition-all ${
                       form.dueDays === String(o.days)
                         ? "border-vodium-gold bg-vodium-gold/10 text-vodium-cream font-medium"
@@ -369,7 +422,9 @@ export default function NewCreditPage() {
               {form.dueDays && (
                 <p className="text-xs text-vodium-cream/35 mt-2 flex items-center gap-1">
                   <Calendar size={11} className="text-vodium-gold" /> Due:{" "}
-                  <span className="text-vodium-cream/60 font-medium">{dueDate()}</span>
+                  <span className="text-vodium-cream/60 font-medium">
+                    {dueDate()}
+                  </span>
                 </p>
               )}
             </StepField>
@@ -395,13 +450,27 @@ export default function NewCreditPage() {
         {/* ── Step 3: Confirm ───────────────────────────────────────── */}
         {step === "confirm" && (
           <div className="bg-vodium-charcoal rounded-2xl border border-white/[0.06] p-8">
-            <h2 className="font-serif text-xl text-vodium-cream mb-1">Confirm credit</h2>
-            <p className="text-sm text-vodium-cream/35 mb-6">Check the details before saving.</p>
+            <h2 className="font-serif text-xl text-vodium-cream mb-1">
+              Confirm credit
+            </h2>
+            <p className="text-sm text-vodium-cream/35 mb-6">
+              Check the details before saving.
+            </p>
 
             {/* Review rows */}
             <div className="space-y-0 mb-6 rounded-xl border border-white/[0.06] overflow-hidden">
-              <ReviewRow icon={<User size={14} />} label="Student" value={`${form.studentName}${form.matricNumber ? ` · ${form.matricNumber}` : ""}`} />
-              {form.phone && <ReviewRow icon={<MessageCircle size={14} />} label="Phone" value={form.phone} />}
+              <ReviewRow
+                icon={<User size={14} />}
+                label="Student"
+                value={`${form.studentName}${form.matricNumber ? ` · ${form.matricNumber}` : ""}`}
+              />
+              {form.phone && (
+                <ReviewRow
+                  icon={<MessageCircle size={14} />}
+                  label="Phone"
+                  value={form.phone}
+                />
+              )}
               <ReviewRow
                 icon={<Banknote size={14} />}
                 label="Amount"
@@ -409,16 +478,27 @@ export default function NewCreditPage() {
                 highlight
               />
               {form.description && (
-                <ReviewRow icon={<span className="text-xs leading-none">📦</span>} label="Description" value={form.description} />
+                <ReviewRow
+                  icon={<span className="text-xs leading-none">📦</span>}
+                  label="Description"
+                  value={form.description}
+                />
               )}
-              <ReviewRow icon={<Calendar size={14} />} label="Due date" value={dueDate()} />
+              <ReviewRow
+                icon={<Calendar size={14} />}
+                label="Due date"
+                value={dueDate()}
+              />
             </div>
 
             {/* Reminder note */}
             <div className="bg-vodium-gold/[0.06] border border-vodium-gold/15 rounded-xl p-4 mb-6 text-xs text-vodium-cream/45 leading-relaxed">
               A polite reminder will be sent to{" "}
-              <span className="text-vodium-cream/70 font-medium">{form.studentName}</span> 2 days
-              before the due date. Their Vodium score will be updated when they pay.
+              <span className="text-vodium-cream/70 font-medium">
+                {form.studentName}
+              </span>{" "}
+              2 days before the due date. Their Vodium score will be updated
+              when they pay.
             </div>
 
             {/* Error */}

@@ -32,7 +32,7 @@ const ROLE_COLORS: Record<AdminRole, string> = {
 };
 
 const ROLE_DESC: Record<AdminRole, string> = {
-  SUPER_ADMIN:   "Full access — vendors, finance, team",
+  SUPER_ADMIN:   "Full access : vendors, finance, team",
   CFO:           "Finance & revenue metrics",
   CUSTOMER_CARE: "Vendor support & outreach",
   ANALYTICS:     "Platform insights & trends",
@@ -257,7 +257,7 @@ export default function AdminTeamPage() {
                   <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value as AdminRole)}
                     className="input-dark w-full appearance-none">
                     {(Object.entries(ROLE_LABELS) as [AdminRole, string][]).map(([v, l]) => (
-                      <option key={v} value={v} className="bg-vodium-charcoal">{l} — {ROLE_DESC[v]}</option>
+                      <option key={v} value={v} className="bg-vodium-charcoal">{l} : {ROLE_DESC[v]}</option>
                     ))}
                   </select>
                 </div>

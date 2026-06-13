@@ -115,11 +115,11 @@ export type ActivityItem = {
 
 export const DEMO_ACTIVITY: ActivityItem[] = [
   { id: "a1", type: "paid",     text: "Emeka Okonkwo paid ₦5,500",                   subtext: "Credit fully settled",                       at: "2 hours ago" },
-  { id: "a2", type: "credit",   text: "Added ₦3,200 credit for Chidinma Eze",         subtext: "Due Friday — auto-reminder set",             at: "4 hours ago" },
-  { id: "a3", type: "reminder", text: "Auto-reminder sent to Babatunde Adeyemi",      subtext: "₦4,200 — 3 days overdue",                   at: "Yesterday, 9:14 AM" },
-  { id: "a4", type: "paid",     text: "Folake Ogundimu paid ₦8,000",                  subtext: "Paid 1 day early — score updated to 890",    at: "Yesterday, 7:30 AM" },
+  { id: "a2", type: "credit",   text: "Added ₦3,200 credit for Chidinma Eze",         subtext: "Due Friday  auto-reminder set",             at: "4 hours ago" },
+  { id: "a3", type: "reminder", text: "Auto-reminder sent to Babatunde Adeyemi",      subtext: "₦4,200  3 days overdue",                   at: "Yesterday, 9:14 AM" },
+  { id: "a4", type: "paid",     text: "Folake Ogundimu paid ₦8,000",                  subtext: "Paid 1 day early  score updated to 890",    at: "Yesterday, 7:30 AM" },
   { id: "a5", type: "credit",   text: "Added ₦2,500 credit for Ibrahim Suleiman",     subtext: "Due in 7 days",                              at: "2 days ago" },
-  { id: "a6", type: "overdue",  text: "Ngozi Okafor — ₦8,000 is 10 days overdue",    subtext: "3rd reminder sent via WhatsApp",             at: "2 days ago" },
+  { id: "a6", type: "overdue",  text: "Ngozi Okafor ₦8,000 is 10 days overdue",    subtext: "3rd reminder sent via WhatsApp",             at: "2 days ago" },
   { id: "a7", type: "paid",     text: "Amaka Chukwu paid ₦1,500",                     subtext: "Partial payment received",                   at: "3 days ago" },
   { id: "a8", type: "score",    text: "Chiamaka Obi's Vodium score dropped to 390",   subtext: "5 days overdue on ₦5,500",                   at: "3 days ago" },
 ];
@@ -229,10 +229,10 @@ export const ADMIN_VENDORS: AdminVendorRow[] = [
 // ─── Admin recent system activity ────────────────────────────────────────────
 
 export const ADMIN_ACTIVITY = [
-  { id: "aa1", type: "vendor_joined",  text: "FastPrint Solutions joined",            subtext: "OAU — Starter plan trial",            at: "1 day ago" },
+  { id: "aa1", type: "vendor_joined",  text: "FastPrint Solutions joined",            subtext: "OAU Starter plan trial",            at: "1 day ago" },
   { id: "aa2", type: "credit_logged",  text: "287 credits logged across platform",    subtext: "Last 24 hours",                       at: "Today, 8:00 AM" },
   { id: "aa3", type: "payment",        text: "Baba Wale's collected ₦78,000",         subtext: "Top vendor this week",                at: "Today, 6:45 AM" },
-  { id: "aa4", type: "vendor_joined",  text: "Campus Pharmacy Plus joined",           text2: "FUTA — Growth plan trial",              subtext: "FUTA — Growth plan trial",            at: "2 days ago" },
+  { id: "aa4", type: "vendor_joined",  text: "Campus Pharmacy Plus joined",           text2: "FUTA Growth plan trial",              subtext: "FUTA Growth plan trial",            at: "2 days ago" },
   { id: "aa5", type: "subscription",   text: "Oga Emeka's Mini Mart upgraded",        subtext: "Starter → Campus Pro",                at: "3 days ago" },
   { id: "aa6", type: "milestone",      text: "Platform hit ₦47M total tracked",       subtext: "Up from ₦38M last month (+23.6%)",   at: "4 days ago" },
 ];

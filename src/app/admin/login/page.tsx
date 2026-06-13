@@ -72,7 +72,7 @@ export default function AdminLoginPage() {
               Vodium Ledger
             </h1>
             <p className="text-vodium-cream/30 text-xs mt-1.5">
-              Restricted access — authorised personnel only
+              Restricted access authorised personnel only
             </p>
           </div>
 
@@ -99,7 +99,7 @@ export default function AdminLoginPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Email — staff only */}
+            {/* Email staff only */}
             {mode === "staff" && (
               <div>
                 <label className="block text-xs font-medium text-vodium-cream/50 mb-2 uppercase tracking-wider">

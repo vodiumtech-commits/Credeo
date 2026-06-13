@@ -3,45 +3,60 @@ import { Resend } from "resend";
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 const ROLE_LABELS: Record<string, string> = {
-  SUPER_ADMIN:   "Super Admin",
-  CFO:           "CFO",
+  SUPER_ADMIN: "Super Admin",
+  CFO: "CFO",
   CUSTOMER_CARE: "Customer Care",
-  ANALYTICS:     "Analytics",
+  ANALYTICS: "Analytics",
 };
 
 const ROLE_DESC: Record<string, string> = {
-  SUPER_ADMIN:   "Full platform access — vendors, finance, team management.",
-  CFO:           "Finance & revenue metrics — MRR, ARR, subscription analytics.",
-  CUSTOMER_CARE: "Vendor support — search, contact, and assist vendors.",
-  ANALYTICS:     "Platform insights — credit trends, university coverage, scores.",
+  SUPER_ADMIN: "Full platform access : vendors, finance, team management.",
+  CFO: "Finance & revenue metrics : MRR, ARR, subscription analytics.",
+  CUSTOMER_CARE: "Vendor support : search, contact, and assist vendors.",
+  ANALYTICS: "Platform insights : credit trends, university coverage, scores.",
 };
 
 interface InviteEmailParams {
-  name:      string;
-  email:     string;
-  role:      string;
+  name: string;
+  email: string;
+  role: string;
   inviteUrl: string;
 }
 
-export async function sendAdminInviteEmail({ name, email, role, inviteUrl }: InviteEmailParams) {
+export async function sendAdminInviteEmail({
+  name,
+  email,
+  role,
+  inviteUrl,
+}: InviteEmailParams) {
   if (!process.env.RESEND_API_KEY) {
-    console.log(`\n[ADMIN INVITE EMAIL → ${email}]\n  Name: ${name}\n  Role: ${role}\n  Link: ${inviteUrl}\n`);
+    console.log(
+      `\n[ADMIN INVITE EMAIL → ${email}]\n  Name: ${name}\n  Role: ${role}\n  Link: ${inviteUrl}\n`,
+    );
     return;
   }
 
   const roleLabel = ROLE_LABELS[role] ?? role;
-  const roleDesc  = ROLE_DESC[role] ?? "";
+  const roleDesc = ROLE_DESC[role] ?? "";
 
   await resend.emails.send({
-    from:    "Vodium Ledger <noreply@vodiumledger.com>",
-    to:      email,
+    from: "Vodium Ledger <noreply@vodiumledger.com>",
+    to: email,
     subject: `You've been invited to Vodium Ledger Admin Console`,
-    html:    buildHtml({ name, roleLabel, roleDesc, inviteUrl }),
+    html: buildHtml({ name, roleLabel, roleDesc, inviteUrl }),
   });
 }
 
-function buildHtml({ name, roleLabel, roleDesc, inviteUrl }: {
-  name: string; roleLabel: string; roleDesc: string; inviteUrl: string;
+function buildHtml({
+  name,
+  roleLabel,
+  roleDesc,
+  inviteUrl,
+}: {
+  name: string;
+  roleLabel: string;
+  roleDesc: string;
+  inviteUrl: string;
 }) {
   return `<!DOCTYPE html>
 <html lang="en">

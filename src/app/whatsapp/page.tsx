@@ -1,8 +1,15 @@
 import Link from "next/link";
-import { ArrowLeft, MessageCircle, List, CheckCircle, HelpCircle, ExternalLink } from "lucide-react";
+import {
+  ArrowLeft,
+  MessageCircle,
+  List,
+  CheckCircle,
+  HelpCircle,
+  ExternalLink,
+} from "lucide-react";
 
 export const metadata = {
-  title: "WhatsApp Bot — Vodium Ledger",
+  title: "WhatsApp Bot : Vodium Ledger",
   description: "Track credits and send reminders right from WhatsApp.",
 };
 
@@ -28,25 +35,29 @@ const commands = [
     keyword: "ADD",
     icon: MessageCircle,
     label: "Log a credit",
-    description: "Record a new credit for any student in seconds. Vodium captures the name, amount, and due date.",
+    description:
+      "Record a new credit for any student in seconds. Vodium captures the name, amount, and due date.",
   },
   {
     keyword: "LIST",
     icon: List,
     label: "View who owes",
-    description: "Get a live summary of all outstanding credits — sorted by due date so you know who to chase first.",
+    description:
+      "Get a live summary of all outstanding credits : sorted by due date so you know who to chase first.",
   },
   {
     keyword: "PAID [name]",
     icon: CheckCircle,
     label: "Mark as paid",
-    description: "When a student settles up, mark them paid instantly. Their Vodium Score updates automatically.",
+    description:
+      "When a student settles up, mark them paid instantly. Their Vodium Score updates automatically.",
   },
   {
     keyword: "HELP",
     icon: HelpCircle,
     label: "See all commands",
-    description: "Forgotten a command? Message HELP and Vodium will send you the full command list.",
+    description:
+      "Forgotten a command? Message HELP and Vodium will send you the full command list.",
   },
 ];
 
@@ -58,15 +69,27 @@ export default function WhatsAppPage() {
         <div className="max-w-6xl mx-auto px-6 md:px-12 flex items-center justify-between h-16">
           <Link href="/" className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-vodium-charcoal border border-vodium-gold/40 flex items-center justify-center">
-              <span className="font-serif text-vodium-gold text-lg leading-none">V</span>
+              <span className="font-serif text-vodium-gold text-lg leading-none">
+                V
+              </span>
             </div>
-            <span className="font-serif tracking-[0.18em] text-vodium-gold text-sm">VODIUM LEDGER</span>
+            <span className="font-serif tracking-[0.18em] text-vodium-gold text-sm">
+              VODIUM LEDGER
+            </span>
           </Link>
           <div className="flex items-center gap-4">
-            <Link href="/" className="text-sm text-vodium-cream/50 hover:text-vodium-gold transition-colors flex items-center gap-1.5">
+            <Link
+              href="/"
+              className="text-sm text-vodium-cream/50 hover:text-vodium-gold transition-colors flex items-center gap-1.5"
+            >
               <ArrowLeft size={14} /> Home
             </Link>
-            <Link href="/register" className="btn-gold px-4 py-2 rounded-lg text-sm">Get started</Link>
+            <Link
+              href="/register"
+              className="btn-gold px-4 py-2 rounded-lg text-sm"
+            >
+              Get started
+            </Link>
           </div>
         </div>
       </nav>
@@ -85,8 +108,8 @@ export default function WhatsAppPage() {
                 <span className="text-gradient-gold">lives in WhatsApp.</span>
               </h1>
               <p className="text-vodium-cream/55 text-xl leading-relaxed max-w-2xl mb-10">
-                No app to download. No browser to open. Just message VODIUM on WhatsApp — and
-                you&apos;re tracking.
+                No app to download. No browser to open. Just message VODIUM on
+                WhatsApp and you&apos;re tracking.
               </p>
               <a
                 href="https://wa.me/2347019575717?text=HELP"
@@ -115,39 +138,54 @@ export default function WhatsAppPage() {
                 Add a credit in under 15 seconds.
               </h2>
               <p className="text-vodium-cream/55 text-base leading-relaxed mb-5">
-                Vodium&apos;s bot guides you through every step. No forms, no typing long commands —
-                just a natural conversation.
+                Vodium&apos;s bot guides you through every step. No forms, no
+                typing long commands just a natural conversation.
               </p>
               <p className="text-vodium-cream/55 text-base leading-relaxed">
-                Once saved, Vodium automatically messages the student a reminder 2 days before the
-                due date — so you don&apos;t have to.
+                Once saved, Vodium automatically messages the student a reminder
+                2 days before the due date so you don&apos;t have to.
               </p>
             </div>
 
             {/* WhatsApp chat mockup */}
             <div className="mx-auto w-full max-w-sm">
               {/* Phone shell */}
-              <div className="rounded-3xl overflow-hidden border border-white/[0.10] shadow-2xl" style={{ background: "#111B21" }}>
+              <div
+                className="rounded-3xl overflow-hidden border border-white/[0.10] shadow-2xl"
+                style={{ background: "#111B21" }}
+              >
                 {/* WA header */}
                 <div
                   className="flex items-center gap-3 px-4 py-3"
                   style={{ background: "#202C33" }}
                 >
                   <div className="w-9 h-9 rounded-full bg-vodium-charcoal border border-vodium-gold/40 flex items-center justify-center flex-shrink-0">
-                    <span className="font-serif text-vodium-gold text-base leading-none">V</span>
+                    <span className="font-serif text-vodium-gold text-base leading-none">
+                      V
+                    </span>
                   </div>
                   <div>
-                    <p className="text-white text-sm font-semibold leading-tight">VODIUM</p>
-                    <p className="text-white/40 text-[11px]">WhatsApp Bot · online</p>
+                    <p className="text-white text-sm font-semibold leading-tight">
+                      VODIUM
+                    </p>
+                    <p className="text-white/40 text-[11px]">
+                      WhatsApp Bot · online
+                    </p>
                   </div>
                 </div>
 
                 {/* Messages */}
-                <div className="px-3 py-4 space-y-2 min-h-[380px]" style={{ background: "#0B141A" }}>
+                <div
+                  className="px-3 py-4 space-y-2 min-h-[380px]"
+                  style={{ background: "#0B141A" }}
+                >
                   {chatMessages.map((msg, i) => {
                     const isUser = msg.from === "user";
                     return (
-                      <div key={i} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+                      <div
+                        key={i}
+                        className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+                      >
                         <div
                           className={`max-w-[78%] px-3.5 py-2.5 rounded-2xl text-[13px] leading-relaxed whitespace-pre-line ${
                             isUser
@@ -187,7 +225,10 @@ export default function WhatsAppPage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {commands.map(({ keyword, icon: Icon, label, description }) => (
-                <div key={keyword} className="card-dark-hover p-6 flex flex-col gap-4">
+                <div
+                  key={keyword}
+                  className="card-dark-hover p-6 flex flex-col gap-4"
+                >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-vodium-gold/10 border border-vodium-gold/20 flex items-center justify-center flex-shrink-0">
                       <Icon size={16} className="text-vodium-gold" />
@@ -200,8 +241,12 @@ export default function WhatsAppPage() {
                     </code>
                   </div>
                   <div>
-                    <p className="text-vodium-cream font-semibold text-sm mb-1.5">{label}</p>
-                    <p className="text-vodium-cream/45 text-xs leading-relaxed">{description}</p>
+                    <p className="text-vodium-cream font-semibold text-sm mb-1.5">
+                      {label}
+                    </p>
+                    <p className="text-vodium-cream/45 text-xs leading-relaxed">
+                      {description}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -218,7 +263,7 @@ export default function WhatsAppPage() {
             Start tracking now.
           </h2>
           <p className="text-vodium-cream/50 text-base mb-10 max-w-sm mx-auto">
-            Message HELP to get started. No signup required — just WhatsApp.
+            Message HELP to get started. No signup required just WhatsApp.
           </p>
           <a
             href="https://wa.me/2347019575717?text=HELP"
@@ -238,9 +283,24 @@ export default function WhatsAppPage() {
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-vodium-cream/30">
           <span>© 2026 Vodium. Lagos, Nigeria.</span>
           <div className="flex gap-6">
-            <Link href="/privacy" className="hover:text-vodium-gold transition-colors">Privacy</Link>
-            <Link href="/terms" className="hover:text-vodium-gold transition-colors">Terms</Link>
-            <Link href="/about" className="hover:text-vodium-gold transition-colors">About</Link>
+            <Link
+              href="/privacy"
+              className="hover:text-vodium-gold transition-colors"
+            >
+              Privacy
+            </Link>
+            <Link
+              href="/terms"
+              className="hover:text-vodium-gold transition-colors"
+            >
+              Terms
+            </Link>
+            <Link
+              href="/about"
+              className="hover:text-vodium-gold transition-colors"
+            >
+              About
+            </Link>
           </div>
         </div>
       </footer>

@@ -1,8 +1,16 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
-  TrendingUp, AlertCircle, CheckCircle2, Clock,
-  ArrowRight, Plus, MessageCircle, Users, Zap, BarChart3,
+  TrendingUp,
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  ArrowRight,
+  Plus,
+  MessageCircle,
+  Users,
+  Zap,
+  BarChart3,
 } from "lucide-react";
 import { getVendorSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
@@ -26,31 +34,43 @@ export default async function DashboardPage() {
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
   // ── Computed stats ──────────────────────────────────────────
-  const outstanding = credits.filter((c) =>
-    !["PAID", "WRITTEN_OFF"].includes(c.status)
+  const outstanding = credits.filter(
+    (c) => !["PAID", "WRITTEN_OFF"].includes(c.status),
   );
   const totalOwed = outstanding.reduce(
-    (s, c) => s + Number(c.amount) - Number(c.amountRepaid), 0
+    (s, c) => s + Number(c.amount) - Number(c.amountRepaid),
+    0,
   );
   const paidCredits = credits.filter((c) => c.status === "PAID");
   const paidThisMonth = paidCredits
     .filter((c) => c.closedAt && c.closedAt >= startOfMonth)
     .reduce((s, c) => s + Number(c.amount), 0);
   const overdueList = credits.filter((c) => c.status === "OVERDUE").slice(0, 5);
-  const dueSoonList = credits.filter((c) => c.status === "DUE_SOON").slice(0, 5);
+  const dueSoonList = credits
+    .filter((c) => c.status === "DUE_SOON")
+    .slice(0, 5);
   const totalStudents = new Set(credits.map((c) => c.studentId)).size;
-  const creditsOwing = outstanding.filter((c) => Number(c.amount) - Number(c.amountRepaid) > 0).length;
-  const avgCredit = credits.length ? credits.reduce((s, c) => s + Number(c.amount), 0) / credits.length : 0;
-  const creditsThisMonth = credits.filter((c) => c.createdAt >= startOfMonth).length;
-  const recoveryRate = paidCredits.length && credits.length
-    ? Math.round((paidCredits.length / credits.length) * 100)
+  const creditsOwing = outstanding.filter(
+    (c) => Number(c.amount) - Number(c.amountRepaid) > 0,
+  ).length;
+  const avgCredit = credits.length
+    ? credits.reduce((s, c) => s + Number(c.amount), 0) / credits.length
     : 0;
+  const creditsThisMonth = credits.filter(
+    (c) => c.createdAt >= startOfMonth,
+  ).length;
+  const recoveryRate =
+    paidCredits.length && credits.length
+      ? Math.round((paidCredits.length / credits.length) * 100)
+      : 0;
 
   // ── Monthly volume (last 6 months) ────────────────────────
   const monthlyVolume = Array.from({ length: 6 }, (_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
     const next = new Date(d.getFullYear(), d.getMonth() + 1, 1);
-    const monthCredits = credits.filter((c) => c.createdAt >= d && c.createdAt < next);
+    const monthCredits = credits.filter(
+      (c) => c.createdAt >= d && c.createdAt < next,
+    );
     return {
       month: d.toLocaleString("en-NG", { month: "short" }).slice(0, 3),
       extended: monthCredits.reduce((s, c) => s + Number(c.amount), 0),
@@ -63,15 +83,23 @@ export default async function DashboardPage() {
   // ── Activity feed (8 most recent events) ──────────────────
   const activity = credits.slice(0, 8).map((c) => ({
     id: c.id,
-    type: c.status === "PAID" ? "paid" : c.status === "OVERDUE" ? "overdue" : "credit",
+    type:
+      c.status === "PAID"
+        ? "paid"
+        : c.status === "OVERDUE"
+          ? "overdue"
+          : "credit",
     text:
       c.status === "PAID"
         ? `${c.student.fullName} paid ${formatNaira(Number(c.amount))}`
         : c.status === "OVERDUE"
-        ? `${c.student.fullName} is overdue — ${formatNaira(Number(c.amount) - Number(c.amountRepaid))} owed`
-        : `Credit of ${formatNaira(Number(c.amount))} recorded for ${c.student.fullName}`,
+          ? `${c.student.fullName} is overdue — ${formatNaira(Number(c.amount) - Number(c.amountRepaid))} owed`
+          : `Credit of ${formatNaira(Number(c.amount))} recorded for ${c.student.fullName}`,
     subtext: c.description ?? "",
-    at: c.createdAt.toLocaleDateString("en-NG", { month: "short", day: "numeric" }),
+    at: c.createdAt.toLocaleDateString("en-NG", {
+      month: "short",
+      day: "numeric",
+    }),
   }));
 
   // This month's extended total for chart footer
@@ -131,7 +159,9 @@ export default async function DashboardPage() {
           value={`${recoveryRate}%`}
           sub="All-time paid vs issued"
           icon={<BarChart3 size={16} />}
-          trend={recoveryRate >= 70 ? "Strong repayment trend" : "Needs attention"}
+          trend={
+            recoveryRate >= 70 ? "Strong repayment trend" : "Needs attention"
+          }
           trendUp={recoveryRate >= 70}
           delay={0.24}
         />
@@ -211,7 +241,9 @@ export default async function DashboardPage() {
                 },
                 {
                   href: "https://wa.me/2347019575717?text=LIST",
-                  icon: <MessageCircle size={16} className="text-vodium-gold" />,
+                  icon: (
+                    <MessageCircle size={16} className="text-vodium-gold" />
+                  ),
                   label: "WhatsApp bot",
                   external: true,
                 },
@@ -228,7 +260,10 @@ export default async function DashboardPage() {
                       {a.icon}
                       {a.label}
                     </div>
-                    <ArrowRight size={14} className="text-vodium-cream/20 group-hover:text-vodium-gold transition-colors" />
+                    <ArrowRight
+                      size={14}
+                      className="text-vodium-cream/20 group-hover:text-vodium-gold transition-colors"
+                    />
                   </a>
                 ) : (
                   <Link
@@ -240,9 +275,12 @@ export default async function DashboardPage() {
                       {a.icon}
                       {a.label}
                     </div>
-                    <ArrowRight size={14} className="text-vodium-cream/20 group-hover:text-vodium-gold transition-colors" />
+                    <ArrowRight
+                      size={14}
+                      className="text-vodium-cream/20 group-hover:text-vodium-gold transition-colors"
+                    />
                   </Link>
-                )
+                ),
               )}
             </div>
           </div>
@@ -250,21 +288,39 @@ export default async function DashboardPage() {
           {/* Mini stats grid */}
           <div className="bg-vodium-charcoal border border-white/[0.06] rounded-2xl p-5 grid grid-cols-2 gap-5">
             <div>
-              <p className="text-[11px] text-vodium-cream/35 uppercase tracking-wider">Customers</p>
-              <p className="font-serif text-xl text-vodium-cream mt-1">{totalStudents}</p>
+              <p className="text-[11px] text-vodium-cream/35 uppercase tracking-wider">
+                Customers
+              </p>
+              <p className="font-serif text-xl text-vodium-cream mt-1">
+                {totalStudents}
+              </p>
             </div>
             <div>
-              <p className="text-[11px] text-vodium-cream/35 uppercase tracking-wider">Avg credit</p>
-              <p className="font-serif text-xl text-vodium-cream mt-1">{formatNaira(Math.round(avgCredit))}</p>
+              <p className="text-[11px] text-vodium-cream/35 uppercase tracking-wider">
+                Avg credit
+              </p>
+              <p className="font-serif text-xl text-vodium-cream mt-1">
+                {formatNaira(Math.round(avgCredit))}
+              </p>
             </div>
             <div>
-              <p className="text-[11px] text-vodium-cream/35 uppercase tracking-wider">This month</p>
-              <p className="font-serif text-xl text-vodium-cream mt-1">{creditsThisMonth}</p>
-              <p className="text-[11px] text-vodium-cream/25 mt-0.5">credits issued</p>
+              <p className="text-[11px] text-vodium-cream/35 uppercase tracking-wider">
+                This month
+              </p>
+              <p className="font-serif text-xl text-vodium-cream mt-1">
+                {creditsThisMonth}
+              </p>
+              <p className="text-[11px] text-vodium-cream/25 mt-0.5">
+                credits issued
+              </p>
             </div>
             <div>
-              <p className="text-[11px] text-vodium-cream/35 uppercase tracking-wider">All time</p>
-              <p className="font-serif text-xl text-vodium-cream mt-1">{credits.length}</p>
+              <p className="text-[11px] text-vodium-cream/35 uppercase tracking-wider">
+                All time
+              </p>
+              <p className="font-serif text-xl text-vodium-cream mt-1">
+                {credits.length}
+              </p>
               <p className="text-[11px] text-vodium-cream/25 mt-0.5">logged</p>
             </div>
           </div>
@@ -279,7 +335,11 @@ export default async function DashboardPage() {
             Overdue credits
           </h2>
           <div className="flex items-center gap-3">
-            <BulkRemindButton overdueCount={credits.filter((c) => c.status === "OVERDUE").length} />
+            <BulkRemindButton
+              overdueCount={
+                credits.filter((c) => c.status === "OVERDUE").length
+              }
+            />
             <GlowBadge color="red">
               {credits.filter((c) => c.status === "OVERDUE").length} overdue
             </GlowBadge>
@@ -288,13 +348,13 @@ export default async function DashboardPage() {
 
         {overdueList.length === 0 ? (
           <p className="px-6 py-10 text-sm text-vodium-cream/30 text-center">
-            No overdue credits — great work!
+            No overdue credits great work!
           </p>
         ) : (
           <div className="divide-y divide-white/[0.04]">
             {overdueList.map((c) => {
               const daysOver = Math.floor(
-                (now.getTime() - new Date(c.dueDate).getTime()) / 86_400_000
+                (now.getTime() - new Date(c.dueDate).getTime()) / 86_400_000,
               );
               return (
                 <div
@@ -311,7 +371,9 @@ export default async function DashboardPage() {
                       </p>
                       <p className="text-[11px] text-vodium-cream/35 mt-0.5">
                         {c.student.matricNumber ?? "No matric"} ·{" "}
-                        <span className="text-rose-400/70">{daysOver} day{daysOver !== 1 ? "s" : ""} overdue</span>
+                        <span className="text-rose-400/70">
+                          {daysOver} day{daysOver !== 1 ? "s" : ""} overdue
+                        </span>
                       </p>
                     </div>
                   </div>
@@ -346,9 +408,7 @@ export default async function DashboardPage() {
             <Clock size={16} className="text-amber-400" />
             Due soon
           </h2>
-          <GlowBadge color="amber">
-            {dueSoonList.length} due soon
-          </GlowBadge>
+          <GlowBadge color="amber">{dueSoonList.length} due soon</GlowBadge>
         </div>
         {dueSoonList.length === 0 ? (
           <p className="px-6 py-10 text-sm text-vodium-cream/30 text-center">
@@ -358,7 +418,7 @@ export default async function DashboardPage() {
           <div className="divide-y divide-white/[0.04]">
             {dueSoonList.map((c) => {
               const daysUntil = Math.ceil(
-                (new Date(c.dueDate).getTime() - now.getTime()) / 86_400_000
+                (new Date(c.dueDate).getTime() - now.getTime()) / 86_400_000,
               );
               return (
                 <div
@@ -387,7 +447,8 @@ export default async function DashboardPage() {
                       {formatNaira(Number(c.amount) - Number(c.amountRepaid))}
                     </p>
                     <p className="text-[11px] text-vodium-cream/35 mt-0.5">
-                      in {Math.max(0, daysUntil)} day{daysUntil !== 1 ? "s" : ""}
+                      in {Math.max(0, daysUntil)} day
+                      {daysUntil !== 1 ? "s" : ""}
                     </p>
                   </div>
                 </div>
@@ -433,14 +494,16 @@ export default async function DashboardPage() {
                     a.type === "paid"
                       ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]"
                       : a.type === "overdue"
-                      ? "bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.6)]"
-                      : "bg-vodium-gold shadow-[0_0_8px_rgba(201,169,97,0.6)]"
+                        ? "bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.6)]"
+                        : "bg-vodium-gold shadow-[0_0_8px_rgba(201,169,97,0.6)]"
                   }`}
                 />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-vodium-cream">{a.text}</p>
                   {a.subtext && (
-                    <p className="text-xs text-vodium-cream/30 mt-0.5">{a.subtext}</p>
+                    <p className="text-xs text-vodium-cream/30 mt-0.5">
+                      {a.subtext}
+                    </p>
                   )}
                 </div>
                 <span className="text-[11px] text-vodium-cream/25 whitespace-nowrap flex-shrink-0 mt-0.5">

@@ -5,7 +5,6 @@ import Link from "next/link";
 import {
   CheckCircle,
   Store,
-  Phone,
   Mail,
   MapPin,
   Bell,
@@ -214,7 +213,7 @@ export default function SettingsPage() {
                         />
                       </div>
                       <p className="text-[11px] text-vodium-cream/25 mt-1.5">
-                        Phone cannot be changed — it&rsquo;s your login
+                        Phone cannot be changed it&rsquo;s your login
                       </p>
                     </DarkField>
                     <DarkField label="Email address">
@@ -280,7 +279,7 @@ export default function SettingsPage() {
                   },
                   {
                     label: "Weekly summary report",
-                    sub: "Every Monday — overview of your book",
+                    sub: "Every Monday, overview of your book",
                     defaultOn: false,
                   },
                 ].map((n) => (

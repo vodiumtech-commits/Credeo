@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, CreditCard, Settings, LogOut,
-  MessageCircle, Menu, X, Plus, Bell, ChevronRight, Zap,
+  MessageCircle, Menu, X, Plus, ChevronRight, Zap,
 } from "lucide-react";
 import { NpsWidget } from "@/components/ui/nps-widget";
 import { NavProgress } from "@/components/ui/nav-progress";

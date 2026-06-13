@@ -1,19 +1,30 @@
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, TrendingUp, Users, Shield, Zap, Mail, Target, Lightbulb } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  TrendingUp,
+  Users,
+  Shield,
+  Zap,
+  Mail,
+  Target,
+  Lightbulb,
+} from "lucide-react";
 import { MagicCard } from "@/components/ui/magic-card";
 import { AnimatedBorder } from "@/components/ui/animated-border";
 import { GlowBadge } from "@/components/ui/glow-badge";
 
 export const metadata = {
-  title: "About — Vodium Ledger",
-  description: "We're building Africa's credit graph, one campus vendor at a time.",
+  title: "About Vodium Ledger",
+  description:
+    "We're building Africa's credit graph, one campus vendor at a time.",
 };
 
 const stats = [
-  { value: "127+",   label: "Active vendors" },
+  { value: "127+", label: "Active vendors" },
   { value: "₦47M+", label: "Credit tracked" },
-  { value: "4,800+",label: "Students with history" },
-  { value: "73%",   label: "Repayment rate" },
+  { value: "4,800+", label: "Students with history" },
+  { value: "73%", label: "Repayment rate" },
 ];
 
 const team = [
@@ -44,10 +55,26 @@ const team = [
 ];
 
 const values = [
-  { icon: TrendingUp, label: "Credit data at scale",   desc: "Every transaction builds the graph." },
-  { icon: Users,      label: "Vendor-first",            desc: "If vendors don't love it, nothing else matters." },
-  { icon: Shield,     label: "Privacy-first",           desc: "Student data is never shared without consent." },
-  { icon: Zap,        label: "Speed is a feature",      desc: "15 seconds to log a credit. That's the constraint." },
+  {
+    icon: TrendingUp,
+    label: "Credit data at scale",
+    desc: "Every transaction builds the graph.",
+  },
+  {
+    icon: Users,
+    label: "Vendor-first",
+    desc: "If vendors don't love it, nothing else matters.",
+  },
+  {
+    icon: Shield,
+    label: "Privacy-first",
+    desc: "Student data is never shared without consent.",
+  },
+  {
+    icon: Zap,
+    label: "Speed is a feature",
+    desc: "15 seconds to log a credit. That's the constraint.",
+  },
 ];
 
 export default function AboutPage() {
@@ -58,12 +85,19 @@ export default function AboutPage() {
         <div className="max-w-6xl mx-auto px-6 md:px-12 flex items-center justify-between h-16">
           <Link href="/" className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-vodium-charcoal border border-vodium-gold/40 flex items-center justify-center">
-              <span className="font-serif text-vodium-gold text-lg leading-none">V</span>
+              <span className="font-serif text-vodium-gold text-lg leading-none">
+                V
+              </span>
             </div>
-            <span className="font-serif tracking-[0.18em] text-vodium-gold text-sm">VODIUM LEDGER</span>
+            <span className="font-serif tracking-[0.18em] text-vodium-gold text-sm">
+              VODIUM LEDGER
+            </span>
           </Link>
           <div className="flex items-center gap-3">
-            <Link href="/" className="text-sm text-vodium-cream/50 hover:text-vodium-gold transition-colors flex items-center gap-1.5">
+            <Link
+              href="/"
+              className="text-sm text-vodium-cream/50 hover:text-vodium-gold transition-colors flex items-center gap-1.5"
+            >
               <ArrowLeft size={14} /> Home
             </Link>
             <Link
@@ -87,11 +121,13 @@ export default function AboutPage() {
               </GlowBadge>
               <h1 className="font-serif text-5xl md:text-6xl lg:text-7xl text-vodium-cream leading-[1.05] mb-6">
                 We&apos;re building{" "}
-                <span className="text-gradient-gold">Africa&apos;s credit graph.</span>
+                <span className="text-gradient-gold">
+                  Africa&apos;s credit graph.
+                </span>
               </h1>
               <p className="text-vodium-cream/55 text-xl leading-relaxed max-w-2xl">
-                Starting with the 850,000 campus vendors who extend informal credit to Nigerian
-                students every day.
+                Starting with the 850,000 campus vendors who extend informal
+                credit to Nigerian students every day.
               </p>
             </div>
           </div>
@@ -106,13 +142,15 @@ export default function AboutPage() {
                 Our mission
               </span>
               <p className="text-vodium-cream/70 text-lg leading-relaxed">
-                Africa has 1.4 billion people. Most have no formal credit history. We&apos;re
-                building it — one campus vendor, one student, one repayment at a time.
+                Africa has 1.4 billion people. Most have no formal credit
+                history. We&apos;re building it one campus vendor, one student,
+                one repayment at a time.
               </p>
               <p className="text-vodium-cream/70 text-lg leading-relaxed mt-5">
-                Vodium Ledger is the first product in a long-term vision to own the consumer credit
-                infrastructure layer for Africa. We start where credit data is being created right now —
-                in the informal economy on Nigerian campuses.
+                Vodium Ledger is the first product in a long-term vision to own
+                the consumer credit infrastructure layer for Africa. We start
+                where credit data is being created right now in the informal
+                economy on Nigerian campuses.
               </p>
               <div className="mt-8">
                 <Link
@@ -130,8 +168,12 @@ export default function AboutPage() {
                     <div className="w-9 h-9 rounded-lg bg-vodium-gold/10 border border-vodium-gold/20 flex items-center justify-center">
                       <Icon size={16} className="text-vodium-gold" />
                     </div>
-                    <p className="text-vodium-cream/80 text-sm font-semibold leading-tight">{label}</p>
-                    <p className="text-vodium-cream/40 text-xs leading-relaxed">{desc}</p>
+                    <p className="text-vodium-cream/80 text-sm font-semibold leading-tight">
+                      {label}
+                    </p>
+                    <p className="text-vodium-cream/40 text-xs leading-relaxed">
+                      {desc}
+                    </p>
                   </div>
                 </MagicCard>
               ))}
@@ -144,11 +186,16 @@ export default function AboutPage() {
           <div className="max-w-6xl mx-auto px-6 md:px-12 py-14">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-0 md:divide-x md:divide-white/[0.06]">
               {stats.map(({ value, label }) => (
-                <div key={label} className="flex flex-col items-center text-center md:px-8">
+                <div
+                  key={label}
+                  className="flex flex-col items-center text-center md:px-8"
+                >
                   <span className="font-serif text-4xl md:text-5xl text-gradient-gold font-bold mb-2">
                     {value}
                   </span>
-                  <span className="text-vodium-cream/45 text-sm tracking-wide">{label}</span>
+                  <span className="text-vodium-cream/45 text-sm tracking-wide">
+                    {label}
+                  </span>
                 </div>
               ))}
             </div>
@@ -162,16 +209,17 @@ export default function AboutPage() {
               The problem
             </span>
             <h2 className="font-serif text-3xl md:text-4xl text-vodium-cream mb-8 leading-snug">
-              Billions lost to informal credit defaults — every year.
+              Billions lost to informal credit defaults every year.
             </h2>
             <p className="text-vodium-cream/60 text-lg leading-relaxed">
-              Nigerian campus vendors lose billions each year to informal credit defaults. They track
-              debtors in torn notebooks. Students pay late or disappear. Vendors have no recourse
-              and no data.
+              Nigerian campus vendors lose billions each year to informal credit
+              defaults. They track debtors in torn notebooks. Students pay late
+              or disappear. Vendors have no recourse and no data.
             </p>
             <p className="text-vodium-cream/60 text-lg leading-relaxed mt-5">
-              Vodium Ledger fixes this — a WhatsApp-first tool that takes 15 seconds to log a credit
-              and auto-reminds students before they default.
+              Vodium Ledger fixes this a WhatsApp-first tool that takes 15
+              seconds to log a credit and auto-reminds students before they
+              default.
             </p>
           </div>
         </section>
@@ -188,7 +236,8 @@ export default function AboutPage() {
               Built by Nigerians, for Nigeria.
             </h2>
             <p className="text-vodium-cream/45 text-sm mt-3 max-w-md mx-auto">
-              A small team with deep roots in Nigerian fintech, banking, and campus commerce.
+              A small team with deep roots in Nigerian fintech, banking, and
+              campus commerce.
             </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -196,13 +245,21 @@ export default function AboutPage() {
               <AnimatedBorder key={name}>
                 <div className="p-6 flex flex-col gap-4">
                   <div className="w-12 h-12 rounded-full bg-vodium-charcoal border border-vodium-gold/40 flex items-center justify-center shadow-[0_0_16px_rgba(201,169,97,0.1)]">
-                    <span className="font-serif text-vodium-gold text-lg leading-none">{initials}</span>
+                    <span className="font-serif text-vodium-gold text-lg leading-none">
+                      {initials}
+                    </span>
                   </div>
                   <div>
-                    <p className="text-vodium-cream font-semibold text-sm leading-tight">{name}</p>
-                    <p className="text-vodium-gold text-xs mt-1 font-medium">{role}</p>
+                    <p className="text-vodium-cream font-semibold text-sm leading-tight">
+                      {name}
+                    </p>
+                    <p className="text-vodium-gold text-xs mt-1 font-medium">
+                      {role}
+                    </p>
                   </div>
-                  <p className="text-vodium-cream/50 text-sm leading-relaxed">{bio}</p>
+                  <p className="text-vodium-cream/50 text-sm leading-relaxed">
+                    {bio}
+                  </p>
                 </div>
               </AnimatedBorder>
             ))}
@@ -221,28 +278,57 @@ export default function AboutPage() {
                   Phase 1 is just the beginning.
                 </h2>
                 <p className="text-vodium-cream/60 text-base leading-relaxed mb-5">
-                  Vodium Ledger (Phase 1) builds the proprietary repayment data that earns us the
-                  right to launch Vodium Premium — Africa&apos;s first consumer credit card brand —
-                  in Year 2.
+                  Vodium Ledger (Phase 1) builds the proprietary repayment data
+                  that earns us the right to launch Vodium Premium Africa&apos;s
+                  first consumer credit card brand in Year 2.
                 </p>
                 <p className="text-vodium-cream/60 text-base leading-relaxed">
-                  Every vendor who subscribes and every credit tracked brings us one step closer to
-                  owning the credit infrastructure layer for Africa&apos;s 1.4 billion consumers.
+                  Every vendor who subscribes and every credit tracked brings us
+                  one step closer to owning the credit infrastructure layer for
+                  Africa&apos;s 1.4 billion consumers.
                 </p>
               </div>
               <div className="space-y-4">
                 {[
-                  { icon: Target,    label: "Phase 1 — Vodium Ledger",  desc: "WhatsApp-first credit ledger for campus vendors. Build the data." },
-                  { icon: Lightbulb, label: "Phase 2 — Vodium Premium", desc: "Africa's first campus-native credit card, powered by our repayment data." },
-                  { icon: TrendingUp,label: "Phase 3 — Vodium Network",  desc: "Cross-vendor credit graph. Know who pays — before you extend credit." },
+                  {
+                    icon: Target,
+                    label: "Phase 1 : Vodium Ledger",
+                    desc: "WhatsApp-first credit ledger for campus vendors. Build the data.",
+                  },
+                  {
+                    icon: Lightbulb,
+                    label: "Phase 2 : Vodium Premium",
+                    desc: "Africa's first campus-native credit card, powered by our repayment data.",
+                  },
+                  {
+                    icon: TrendingUp,
+                    label: "Phase 3 : Vodium Network",
+                    desc: "Cross-vendor credit graph. Know who pays before you extend credit.",
+                  },
                 ].map(({ icon: Icon, label, desc }, i) => (
-                  <div key={label} className="flex items-start gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/[0.05]">
-                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${i === 0 ? "bg-vodium-gold/15 border border-vodium-gold/30" : "bg-white/[0.04] border border-white/[0.08]"}`}>
-                      <Icon size={15} className={i === 0 ? "text-vodium-gold" : "text-vodium-cream/30"} />
+                  <div
+                    key={label}
+                    className="flex items-start gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/[0.05]"
+                  >
+                    <div
+                      className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${i === 0 ? "bg-vodium-gold/15 border border-vodium-gold/30" : "bg-white/[0.04] border border-white/[0.08]"}`}
+                    >
+                      <Icon
+                        size={15}
+                        className={
+                          i === 0 ? "text-vodium-gold" : "text-vodium-cream/30"
+                        }
+                      />
                     </div>
                     <div>
-                      <p className={`text-sm font-semibold leading-tight ${i === 0 ? "text-vodium-cream" : "text-vodium-cream/45"}`}>{label}</p>
-                      <p className="text-vodium-cream/35 text-xs mt-1 leading-relaxed">{desc}</p>
+                      <p
+                        className={`text-sm font-semibold leading-tight ${i === 0 ? "text-vodium-cream" : "text-vodium-cream/45"}`}
+                      >
+                        {label}
+                      </p>
+                      <p className="text-vodium-cream/35 text-xs mt-1 leading-relaxed">
+                        {desc}
+                      </p>
                     </div>
                   </div>
                 ))}
@@ -253,9 +339,12 @@ export default function AboutPage() {
 
         {/* Contact */}
         <section className="max-w-6xl mx-auto px-6 md:px-12 py-20 text-center">
-          <h2 className="font-serif text-3xl text-vodium-cream mb-4">Get in touch.</h2>
+          <h2 className="font-serif text-3xl text-vodium-cream mb-4">
+            Get in touch.
+          </h2>
           <p className="text-vodium-cream/50 mb-8 max-w-md mx-auto">
-            Partnerships, press, investors, or just want to learn more about what we&apos;re building?
+            Partnerships, press, investors, or just want to learn more about
+            what we&apos;re building?
           </p>
           <a
             href="mailto:hello@vodium.co"
@@ -272,10 +361,30 @@ export default function AboutPage() {
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-vodium-cream/30">
           <span>© 2026 Vodium. Lagos, Nigeria.</span>
           <div className="flex gap-6">
-            <Link href="/privacy"  className="hover:text-vodium-gold transition-colors">Privacy</Link>
-            <Link href="/terms"    className="hover:text-vodium-gold transition-colors">Terms</Link>
-            <Link href="/careers"  className="hover:text-vodium-gold transition-colors">Careers</Link>
-            <Link href="/blog"     className="hover:text-vodium-gold transition-colors">Blog</Link>
+            <Link
+              href="/privacy"
+              className="hover:text-vodium-gold transition-colors"
+            >
+              Privacy
+            </Link>
+            <Link
+              href="/terms"
+              className="hover:text-vodium-gold transition-colors"
+            >
+              Terms
+            </Link>
+            <Link
+              href="/careers"
+              className="hover:text-vodium-gold transition-colors"
+            >
+              Careers
+            </Link>
+            <Link
+              href="/blog"
+              className="hover:text-vodium-gold transition-colors"
+            >
+              Blog
+            </Link>
           </div>
         </div>
       </footer>

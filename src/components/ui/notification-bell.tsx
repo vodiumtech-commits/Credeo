@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Bell, Info, CheckCircle2, AlertTriangle, XCircle, X, Trash2 } from "lucide-react";
+import { Bell, Info, CheckCircle2, AlertTriangle, XCircle, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 interface Notification {

@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Upsert subscription record so the webhook knows which vendor to update
-  let paystackCustomerId = vendor.subscription?.paystackCustomerId ?? null;
+  const paystackCustomerId = vendor.subscription?.paystackCustomerId ?? null;
 
   // Initialise Paystack transaction
   const callbackUrl = `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/settings?subscribed=1`;

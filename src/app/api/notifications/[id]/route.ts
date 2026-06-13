@@ -15,7 +15,7 @@ export async function PATCH(
       data: { read: true },
     });
     return NextResponse.json(notification);
-  } catch (err) {
+  } catch {
     return NextResponse.json({ error: "Notification not found" }, { status: 404 });
   }
 }
@@ -32,7 +32,7 @@ export async function DELETE(
       where: { id: params.id, vendorId: vendor.id },
     });
     return NextResponse.json({ ok: true });
-  } catch (err) {
+  } catch {
     return NextResponse.json({ error: "Notification not found" }, { status: 404 });
   }
 }

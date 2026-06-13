@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { Check, Zap, Rocket, Crown, ArrowRight, Loader2 } from "lucide-react";
 import { GlowBadge } from "@/components/ui/glow-badge";
-import { AnimatedBorder } from "@/components/ui/animated-border";
 
 type Plan = "STARTER" | "GROWTH" | "CAMPUS_PRO";
 
@@ -13,7 +12,7 @@ interface PlanDetail {
   price: string;
   description: string;
   features: string[];
-  icon: any;
+  icon: React.ElementType;
   color: string;
 }
 

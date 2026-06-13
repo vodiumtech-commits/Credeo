@@ -1,6 +1,5 @@
 "use client";
 import { useRef, useState, useCallback } from "react";
-import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 export function MagicCard({ children, className, gradientColor = "rgba(201,169,97,0.15)" }: { children: React.ReactNode; className?: string; gradientColor?: string }) {

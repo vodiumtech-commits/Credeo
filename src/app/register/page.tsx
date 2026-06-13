@@ -337,7 +337,7 @@ export default function RegisterPage() {
           </h2>
           <p className="text-vodium-cream/45 leading-relaxed max-w-sm text-sm mb-12">
             Join hundreds of campus vendors who&rsquo;ve stopped losing money to
-            defaults. Set up your ledger in under 3 minutes — no card needed.
+            defaults. Set up your ledger in under 3 minutes no card needed.
           </p>
           <div className="space-y-4">
             {[
@@ -527,7 +527,7 @@ export default function RegisterPage() {
                     Which campus?
                   </h1>
                   <p className="text-muted-foreground text-sm">
-                    Type your university name exactly as you know it —
+                    Type your university name exactly as you know it
                     abbreviation or full name both work.
                   </p>
                 </div>
@@ -758,8 +758,8 @@ export default function RegisterPage() {
                     </div>
                     {form.password.length > 0 && form.password.length < 8 && (
                       <p className="text-xs text-danger mt-1.5">
-                        Password too short — needs {8 - form.password.length}{" "}
-                        more character
+                        Password too short needs {8 - form.password.length} more
+                        character
                         {8 - form.password.length !== 1 ? "s" : ""}.
                       </p>
                     )}

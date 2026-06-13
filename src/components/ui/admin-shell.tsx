@@ -61,7 +61,7 @@ function initials(name: string): string {
   return name.split(" ").map((w) => w[0] ?? "").join("").slice(0, 2).toUpperCase();
 }
 
-export function AdminShell({ name, email: _email, role, children }: Props) {
+export function AdminShell({ name, role, children }: Omit<Props, 'email'>) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const router   = useRouter();
