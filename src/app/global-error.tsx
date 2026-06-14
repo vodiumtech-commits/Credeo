@@ -1,6 +1,5 @@
 "use client";
 
-import * as Sentry from "@sentry/nextjs";
 import { useEffect } from "react";
 
 export default function GlobalError({
@@ -8,8 +7,9 @@ export default function GlobalError({
 }: {
   error: Error & { digest?: string };
 }) {
+  // Sentry capture removed to test if it's causing the prerender error
   useEffect(() => {
-    Sentry.captureException(error);
+    console.error("Global error captured:", error);
   }, [error]);
 
   return (

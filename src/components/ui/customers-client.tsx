@@ -54,7 +54,7 @@ export function CustomersClient({
 
     const q = search.trim().toLowerCase();
     if (q) r = r.filter(
-      (s) => s.fullName.toLowerCase().includes(q) || (s.customerID ?? "").toLowerCase().includes(q)
+      (s) => s.fullName.toLowerCase().includes(q) || (s.matricNumber ?? "").toLowerCase().includes(q)
     );
 
     return r;
@@ -200,7 +200,7 @@ export function CustomersClient({
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-vodium-cream truncate leading-tight">{s.fullName}</p>
-                  <p className="text-[10px] text-vodium-cream/30 mt-0.5">{s.customerID ?? "No ID"}</p>
+                  <p className="text-[10px] text-vodium-cream/30 mt-0.5">{s.matricNumber ?? "No ID"}</p>
                 </div>
               </div>
 
