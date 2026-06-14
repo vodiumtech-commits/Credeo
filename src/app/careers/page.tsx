@@ -51,7 +51,7 @@ const jobs: JobPost[] = [
     location: "Lagos / Remote",
     type: "Full-time",
     description:
-      "Be the voice of Vodium to vendors and students. Onboard new shops, gather feedback, drive retention. You'll know every pilot vendor by name.",
+      "Be the voice of Vodium to vendors and customers. Onboard new shops, gather feedback, drive retention. You'll know every pilot vendor by name.",
     mailto: "careers@vodium.co?subject=Application: Customer Success Lead",
   },
   {

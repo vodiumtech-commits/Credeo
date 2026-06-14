@@ -3,10 +3,10 @@
  * Keep copy short, Nigerian-English, respectful, no slang that excludes older vendors.
  */
 
-import { formatNaira } from "@/lib/utils";
+import { formatNaira } from "../utils";
 
 export type CreditEntry = {
-  studentName: string;
+  customerName: string;
   amount: number;
   daysUntilDue: number; // negative = overdue
 };
@@ -15,7 +15,7 @@ export const messages = {
   // ── Welcome & onboarding ───────────────────────────────────────────────
   welcome: () =>
     `👋 Welcome to *Vodium Ledger*.\n\n` +
-    `I help campus vendors track who owes them money and recover it faster.\n\n` +
+    `I help vendors track who owes them money and recover it faster.\n\n` +
     `Reply:\n` +
     `• *START* : set up your shop\n` +
     `• *HELP* : see all commands`,
@@ -30,8 +30,8 @@ export const messages = {
     `Nice to meet you, *${name}*. What's the name of your shop or business?`,
 
   onboardingAskUniversity: () =>
-    `Which campus is your shop on?\n\n` +
-    `Reply with the short code e.g. *UNILAG*, *OAU*, *UI*, *COVENANT*, *FUTA*, *LASU*, *UNIBEN*, *ABU*, *UNN*, *UNILORIN*.`,
+    `Which city or community is your shop in?\n\n` +
+    `Reply with the short code if it's a campus (e.g. *UNILAG*, *OAU*) or the city name (e.g. *Lagos*, *Ibadan*).`,
 
   onboardingDone: (businessName: string) =>
     `✅ *${businessName}* is set up on Vodium Ledger!\n\n` +
@@ -39,28 +39,35 @@ export const messages = {
     `Reply *ADD* to add a credit, or *HELP* for all commands.`,
 
   // ── ADD credit flow ────────────────────────────────────────────────────
-  addCreditAskStudent: () =>
-    `Who took the credit? Send their full name (and matric number if you know it).\n\n` +
-    `Example: *Chidi Okeke 18/0234*`,
+  addCreditAskCustomer: () =>
+    `Who took the credit? Send their full name.\n\n` +
+    `Example: *Chidi Okeke*`,
 
-  addCreditAskAmount: (studentName: string) =>
-    `How much does *${studentName}* owe? Send just the number.\n\n` +
+  addCreditAskPhone: (customerName: string) =>
+    `What is *${customerName}'s* WhatsApp number?\n\n` +
+    `We need this to send them a polite reminder. Send the number in any format.\n\n` +
+    `Example: *08012345678*`,
+
+  addCreditAskAmount: (customerName: string) =>
+    `How much does *${customerName}* owe? Send just the number.\n\n` +
     `Example: *2500*`,
 
-  addCreditAskDue: (studentName: string, amount: number) =>
-    `${formatNaira(amount)} for *${studentName}*. ✓\n\n` +
+  addCreditAskDue: (customerName: string, amount: number) =>
+    `${formatNaira(amount)} for *${customerName}*. ✓\n\n` +
     `When should they pay back? Reply with:\n` +
+    `• *30M* : in 30 minutes\n` +
+    `• *2H* : in 2 hours\n` +
     `• *7* : in 7 days\n` +
     `• *END* : end of month\n` +
     `• *15-06-2026* : a specific date`,
 
   addCreditConfirmed: (
-    studentName: string,
+    customerName: string,
     amount: number,
     dueDateText: string,
   ) =>
     `✅ Saved.\n\n` +
-    `*${studentName}* owes you *${formatNaira(amount)}*, due ${dueDateText}.\n\n` +
+    `*${customerName}* owes you *${formatNaira(amount)}*, due ${dueDateText}.\n\n` +
     `I'll send them a polite reminder 2 days before the due date.\n\n` +
     `Reply *ADD* for another, or *LIST* to see everyone who owes you.`,
 
@@ -69,6 +76,9 @@ export const messages = {
 
   invalidDueDate: () =>
     `Please reply with a number of days (e.g. *7*), *END* for end of month, or a date like *15-06-2026*.`,
+
+  invalidPhone: () =>
+    `That doesn't look like a valid phone number. Please send a valid Nigerian number.\n\nExample: *08012345678*`,
 
   noVendorAccount: () =>
     `You don't have a shop set up yet. Reply *START* to get started.`,
@@ -98,7 +108,7 @@ export const messages = {
         } else {
           due = `due in ${c.daysUntilDue} days`;
         }
-        return `${i + 1}. *${c.studentName}* : ${formatNaira(c.amount)} (${due}${flag})`;
+        return `${i + 1}. *${c.customerName}* : ${formatNaira(c.amount)} (${due}${flag})`;
       })
       .join("\n");
 
@@ -112,18 +122,18 @@ export const messages = {
   // ── PAID flow ──────────────────────────────────────────────────────────
   paidAsk: () => `Who paid? Send their full name.\n\nExample: *Chidi Okeke*`,
 
-  paidConfirmed: (studentName: string, amount: number) =>
-    `✅ Marked *${studentName}'s* ${formatNaira(amount)} as *paid*.\n\n` +
+  paidConfirmed: (customerName: string, amount: number) =>
+    `✅ Marked *${customerName}'s* ${formatNaira(amount)} as *paid*.\n\n` +
     `Their Vodium score has improved. Reply *LIST* to see remaining credits.`,
 
-  paidNotFound: (studentName: string) =>
-    `❌ No outstanding credit found for *${studentName}*.\n\n` +
+  paidNotFound: (customerName: string) =>
+    `❌ No outstanding credit found for *${customerName}*.\n\n` +
     `Check the spelling and try again, or reply *LIST* to see all credits.`,
 
   // ── SCORE lookup ───────────────────────────────────────────────────────
-  scoreLookupAsk: () => `Which student? Send their full name or matric number.`,
+  scoreLookupAsk: () => `Which customer? Send their full name or phone number.`,
 
-  scoreReply: (studentName: string, score: number, summary: string) => {
+  scoreReply: (customerName: string, score: number, summary: string) => {
     const band =
       score >= 750
         ? "🟢 Excellent"
@@ -136,30 +146,30 @@ export const messages = {
               : "🔴 High risk";
 
     return (
-      `📊 *${studentName}* : Vodium Score: *${score}/1000*\n` +
+      `📊 *${customerName}* : Vodium Score: *${score}/1000*\n` +
       `${band}\n\n` +
       `${summary}\n\n` +
-      `_Scores above 650 indicate good repayment history across campus vendors._`
+      `_Scores above 650 indicate good repayment history across vendors._`
     );
   },
 
   scoreNotFound: (query: string) =>
-    `❌ No student found matching *"${query}"*.\n\n` +
-    `Check the spelling or try their matric number.`,
+    `❌ No customer found matching *"${query}"*.\n\n` +
+    `Check the spelling or try their phone number.`,
 
-  scoreNoHistory: (studentName: string) =>
-    `📊 *${studentName}* : Vodium Score: *500/1000*\n` +
+  scoreNoHistory: (customerName: string) =>
+    `📊 *${customerName}* : Vodium Score: *500/1000*\n` +
     `🔵 New : no credit history yet.\n\n` +
-    `This student has no recorded credits on Vodium.`,
+    `This customer has no recorded credits on Vodium.`,
 
-  // ── Proactive reminders (sent to students) ─────────────────────────────
-  reminderToStudent: (
-    studentName: string,
+  // ── Proactive reminders (sent to customers) ─────────────────────────────
+  reminderToCustomer: (
+    customerName: string,
     vendorBusinessName: string,
     amount: number,
     dueDateText: string,
   ) =>
-    `Hi *${studentName}* 👋\n\n` +
+    `Hi *${customerName}* 👋\n\n` +
     `Friendly reminder from *${vendorBusinessName}*: you have *${formatNaira(amount)}* due ${dueDateText}.\n\n` +
     `Paying on time builds your Vodium credit score, it'll help you access better products in future.\n\n` +
     `Reply *PAID* once you've settled.`,
@@ -170,9 +180,10 @@ export const messages = {
     `• *ADD* : record a new credit\n` +
     `• *PAID [name]* : mark a credit paid\n` +
     `• *LIST* : see who owes you\n` +
-    `• *SCORE [name]* : check a student's reliability\n` +
+    `• *SCORE [name]* : check a customer's reliability\n` +
     `• *DASHBOARD* : get a link to your full dashboard\n` +
     `• *SUPPORT* : talk to a human`,
+
 
   unknown: () =>
     `Sorry, I didn't catch that. Reply *HELP* to see what I can do.`,

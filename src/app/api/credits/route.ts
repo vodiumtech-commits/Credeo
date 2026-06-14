@@ -51,12 +51,12 @@ export async function GET(req: NextRequest) {
 }
 
 const createSchema = z.object({
-  studentName:   z.string().min(2).max(100),
-  matricNumber:  z.string().optional(),
-  studentPhone:  z.string().optional(),
-  amount:        z.number().positive(),
-  description:   z.string().max(200).optional(),
-  dueDate:       z.string().datetime(),
+  customerName:   z.string().min(2).max(100),
+  customerID:     z.string().optional(),
+  customerPhone:  z.string().optional(),
+  amount:         z.number().positive(),
+  description:    z.string().max(200).optional(),
+  dueDate:        z.string().datetime(),
 });
 
 // POST /api/credits
@@ -93,46 +93,46 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid input", issues: parsed.error.issues }, { status: 400 });
   }
 
-  const { studentName, matricNumber, studentPhone, amount, description, dueDate } = parsed.data;
+  const { customerName, customerID, customerPhone, amount, description, dueDate } = parsed.data;
 
-  // Normalise student phone if provided
-  const normalisedStudentPhone =
-    studentPhone ? (normalisePhoneNG(studentPhone) ?? `pending:${Date.now()}`) : `pending:${Date.now()}`;
+  // Normalise customer phone if provided
+  const normalisedCustomerPhone =
+    customerPhone ? (normalisePhoneNG(customerPhone) ?? `pending:${Date.now()}`) : `pending:${Date.now()}`;
 
-  // Upsert student — prefer matching by phone, fall back to matric placeholder
+  // Upsert customer — prefer matching by phone, fall back to ID placeholder
   const student = await prisma.student.upsert({
-    where: { phone: normalisedStudentPhone },
+    where: { phone: normalisedCustomerPhone },
     update: {
-      ...(matricNumber && { matricNumber }),
+      ...(customerID && { matricNumber: customerID }),
     },
     create: {
-      fullName: studentName,
-      phone: normalisedStudentPhone,
-      matricNumber: matricNumber ?? null,
+      fullName: customerName,
+      phone: normalisedCustomerPhone,
+      matricNumber: customerID ?? null,
       universityId: vendor.universityId,
     },
   });
 
-  // ── Student count gating (only for new students) ─────────────────────────
+  // ── Customer count gating (only for new customers) ─────────────────────────
   const plan = vendor.subscription?.plan ?? "STARTER";
-  const studentLimit = getStudentLimit(plan);
+  const customerLimit = getStudentLimit(plan);
 
-  if (studentLimit !== null) {
+  if (customerLimit !== null) {
     const alreadyOnBook = await prisma.credit.findFirst({
       where: { vendorId: vendor.id, studentId: student.id },
       select: { id: true },
     });
     if (!alreadyOnBook) {
-      const uniqueStudentCount = await prisma.student.count({
+      const uniqueCustomerCount = await prisma.student.count({
         where: { credits: { some: { vendorId: vendor.id } } },
       });
-      if (uniqueStudentCount >= studentLimit) {
+      if (uniqueCustomerCount >= customerLimit) {
         return NextResponse.json(
           {
-            error: `You've reached the ${studentLimit}-student limit on your ${plan} plan. Upgrade to add more students.`,
+            error: `You've reached the ${customerLimit}-customer limit on your ${plan} plan. Upgrade to add more customers.`,
             limitReached: true,
             plan,
-            limit: studentLimit,
+            limit: customerLimit,
           },
           { status: 403 }
         );

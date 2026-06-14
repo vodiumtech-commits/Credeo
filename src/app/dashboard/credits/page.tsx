@@ -31,18 +31,18 @@ export default async function CreditsPage() {
   const recoveryRate = totalAmount > 0 ? Math.round((paidAmount / totalAmount) * 100) : 0;
 
   // Serialise for client — Decimal → number, Date → ISO string
-  const serialised = credits.map((c) => ({
+  const rows: CreditRow[] = credits.map((c) => ({
     id:           c.id,
     amount:       Number(c.amount),
     amountRepaid: Number(c.amountRepaid),
-    status:       c.status as CreditStatus,
-    description:  c.description ?? null,
+    status:       c.status,
+    description:  c.description,
     dueDate:      c.dueDate.toISOString(),
     createdAt:    c.createdAt.toISOString(),
-    student: {
+    customer: {
       id:           c.student.id,
       fullName:     c.student.fullName,
-      matricNumber: c.student.matricNumber ?? null,
+      customerID:   c.student.matricNumber ?? null,
     },
   }));
 

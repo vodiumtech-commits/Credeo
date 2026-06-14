@@ -180,7 +180,7 @@ export default function LandingPage() {
           >
             Stop losing money
             <br />
-            to campus credit{" "}
+            to credit{" "}
             <em className="text-gradient-gold not-italic">defaults.</em>
           </motion.h1>
 
@@ -189,7 +189,7 @@ export default function LandingPage() {
             className="text-lg md:text-xl text-vodium-cream/60 max-w-2xl leading-relaxed mb-10"
           >
             Vodium Ledger is the WhatsApp-first credit ledger built for Nigerian
-            campus vendors. Record a credit in 15 seconds. Auto-remind students.
+            vendors. Record a credit in 15 seconds. Auto-remind customers.
             Track every naira you&rsquo;re owed from your phone, not an app.
           </motion.p>
 
@@ -243,7 +243,7 @@ export default function LandingPage() {
             {[
               { value: "127+", label: "Active vendors" },
               { value: "₦47M+", label: "Credit tracked" },
-              { value: "4,800+", label: "Students with history" },
+              { value: "4,800+", label: "Customers with history" },
               { value: "73%", label: "Repayment rate" },
             ].map((s) => (
               <div key={s.label}>
@@ -512,7 +512,7 @@ export default function LandingPage() {
               {
                 number: "02",
                 icon: <Bell size={22} />,
-                title: "Auto-reminders to students",
+                title: "Auto-reminders to customers",
                 body: "2 days before repayment is due, a respectful WhatsApp message goes to the student. No chasing from you. Dignity intact for them.",
               },
               {
@@ -685,16 +685,16 @@ export default function LandingPage() {
             {[
               {
                 quote:
-                  "Vodium saved me ₦45,000 last semester. Three students I would have written off paid because of the reminders.",
+                  "Vodium saved me ₦45,000 last semester. Three customers I would have written off paid because of the reminders.",
                 name: "Mama Taiwo",
-                role: "Provisions vendor, UNILAG, 63 students tracked",
+                role: "Provisions vendor, UNILAG, 63 customers tracked",
                 delay: 0,
               },
               {
                 quote:
                   "I check every student's Vodium score before I give credit now. One girl had a score of 320, I said no. Turned out she owed 4 other shops. Game changer.",
                 name: "Baba Wale",
-                role: "Food Canteen, OAU, 89 students tracked",
+                role: "Food Canteen, OAU, 89 customers tracked",
                 delay: 0.1,
               },
             ].map((t) => (
@@ -751,13 +751,13 @@ export default function LandingPage() {
                 plan: "Starter",
                 price: "₦2,000",
                 sub: "/month after trial",
-                description: "Up to 50 students. Perfect to get started.",
+                description: "Up to 50 customers. Perfect to get started.",
                 features: [
                   "WhatsApp bot access",
                   "Credit tracking",
                   "Auto-reminders",
                   "Web dashboard",
-                  "Up to 50 students",
+                  "Up to 50 customers",
                 ],
                 popular: false,
                 delay: 0,
@@ -766,12 +766,12 @@ export default function LandingPage() {
                 plan: "Growth",
                 price: "₦5,000",
                 sub: "/month after trial",
-                description: "Up to 200 students + cross-vendor credit scores.",
+                description: "Up to 200 customers + cross-vendor credit scores.",
                 features: [
                   "Everything in Starter",
                   "Cross-vendor credit scores",
                   "Dashboard analytics",
-                  "Up to 200 students",
+                  "Up to 200 customers",
                   "CSV export",
                 ],
                 popular: true,
@@ -782,10 +782,10 @@ export default function LandingPage() {
                 price: "₦10,000",
                 sub: "/month after trial",
                 description:
-                  "Unlimited students. Full analytics. Priority support.",
+                  "Unlimited customers. Full analytics. Priority support.",
                 features: [
                   "Everything in Growth",
-                  "Unlimited students",
+                  "Unlimited customers",
                   "Priority WhatsApp support",
                   "Monthly report PDF",
                   "API access (beta)",
@@ -909,7 +909,7 @@ export default function LandingPage() {
               </div>
               <p className="text-vodium-cream/35 text-sm leading-relaxed">
                 Africa&rsquo;s credit infrastructure layer. Starting with
-                Nigerian university campus vendors.
+                Nigerian vendors.
               </p>
             </div>
 
@@ -985,3 +985,4 @@ function FooterLinks({
     </div>
   );
 }
+

@@ -260,7 +260,7 @@ export function CreditsClient({
           />
           <input
             type="text"
-            placeholder="Search by name, matric number…"
+            placeholder="Search by name, ID…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="input-dark pl-9 pr-9 h-9 text-sm w-full"
@@ -485,19 +485,19 @@ export function CreditsClient({
 
               {/* Desktop grid */}
               <div className="hidden md:grid grid-cols-12 items-center px-5 py-3.5 gap-2">
-                {/* Student */}
+                {/* Customer */}
                 <div className="col-span-3 flex items-center gap-2.5 min-w-0">
                   <div
                     className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-[11px] font-bold ${isOverdue ? "bg-rose-500/15 text-rose-400" : "bg-vodium-gold/10 text-vodium-gold"}`}
                   >
-                    {c.student.fullName.charAt(0).toUpperCase()}
+                    {c.customer.fullName.charAt(0).toUpperCase()}
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm text-vodium-cream font-medium truncate leading-tight">
-                      {c.student.fullName}
+                      {c.customer.fullName}
                     </p>
                     <p className="text-[10px] text-vodium-cream/30 mt-0.5">
-                      {c.student.matricNumber ?? "—"}
+                      {c.customer.customerID ?? "—"}
                     </p>
                   </div>
                 </div>

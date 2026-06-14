@@ -187,21 +187,21 @@ export default async function CustomerProfilePage({ params }: { params: { id: st
           {/* Name + meta */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 flex-wrap mb-1">
-              <h1 className="font-serif text-2xl text-vodium-cream">{student.fullName}</h1>
+              <h1 className="font-serif text-2xl text-vodium-cream">{customer.fullName}</h1>
               <GlowBadge color={statusMeta[statusLabel]?.color as "red" | "gold" | "green" ?? "gold"}>
                 {statusMeta[statusLabel]?.text}
               </GlowBadge>
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-vodium-cream/40">
-              {student.matricNumber && <span>Matric: {student.matricNumber}</span>}
+              {customer.matricNumber && <span>ID: {customer.matricNumber}</span>}
               {displayPhone && <span>WhatsApp: {displayPhone}</span>}
-              {!displayPhone && !student.matricNumber && <span>No contact details on file</span>}
+              {!displayPhone && !customer.matricNumber && <span>No contact details on file</span>}
             </div>
           </div>
 
           {/* Score ring */}
           <div className="text-center flex-shrink-0">
-            <ScoreRing score={student.vodiumScore} tier={tier} />
+            <ScoreRing score={customer.vodiumScore} tier={tier} />
             <p className="text-xs text-vodium-cream/35 mt-2">Vodium Score</p>
             <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border mt-1 inline-block ${tier.badge}`}>
               {tier.label}
@@ -345,7 +345,7 @@ export default async function CustomerProfilePage({ params }: { params: { id: st
       {/* Add new credit CTA */}
       <div className="flex justify-end">
         <Link
-          href={`/dashboard/credit/new?student=${encodeURIComponent(student.fullName)}${student.matricNumber ? `&matric=${encodeURIComponent(student.matricNumber)}` : ""}`}
+          href={`/dashboard/credit/new?customer=${encodeURIComponent(customer.fullName)}${customer.matricNumber ? `&customerID=${encodeURIComponent(customer.matricNumber)}` : ""}`}
           className="btn-gold px-5 py-2.5 rounded-xl text-sm flex items-center gap-2"
         >
           <CreditCard size={14} /> Record new credit

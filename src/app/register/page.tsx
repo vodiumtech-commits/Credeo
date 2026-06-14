@@ -326,7 +326,7 @@ export default function RegisterPage() {
 
         <div className="flex-1 flex flex-col justify-center relative z-10">
           <p className="text-vodium-gold text-xs tracking-[0.35em] uppercase mb-6">
-            For campus vendors
+            For all vendors
           </p>
           <h2 className="font-serif text-4xl text-vodium-cream leading-tight mb-6">
             Start tracking
@@ -336,7 +336,7 @@ export default function RegisterPage() {
             <em className="text-gradient-gold not-italic">minutes.</em>
           </h2>
           <p className="text-vodium-cream/45 leading-relaxed max-w-sm text-sm mb-12">
-            Join hundreds of campus vendors who&rsquo;ve stopped losing money to
+            Join hundreds of vendors who&rsquo;ve stopped losing money to
             defaults. Set up your ledger in under 3 minutes no card needed.
           </p>
           <div className="space-y-4">
@@ -354,7 +354,7 @@ export default function RegisterPage() {
               {
                 icon: <Shield size={15} />,
                 label: "Private by design",
-                sub: "Students only see their own balance",
+                sub: "Customers only see their own balance",
               },
               {
                 icon: <TrendingUp size={15} />,
@@ -516,7 +516,7 @@ export default function RegisterPage() {
               </div>
             )}
 
-            {/* ── Step 2: University (free-text) ───────────────────── */}
+            {/* ── Step 2: Community (free-text) ───────────────────── */}
             {step === 2 && (
               <div className="animate-fade-up">
                 <div className="mb-7">
@@ -524,18 +524,17 @@ export default function RegisterPage() {
                     <Building2 size={20} className="text-vodium-gold" />
                   </div>
                   <h1 className="font-serif text-3xl text-vodium-black mb-2">
-                    Which campus?
+                    Which community?
                   </h1>
                   <p className="text-muted-foreground text-sm">
-                    Type your university name exactly as you know it
-                    abbreviation or full name both work.
+                    Type your community or institution name exactly as you know it.
                   </p>
                 </div>
 
                 <Field
-                  label="University / campus name"
+                  label="Community / Institution name"
                   required
-                  hint="e.g. Dominion University, UNILAG, Covenant University"
+                  hint="e.g. UNILAG, Yaba, Victoria Island, or OAU"
                 >
                   <div className="relative">
                     <Building2
@@ -544,7 +543,7 @@ export default function RegisterPage() {
                     />
                     <input
                       type="text"
-                      placeholder="e.g. Dominion University"
+                      placeholder="e.g. UNILAG or Victoria Island"
                       value={form.university}
                       onChange={(e) => update("university", e.target.value)}
                       className="input-premium pl-9"

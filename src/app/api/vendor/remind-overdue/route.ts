@@ -23,10 +23,10 @@ export async function POST() {
   });
 
   if (overdue.length === 0) {
-    return NextResponse.json({ ok: true, sent: 0, message: "No overdue credits with reachable students." });
+    return NextResponse.json({ ok: true, sent: 0, message: "No overdue credits with reachable customers." });
   }
 
-  // Deduplicate by student — one message per student even if they have multiple overdue credits
+  // Deduplicate by customer — one message per customer even if they have multiple overdue credits
   const byStudent = new Map<string, { student: typeof overdue[number]["student"]; totalOwed: number }>();
   for (const credit of overdue) {
     const existing = byStudent.get(credit.studentId);
@@ -42,7 +42,7 @@ export async function POST() {
   let failed = 0;
 
   for (const { student, totalOwed } of byStudent.values()) {
-    const body = messages.reminderToStudent(
+    const body = messages.reminderToCustomer(
       student.fullName,
       vendor.businessName,
       totalOwed,

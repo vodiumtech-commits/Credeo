@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionPhone } from "@/lib/session";
 
-// GET /api/customers — students who have at least one credit with this vendor
+// GET /api/customers — customers who have at least one credit with this vendor
 export async function GET() {
   const phone = getSessionPhone();
   if (!phone) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

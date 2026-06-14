@@ -25,18 +25,18 @@ const DURATION_OPTIONS = [
 type StepName = "student" | "details" | "confirm" | "done";
 
 const STEP_META = [
-  { id: 1, key: "student" as const, label: "Student" },
+  { id: 1, key: "student" as const, label: "Customer" },
   { id: 2, key: "details" as const, label: "Details" },
   { id: 3, key: "confirm" as const, label: "Confirm" },
 ];
 
 export default function NewCreditPage() {
-  const [step, setStep] = useState<StepName>("student");
+  const [step, setStep] = useState<StepName>("customer");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
-    studentName: "",
-    matricNumber: "",
+    customerName: "",
+    customerID: "",
     phone: "",
     amount: "",
     description: "",
@@ -63,7 +63,7 @@ export default function NewCreditPage() {
     });
   };
 
-  const isStep1Valid = form.studentName.length > 1;
+  const isStep1Valid = form.customerName.length > 1;
   const isStep2Valid =
     parseFloat(form.amount) > 0 &&
     (form.dueDays === "custom"
@@ -71,7 +71,7 @@ export default function NewCreditPage() {
       : form.dueDays !== "");
 
   const currentStepNum =
-    step === "student"
+    step === "customer"
       ? 1
       : step === "details"
         ? 2
@@ -94,9 +94,9 @@ export default function NewCreditPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          studentName: form.studentName,
-          matricNumber: form.matricNumber || undefined,
-          studentPhone: form.phone || undefined,
+          customerName: form.customerName,
+          customerID: form.customerID || undefined,
+          customerPhone: form.phone || undefined,
           amount: parseFloat(form.amount),
           description: form.description || undefined,
           dueDate: dueDateTime.toISOString(),
@@ -128,7 +128,7 @@ export default function NewCreditPage() {
             </h2>
             <p className="text-vodium-cream/50 text-sm mb-1">
               <span className="text-vodium-cream font-semibold">
-                {form.studentName}
+                {form.customerName}
               </span>{" "}
               owes you{" "}
               <span className="text-vodium-gold font-semibold">
@@ -143,10 +143,10 @@ export default function NewCreditPage() {
               <ShimmerButton
                 className="w-full h-12 text-sm"
                 onClick={() => {
-                  setStep("student");
+                  setStep("customer");
                   setForm({
-                    studentName: "",
-                    matricNumber: "",
+                    customerName: "",
+                    customerID: "",
                     phone: "",
                     amount: "",
                     description: "",
@@ -172,7 +172,7 @@ export default function NewCreditPage() {
               You can also add credits via WhatsApp:
             </p>
             <code className="text-vodium-gold font-mono text-sm">
-              ADD {form.studentName.split(" ")[0]?.toUpperCase() || "NAME"}{" "}
+              ADD {form.customerName.split(" ")[0]?.toUpperCase() || "NAME"}{" "}
               {form.amount}
             </code>
             <div className="mt-4">
@@ -258,7 +258,7 @@ export default function NewCreditPage() {
           })}
         </div>
 
-        {/* ── Step 1: Student info ──────────────────────────────────── */}
+        {/* ── Step 1: Customer info ──────────────────────────────────── */}
         {step === "student" && (
           <div className="bg-vodium-charcoal rounded-2xl border border-white/[0.06] p-8 space-y-5">
             <div className="flex items-center gap-3 mb-2">
@@ -267,7 +267,7 @@ export default function NewCreditPage() {
               </div>
               <div>
                 <h2 className="font-semibold text-vodium-cream">
-                  Student details
+                  Customer details
                 </h2>
                 <p className="text-xs text-vodium-cream/35">
                   Who are you extending credit to?
@@ -279,22 +279,22 @@ export default function NewCreditPage() {
               <input
                 type="text"
                 placeholder="e.g. Emeka Okonkwo"
-                value={form.studentName}
-                onChange={(e) => update("studentName", e.target.value)}
+                value={form.customerName}
+                onChange={(e) => update("customerName", e.target.value)}
                 className="input-dark"
                 autoFocus
               />
             </StepField>
 
             <StepField
-              label="Matric number"
-              hint="Optional : helps identify the student."
+              label="Customer ID"
+              hint="Optional : helps identify the customer."
             >
               <input
                 type="text"
-                placeholder="e.g. 2019/0123"
-                value={form.matricNumber}
-                onChange={(e) => update("matricNumber", e.target.value)}
+                placeholder="e.g. LGS/23/042"
+                value={form.customerID}
+                onChange={(e) => update("customerID", e.target.value)}
                 className="input-dark"
               />
             </StepField>
@@ -431,7 +431,7 @@ export default function NewCreditPage() {
 
             <div className="flex items-center justify-between pt-2">
               <button
-                onClick={() => setStep("student")}
+                onClick={() => setStep("customer")}
                 className="text-sm text-vodium-cream/40 hover:text-vodium-cream/70 transition-colors border border-white/[0.06] px-5 py-2.5 rounded-xl"
               >
                 ← Back
@@ -461,7 +461,7 @@ export default function NewCreditPage() {
             <div className="space-y-0 mb-6 rounded-xl border border-white/[0.06] overflow-hidden">
               <ReviewRow
                 icon={<User size={14} />}
-                label="Student"
+                label="Customer"
                 value={`${form.studentName}${form.matricNumber ? ` · ${form.matricNumber}` : ""}`}
               />
               {form.phone && (
@@ -495,7 +495,7 @@ export default function NewCreditPage() {
             <div className="bg-vodium-gold/[0.06] border border-vodium-gold/15 rounded-xl p-4 mb-6 text-xs text-vodium-cream/45 leading-relaxed">
               A polite reminder will be sent to{" "}
               <span className="text-vodium-cream/70 font-medium">
-                {form.studentName}
+                {form.customerName}
               </span>{" "}
               2 days before the due date. Their Vodium score will be updated
               when they pay.
@@ -531,7 +531,7 @@ export default function NewCreditPage() {
           <p className="text-xs text-vodium-cream/25 text-center mt-6">
             You can also record via WhatsApp:{" "}
             <code className="text-vodium-gold/60 font-mono">
-              ADD {form.studentName || "[name]"} {form.amount || "[amount]"}
+              ADD {form.customerName || "[name]"} {form.amount || "[amount]"}
             </code>
           </p>
         )}
@@ -589,3 +589,14 @@ function ReviewRow({
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+

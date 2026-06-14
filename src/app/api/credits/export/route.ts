@@ -18,8 +18,8 @@ export async function GET() {
 
   const header = [
     "Date",
-    "Student Name",
-    "Matric Number",
+    "Customer Name",
+    "Customer ID",
     "Description",
     "Amount (NGN)",
     "Amount Repaid (NGN)",

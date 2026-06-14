@@ -50,7 +50,7 @@ const team = [
     initials: "OA",
     name: "Oluwademilade Akinsipe",
     role: "CPO & Co-founder",
-    bio: "Product thinker focused on 15-second vendor flows and student dignity.",
+    bio: "Product thinker focused on 15-second vendor flows and customer dignity.",
   },
 ];
 
@@ -127,7 +127,7 @@ export default function AboutPage() {
               </h1>
               <p className="text-vodium-cream/55 text-xl leading-relaxed max-w-2xl">
                 Starting with the 850,000 campus vendors who extend informal
-                credit to Nigerian students every day.
+                credit to Nigerian customers every day.
               </p>
             </div>
           </div>
@@ -143,7 +143,7 @@ export default function AboutPage() {
               </span>
               <p className="text-vodium-cream/70 text-lg leading-relaxed">
                 Africa has 1.4 billion people. Most have no formal credit
-                history. We&apos;re building it one campus vendor, one student,
+                history. We&apos;re building it one campus vendor, one customer,
                 one repayment at a time.
               </p>
               <p className="text-vodium-cream/70 text-lg leading-relaxed mt-5">
@@ -218,7 +218,7 @@ export default function AboutPage() {
             </p>
             <p className="text-vodium-cream/60 text-lg leading-relaxed mt-5">
               Vodium Ledger fixes this a WhatsApp-first tool that takes 15
-              seconds to log a credit and auto-reminds students before they
+              seconds to log a credit and auto-reminds customers before they
               default.
             </p>
           </div>

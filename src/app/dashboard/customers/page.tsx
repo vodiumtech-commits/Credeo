@@ -36,7 +36,7 @@ export default async function CustomersPage() {
     return {
       id:           s.id,
       fullName:     s.fullName,
-      matricNumber: s.matricNumber ?? null,
+      customerID:   s.matricNumber ?? null,
       vodiumScore:  s.vodiumScore,
       creditCount:  credits.length,
       totalOwed,

@@ -41,10 +41,10 @@ export interface StepResult {
 
 export type SideEffect =
   | { type: "CREATE_VENDOR";  data: { name: string; businessName: string; universityShortName: string; phone: string } }
-  | { type: "CREATE_CREDIT";  data: { vendorId: string; studentName: string; matric?: string; amount: number; dueInDays: number } }
-  | { type: "MARK_PAID";      data: { vendorId: string; studentName: string } }
+  | { type: "CREATE_CREDIT";  data: { vendorId: string; customerName: string; customerPhone: string; amount: number; dueInMinutes: number } }
+  | { type: "MARK_PAID";      data: { vendorId: string; customerName: string } }
   | { type: "FETCH_LIST";     data: { vendorId: string } }
-  | { type: "FETCH_SCORE";    data: { studentQuery: string; fromPhone: string } };
+  | { type: "FETCH_SCORE";    data: { customerQuery: string; fromPhone: string } };
 
 // ─── intent detection ─────────────────────────────────────────────────────────
 
@@ -107,10 +107,23 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
 
     case "ADDING_CREDIT_STUDENT":
       return {
-        reply: messages.addCreditAskAmount(body),
-        nextState: "ADDING_CREDIT_AMOUNT",
-        contextPatch: { creditStudentName: body },
+        reply: messages.addCreditAskPhone(body),
+        nextState: "ADDING_CREDIT_PHONE",
+        contextPatch: { creditCustomerName: body },
       };
+
+    case "ADDING_CREDIT_PHONE": {
+      // Very basic phone validation: at least 7 digits
+      const phoneDigits = body.replace(/\D/g, "");
+      if (phoneDigits.length < 7) {
+        return { reply: messages.invalidPhone(), nextState: "ADDING_CREDIT_PHONE" };
+      }
+      return {
+        reply: messages.addCreditAskAmount(String(session.context.creditCustomerName ?? "Customer")),
+        nextState: "ADDING_CREDIT_AMOUNT",
+        contextPatch: { creditCustomerPhone: body },
+      };
+    }
 
     case "ADDING_CREDIT_AMOUNT": {
       const amount = parseAmount(body);
@@ -118,39 +131,53 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
         return { reply: messages.invalidAmount(), nextState: "ADDING_CREDIT_AMOUNT" };
       }
       return {
-        reply: messages.addCreditAskDue(String(session.context.creditStudentName ?? "Student"), amount),
+        reply: messages.addCreditAskDue(String(session.context.creditCustomerName ?? "Customer"), amount),
         nextState: "ADDING_CREDIT_DUE",
         contextPatch: { creditAmount: amount },
       };
     }
 
     case "ADDING_CREDIT_DUE": {
-      const dueInDays = parseDueDays(body);
-      if (!dueInDays) {
+      const dueInMinutes = parseDueDuration(body);
+      if (!dueInMinutes) {
         return { reply: messages.invalidDueDate(), nextState: "ADDING_CREDIT_DUE" };
       }
-      const studentName = String(session.context.creditStudentName ?? "Student");
+      const customerName = String(session.context.creditCustomerName ?? "Customer");
+      const customerPhone = String(session.context.creditCustomerPhone ?? "");
       const amount = Number(session.context.creditAmount ?? 0);
+
+      // Friendly text for the reply
+      let dueText = "";
+      if (dueInMinutes < 60) {
+        dueText = `in ${dueInMinutes} minute${dueInMinutes === 1 ? "" : "s"}`;
+      } else if (dueInMinutes < 1440) {
+        const hours = Math.round(dueInMinutes / 60);
+        dueText = `in ${hours} hour${hours === 1 ? "" : "s"}`;
+      } else {
+        const days = Math.round(dueInMinutes / 1440);
+        dueText = `in ${days} day${days === 1 ? "" : "s"}`;
+      }
+
       return {
-        reply: messages.addCreditConfirmed(studentName, amount, `in ${dueInDays} day${dueInDays === 1 ? "" : "s"}`),
+        reply: messages.addCreditConfirmed(customerName, amount, dueText),
         nextState: "IDLE",
-        contextPatch: { creditStudentName: null, creditAmount: null },
+        contextPatch: { creditCustomerName: null, creditCustomerPhone: null, creditAmount: null },
         sideEffects: [
           {
             type: "CREATE_CREDIT",
-            data: { vendorId: session.vendorId!, studentName, amount, dueInDays },
+            data: { vendorId: session.vendorId!, customerName, customerPhone, amount, dueInMinutes },
           },
         ],
       };
     }
 
     case "MARKING_PAID": {
-      // vendor typed student name after we asked "who paid?"
+      // vendor typed customer name after we asked "who paid?"
       return {
         reply: "Checking…",
         nextState: "IDLE",
         sideEffects: [
-          { type: "MARK_PAID", data: { vendorId: session.vendorId!, studentName: body } },
+          { type: "MARK_PAID", data: { vendorId: session.vendorId!, customerName: body } },
         ],
       };
     }
@@ -159,7 +186,7 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
       return {
         reply: "Looking up score…",
         nextState: "IDLE",
-        sideEffects: [{ type: "FETCH_SCORE", data: { studentQuery: body, fromPhone: msg.fromPhone } }],
+        sideEffects: [{ type: "FETCH_SCORE", data: { customerQuery: body, fromPhone: msg.fromPhone } }],
       };
   }
 
@@ -168,14 +195,14 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
   switch (intent) {
     case "START":
       if (session.vendorId) {
-        // already registered — handled by route (passes businessName in context)
-        return { reply: messages.welcome(), nextState: "IDLE" };
+        const businessName = String(session.context.businessName ?? "your shop");
+        return { reply: messages.alreadyRegistered(businessName), nextState: "IDLE" };
       }
       return { reply: messages.onboardingAskName(), nextState: "ONBOARDING_NAME" };
 
     case "ADD":
       if (!session.vendorId) return { reply: messages.noVendorAccount(), nextState: "IDLE" };
-      return { reply: messages.addCreditAskStudent(), nextState: "ADDING_CREDIT_STUDENT" };
+      return { reply: messages.addCreditAskCustomer(), nextState: "ADDING_CREDIT_STUDENT" };
 
     case "PAID": {
       if (!session.vendorId) return { reply: messages.noVendorAccount(), nextState: "IDLE" };
@@ -185,7 +212,7 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
           reply: "Checking…",
           nextState: "IDLE",
           sideEffects: [
-            { type: "MARK_PAID", data: { vendorId: session.vendorId, studentName: nameAfterPaid } },
+            { type: "MARK_PAID", data: { vendorId: session.vendorId, customerName: nameAfterPaid } },
           ],
         };
       }
@@ -206,11 +233,12 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
         return {
           reply: "Looking up score…",
           nextState: "IDLE",
-          sideEffects: [{ type: "FETCH_SCORE", data: { studentQuery: queryAfterScore, fromPhone: msg.fromPhone } }],
+          sideEffects: [{ type: "FETCH_SCORE", data: { customerQuery: queryAfterScore, fromPhone: msg.fromPhone } }],
         };
       }
       return { reply: messages.scoreLookupAsk(), nextState: "LOOKING_UP_SCORE" };
     }
+
 
     case "HELP":
       return { reply: messages.help(), nextState: "IDLE" };
@@ -244,20 +272,41 @@ export function parseAmount(input: string): number | null {
   return isNaN(n) || n <= 0 ? null : n;
 }
 
-export function parseDueDays(input: string): number | null {
+export function parseDueDuration(input: string): number | null {
   const cleaned = input.trim().toUpperCase();
+
+  // Handle "END" (end of month)
   if (cleaned === "END") {
     const now = new Date();
     const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    return Math.max(1, Math.ceil((end.getTime() - now.getTime()) / 86_400_000));
+    const ms = end.getTime() - now.getTime();
+    return Math.max(1, Math.ceil(ms / 60_000));
   }
+
+  // Handle "30m", "1h", "2d" etc.
+  const unitMatch = cleaned.match(/^(\d+)\s*([MHD])$/);
+  if (unitMatch) {
+    const val = parseInt(unitMatch[1], 10);
+    const unit = unitMatch[2];
+    if (unit === "M") return val; // minutes
+    if (unit === "H") return val * 60; // hours
+    if (unit === "D") return val * 1440; // days
+  }
+
+  // Handle "DD-MM-YYYY" dates
   const dateMatch = cleaned.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/);
   if (dateMatch) {
     const [, d, m, y] = dateMatch;
     const target = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
-    const days = Math.ceil((target.getTime() - Date.now()) / 86_400_000);
-    return days > 0 ? days : null;
+    const ms = target.getTime() - Date.now();
+    return ms > 0 ? Math.ceil(ms / 60_000) : null;
   }
+
+  // Default to days if just a number
   const n = parseInt(cleaned, 10);
-  return isNaN(n) || n <= 0 || n > 730 ? null : n;
+  if (!isNaN(n) && n > 0 && n <= 730) {
+    return n * 1440;
+  }
+
+  return null;
 }

@@ -13,16 +13,17 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import { prisma } from "@/lib/prisma";
-import { computeScore } from "@/lib/credit-score/score";
-import { messages } from "@/lib/whatsapp/messages";
-import { sendWhatsAppMessage } from "@/lib/whatsapp/outbound";
-import { parseUniversity } from "@/lib/university";
+import { prisma } from "../../../lib/prisma";
+import { computeScore } from "../../../lib/credit-score/score";
+import { normalisePhone } from "../../../lib/utils";
+import { messages } from "../../../lib/whatsapp/messages";
+import { sendWhatsAppMessage } from "../../../lib/whatsapp/outbound";
+import { parseUniversity } from "../../../lib/university";
 import {
   step,
   type SessionContext,
   type SideEffect,
-} from "@/lib/whatsapp/state-machine";
+} from "../../../lib/whatsapp/state-machine";
 
 export const runtime = "nodejs";
 
@@ -250,23 +251,25 @@ async function runSideEffect(
 
     case "CREATE_CREDIT": {
       if (!vendorId) return {};
-      const { studentName, matric, amount, dueInDays } = effect.data;
-      const pendingPhone = `pending:${studentName.toLowerCase().replace(/\s+/g, "-")}`;
-      const student = await prisma.student.upsert({
-        where:  { phone: pendingPhone },
-        update: {},
-        create: { fullName: studentName, phone: pendingPhone, ...(matric && { matricNumber: matric }) },
+      const { customerName, customerPhone, amount, dueInMinutes } = effect.data;
+      const normalCustomerPhone = normalisePhone(customerPhone) ?? `pending:${customerName.toLowerCase().replace(/\s+/g, "-")}`;
+      
+      const customer = await prisma.student.upsert({
+        where:  { phone: normalCustomerPhone },
+        update: { fullName: customerName },
+        create: { fullName: customerName, phone: normalCustomerPhone },
       });
-      const dueDate = new Date(Date.now() + dueInDays * 86_400_000);
-      await prisma.credit.create({ data: { vendorId, studentId: student.id, amount, dueDate, status: "OUTSTANDING" } });
-      await prisma.creditScoreEvent.create({ data: { studentId: student.id, vendorId, eventType: "CREDIT_EXTENDED", amount, scoreDelta: 0 } });
+
+      const dueDate = new Date(Date.now() + dueInMinutes * 60_000);
+      await prisma.credit.create({ data: { vendorId, studentId: customer.id, amount, dueDate, status: "OUTSTANDING" } });
+      await prisma.creditScoreEvent.create({ data: { studentId: customer.id, vendorId, eventType: "CREDIT_EXTENDED", amount, scoreDelta: 0 } });
 
       // Notify vendor on web dashboard
       await prisma.notification.create({
         data: {
           vendorId,
           title: "New Credit Added",
-          message: `₦${Number(amount).toLocaleString()} credit recorded for ${studentName} via WhatsApp.`,
+          message: `₦${Number(amount).toLocaleString()} credit recorded for ${customerName} via WhatsApp.`,
           type: "INFO",
         },
       });
@@ -282,63 +285,61 @@ async function runSideEffect(
       });
       if (!credits.length) return { replyOverride: messages.listEmpty() };
       const now = Date.now();
-      return { replyOverride: messages.listFull(credits.map((c) => ({ studentName: c.student.fullName, amount: Number(c.amount), daysUntilDue: Math.ceil((c.dueDate.getTime() - now) / 86_400_000) }))) };
+      return { replyOverride: messages.listFull(credits.map((c) => ({ customerName: c.student.fullName, amount: Number(c.amount), daysUntilDue: Math.ceil((c.dueDate.getTime() - now) / 86_400_000) }))) };
     }
 
     case "MARK_PAID": {
       if (!vendorId) return { replyOverride: messages.noVendorAccount() };
-      const { studentName } = effect.data;
-      const words   = studentName.split(/\s+/).filter(Boolean);
+      const { customerName } = effect.data;
+      const words   = customerName.split(/\s+/).filter(Boolean);
       const credits = await prisma.credit.findMany({
         where: { vendorId, status: { in: ["OUTSTANDING", "DUE_SOON", "OVERDUE", "PARTIALLY_PAID"] }, student: { OR: words.map((w) => ({ fullName: { contains: w, mode: "insensitive" as const } })) } },
         include: { student: true }, orderBy: { dueDate: "asc" }, take: 1,
       });
-      if (!credits.length) return { replyOverride: messages.paidNotFound(studentName) };
+      if (!credits.length) return { replyOverride: messages.paidNotFound(customerName) };
       const credit  = credits[0];
       const amount  = Number(credit.amount);
-      const student = credit.student;
+      const customer = credit.student;
       const now     = new Date();
       const paidOnTime = now <= credit.dueDate;
       const scoreDelta = paidOnTime ? 25 : -15;
       const eventType  = paidOnTime ? "PAID_ON_TIME" : "PAID_LATE" as const;
       await prisma.credit.update({ where: { id: credit.id }, data: { status: "PAID", amountRepaid: amount, closedAt: now } });
       await prisma.repayment.create({ data: { creditId: credit.id, amount, method: "CASH", receivedAt: now, recordedBy: vendorId } });
-      await prisma.creditScoreEvent.create({ data: { studentId: student.id, vendorId, creditId: credit.id, eventType, amount, scoreDelta } });
-      const newScore = Math.min(1000, Math.max(0, (student.vodiumScore ?? 500) + scoreDelta));
-      await prisma.student.update({ where: { id: student.id }, data: { vodiumScore: newScore, scoreUpdatedAt: now } });
+      await prisma.creditScoreEvent.create({ data: { studentId: customer.id, vendorId, creditId: credit.id, eventType, amount, scoreDelta } });
+      const newScore = Math.min(1000, Math.max(0, (customer.vodiumScore ?? 500) + scoreDelta));
+      await prisma.student.update({ where: { id: customer.id }, data: { vodiumScore: newScore, scoreUpdatedAt: now } });
 
       // Notify vendor on web dashboard
       await prisma.notification.create({
         data: {
           vendorId,
           title: "Credit Paid",
-          message: `${student.fullName} paid ₦${amount.toLocaleString()} via WhatsApp.`,
+          message: `${customer.fullName} paid ₦${amount.toLocaleString()} via WhatsApp.`,
           type: "SUCCESS",
         },
       });
 
-      return { replyOverride: messages.paidConfirmed(student.fullName, amount) };
+      return { replyOverride: messages.paidConfirmed(customer.fullName, amount) };
     }
 
     case "FETCH_SCORE": {
-      const { studentQuery, fromPhone } = effect.data;
-      const words = studentQuery.split(/\s+/).filter(Boolean);
-      const byMatric = await prisma.student.findFirst({ where: { matricNumber: { equals: studentQuery, mode: "insensitive" } }, include: { scoreEvents: { orderBy: { occurredAt: "asc" } } } });
-      const student = byMatric ?? await prisma.student.findFirst({ where: { OR: words.map((w) => ({ fullName: { contains: w, mode: "insensitive" as const } })), NOT: { phone: { startsWith: "pending:" } } }, include: { scoreEvents: { orderBy: { occurredAt: "asc" } } }, orderBy: { createdAt: "desc" } });
-      if (!student)                    return { replyOverride: messages.scoreNotFound(studentQuery) };
-      if (!student.scoreEvents.length) return { replyOverride: messages.scoreNoHistory(student.fullName) };
+      const { customerQuery, fromPhone: _fromPhone } = effect.data;
+      const words = customerQuery.split(/\s+/).filter(Boolean);
+      
+      // Try by phone first
+      const normalQueryPhone = normalisePhone(customerQuery);
+      const byPhone = normalQueryPhone ? await prisma.student.findUnique({ where: { phone: normalQueryPhone }, include: { scoreEvents: { orderBy: { occurredAt: "asc" } } } }) : null;
+      
+      const customer = byPhone ?? await prisma.student.findFirst({ where: { OR: words.map((w) => ({ fullName: { contains: w, mode: "insensitive" as const } })), NOT: { phone: { startsWith: "pending:" } } }, include: { scoreEvents: { orderBy: { occurredAt: "asc" } } }, orderBy: { createdAt: "desc" } });
+      
+      if (!customer)                    return { replyOverride: messages.scoreNotFound(customerQuery) };
+      if (!customer.scoreEvents.length) return { replyOverride: messages.scoreNoHistory(customer.fullName) };
 
-      // Capture student's WhatsApp phone for reminders (only if phone is pending or not set)
-      if (student.phone?.startsWith("pending:")) {
-        await prisma.student.update({
-          where: { id: student.id },
-          data: { phone: fromPhone },
-        });
-      }
-
-      const { score, summary } = computeScore(student.scoreEvents);
-      return { replyOverride: messages.scoreReply(student.fullName, score, summary) };
+      const { score, summary } = computeScore(customer.scoreEvents);
+      return { replyOverride: messages.scoreReply(customer.fullName, score, summary) };
     }
+
 
     default:
       return {};

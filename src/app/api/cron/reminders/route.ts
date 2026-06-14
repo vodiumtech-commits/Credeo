@@ -57,17 +57,26 @@ export async function GET(req: NextRequest) {
   for (const credit of credits) {
     const student  = credit.student;
     const vendor   = credit.vendor;
-    const daysLeft = Math.ceil((credit.dueDate.getTime() - now.getTime()) / 86_400_000);
-    const dueTxt   = daysLeft === 0
-      ? "today"
-      : daysLeft === 1
-      ? "tomorrow"
-      : `in ${daysLeft} days`;
+    const diffMs   = credit.dueDate.getTime() - now.getTime();
+    const diffMins = Math.ceil(diffMs / 60_000);
+    
+    let dueTxt = "";
+    if (diffMins < 0) {
+      dueTxt = "as soon as possible (overdue)";
+    } else if (diffMins < 60) {
+      dueTxt = `in ${diffMins} minute${diffMins === 1 ? "" : "s"}`;
+    } else if (diffMins < 1440) {
+      const hours = Math.round(diffMins / 60);
+      dueTxt = `in ${hours} hour${hours === 1 ? "" : "s"}`;
+    } else {
+      const days = Math.round(diffMins / 1440);
+      dueTxt = days === 1 ? "tomorrow" : `in ${days} days`;
+    }
 
-    const body = messages.reminderToStudent(
+    const body = messages.reminderToCustomer(
       student.fullName,
       vendor.businessName,
-      Number(credit.amount),
+      Number(credit.amount) - Number(credit.amountRepaid),
       dueTxt
     );
 
@@ -94,7 +103,7 @@ export async function GET(req: NextRequest) {
       data: {
         vendorId,
         title: "Reminders Sent",
-        message: `We automatically sent WhatsApp reminders to ${count} students owing you today.`,
+        message: `We automatically sent WhatsApp reminders to ${count} customers owing you today.`,
         type: "INFO",
       },
     });
