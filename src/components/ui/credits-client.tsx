@@ -490,14 +490,14 @@ export function CreditsClient({
                   <div
                     className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-[11px] font-bold ${isOverdue ? "bg-rose-500/15 text-rose-400" : "bg-vodium-gold/10 text-vodium-gold"}`}
                   >
-                    {c.customer.fullName.charAt(0).toUpperCase()}
+                    {c.student.fullName.charAt(0).toUpperCase()}
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm text-vodium-cream font-medium truncate leading-tight">
-                      {c.customer.fullName}
+                      {c.student.fullName}
                     </p>
                     <p className="text-[10px] text-vodium-cream/30 mt-0.5">
-                      {c.customer.customerID ?? "—"}
+                      {c.student.matricNumber ?? "—"}
                     </p>
                   </div>
                 </div>
