@@ -1,9 +1,3 @@
-/**
- * Vodium Ledger — rich seed script.
- * Creates a realistic Nigerian campus credit ecosystem for development.
- * Run: npm run seed
- */
-
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
