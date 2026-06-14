@@ -27,18 +27,21 @@ export default async function CustomersPage() {
       .reduce((sum, c) => sum + Number(c.amount) - Number(c.amountRepaid), 0);
     const hasOverdue = credits.some((c) => c.status === "OVERDUE");
     const hasDueSoon = credits.some((c) => c.status === "DUE_SOON");
-    const creditStatus =
-      hasOverdue ? "overdue"
-      : hasDueSoon ? "due_soon"
-      : totalOwed > 0 ? "owing"
-      : "settled";
+    const creditStatus = hasOverdue
+      ? "overdue"
+      : hasDueSoon
+        ? "due_soon"
+        : totalOwed > 0
+          ? "owing"
+          : "settled";
 
     return {
-      id:           s.id,
-      fullName:     s.fullName,
-      customerID:   s.matricNumber ?? null,
-      vodiumScore:  s.vodiumScore,
-      creditCount:  credits.length,
+      id: s.id,
+      fullName: s.fullName,
+      // FIXED: Changed customerID back to matricNumber to match what CustomersClient expects
+      matricNumber: s.matricNumber ?? null,
+      vodiumScore: s.vodiumScore,
+      creditCount: credits.length,
       totalOwed,
       creditStatus,
     };
