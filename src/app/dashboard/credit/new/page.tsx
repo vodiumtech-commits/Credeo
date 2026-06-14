@@ -21,11 +21,11 @@ const DURATION_OPTIONS = [
   { label: "End of month", days: 30 },
 ];
 
-// Step order: 1 = student, 2 = credit details, 3 = confirm
-type StepName = "student" | "details" | "confirm" | "done";
+// FIXED: Changed "student" to "customer" to match your state
+type StepName = "customer" | "details" | "confirm" | "done";
 
 const STEP_META = [
-  { id: 1, key: "student" as const, label: "Customer" },
+  { id: 1, key: "customer" as const, label: "Customer" }, // FIXED: key is now customer
   { id: 2, key: "details" as const, label: "Details" },
   { id: 3, key: "confirm" as const, label: "Confirm" },
 ];
@@ -208,7 +208,7 @@ export default function NewCreditPage() {
             Add a credit
           </h1>
           <p className="text-vodium-cream/35 text-sm mt-1">
-            Record money you&rsquo;ve extended to a student.
+            Record money you&rsquo;ve extended to a customer.
           </p>
         </div>
 
@@ -259,7 +259,8 @@ export default function NewCreditPage() {
         </div>
 
         {/* ── Step 1: Customer info ──────────────────────────────────── */}
-        {step === "student" && (
+        {/* FIXED: Changed check to step === "customer" */}
+        {step === "customer" && (
           <div className="bg-vodium-charcoal rounded-2xl border border-white/[0.06] p-8 space-y-5">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-9 h-9 rounded-xl bg-vodium-gold/10 border border-vodium-gold/20 flex items-center justify-center">
@@ -459,10 +460,11 @@ export default function NewCreditPage() {
 
             {/* Review rows */}
             <div className="space-y-0 mb-6 rounded-xl border border-white/[0.06] overflow-hidden">
+              {/* FIXED: Changed form.studentName and form.matricNumber to form.customerName and form.customerID */}
               <ReviewRow
                 icon={<User size={14} />}
                 label="Customer"
-                value={`${form.studentName}${form.matricNumber ? ` · ${form.matricNumber}` : ""}`}
+                value={`${form.customerName}${form.customerID ? ` · ${form.customerID}` : ""}`}
               />
               {form.phone && (
                 <ReviewRow
@@ -589,14 +591,3 @@ function ReviewRow({
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
