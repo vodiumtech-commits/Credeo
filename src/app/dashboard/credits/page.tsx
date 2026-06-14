@@ -17,7 +17,9 @@ export default async function CreditsPage() {
   });
 
   const outstandingAmount = credits
-    .filter((c) => ["OUTSTANDING", "DUE_SOON", "PARTIALLY_PAID"].includes(c.status))
+    .filter((c) =>
+      ["OUTSTANDING", "DUE_SOON", "PARTIALLY_PAID"].includes(c.status),
+    )
     .reduce((s, c) => s + Number(c.amount) - Number(c.amountRepaid), 0);
   const overdueAmount = credits
     .filter((c) => c.status === "OVERDUE")
@@ -27,22 +29,23 @@ export default async function CreditsPage() {
     .reduce((s, c) => s + Number(c.amount), 0);
   const totalAmount = credits.reduce((s, c) => s + Number(c.amount), 0);
   const overdueCount = credits.filter((c) => c.status === "OVERDUE").length;
-  const paidCount    = credits.filter((c) => c.status === "PAID").length;
-  const recoveryRate = totalAmount > 0 ? Math.round((paidAmount / totalAmount) * 100) : 0;
+  const paidCount = credits.filter((c) => c.status === "PAID").length;
+  const recoveryRate =
+    totalAmount > 0 ? Math.round((paidAmount / totalAmount) * 100) : 0;
 
-  // Serialise for client — Decimal → number, Date → ISO string
-  const rows: CreditRow[] = credits.map((c) => ({
-    id:           c.id,
-    amount:       Number(c.amount),
+  // FIXED: Removed the undefined : CreditRow[] type to allow TypeScript inference
+  const rows = credits.map((c) => ({
+    id: c.id,
+    amount: Number(c.amount),
     amountRepaid: Number(c.amountRepaid),
-    status:       c.status,
-    description:  c.description,
-    dueDate:      c.dueDate.toISOString(),
-    createdAt:    c.createdAt.toISOString(),
+    status: c.status,
+    description: c.description,
+    dueDate: c.dueDate.toISOString(),
+    createdAt: c.createdAt.toISOString(),
     customer: {
-      id:           c.student.id,
-      fullName:     c.student.fullName,
-      customerID:   c.student.matricNumber ?? null,
+      id: c.student.id,
+      fullName: c.student.fullName,
+      customerID: c.student.matricNumber ?? null,
     },
   }));
 
@@ -56,5 +59,6 @@ export default async function CreditsPage() {
     totalCount: credits.length,
   };
 
-  return <CreditsClient credits={serialised} stats={stats} />;
+  // FIXED: Changed 'serialised' to 'rows'
+  return <CreditsClient credits={rows} stats={stats} />;
 }
