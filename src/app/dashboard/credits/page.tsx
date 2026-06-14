@@ -33,7 +33,7 @@ export default async function CreditsPage() {
   const recoveryRate =
     totalAmount > 0 ? Math.round((paidAmount / totalAmount) * 100) : 0;
 
-  // FIXED: Removed the undefined : CreditRow[] type to allow TypeScript inference
+  // FIXED: Reverted "customer" back to "student" to match what the CreditsClient component expects
   const rows = credits.map((c) => ({
     id: c.id,
     amount: Number(c.amount),
@@ -42,10 +42,10 @@ export default async function CreditsPage() {
     description: c.description,
     dueDate: c.dueDate.toISOString(),
     createdAt: c.createdAt.toISOString(),
-    customer: {
+    student: {
       id: c.student.id,
       fullName: c.student.fullName,
-      customerID: c.student.matricNumber ?? null,
+      matricNumber: c.student.matricNumber ?? null,
     },
   }));
 
@@ -59,6 +59,5 @@ export default async function CreditsPage() {
     totalCount: credits.length,
   };
 
-  // FIXED: Changed 'serialised' to 'rows'
   return <CreditsClient credits={rows} stats={stats} />;
 }
