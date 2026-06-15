@@ -8,17 +8,17 @@ import type { SubscriptionPlan } from "@prisma/client";
 const PLAN_CODES: Record<SubscriptionPlan, string> = {
   STARTER:    process.env.PAYSTACK_PLAN_STARTER    ?? "",
   GROWTH:     process.env.PAYSTACK_PLAN_GROWTH     ?? "",
-  CAMPUS_PRO: process.env.PAYSTACK_PLAN_CAMPUS_PRO ?? "",
+  PRO:        process.env.PAYSTACK_PLAN_PRO        ?? "",
 };
 
 const PLAN_AMOUNTS: Record<SubscriptionPlan, number> = {
   STARTER:    200000,  // ₦2,000 in kobo
   GROWTH:     500000,  // ₦5,000 in kobo
-  CAMPUS_PRO: 1000000, // ₦10,000 in kobo
+  PRO:        1000000, // ₦10,000 in kobo
 };
 
 const schema = z.object({
-  plan: z.enum(["STARTER", "GROWTH", "CAMPUS_PRO"]),
+  plan: z.enum(["STARTER", "GROWTH", "PRO"]),
 });
 
 // POST /api/paystack/subscribe — initialise a Paystack transaction for plan subscription
@@ -85,22 +85,6 @@ export async function POST(req: NextRequest) {
     console.error("[paystack/subscribe] Paystack error:", data);
     return NextResponse.json({ error: "Could not initiate payment. Please try again." }, { status: 502 });
   }
-
-  // Create or update the subscription record so the webhook can match
-  await prisma.vendorSubscription.upsert({
-    where: { vendorId: vendor.id },
-    create: {
-      vendorId: vendor.id,
-      plan,
-      status: "TRIAL",
-      monthlyAmount: PLAN_AMOUNTS[plan] / 100,
-      paystackCustomerId,
-    },
-    update: {
-      plan,
-      monthlyAmount: PLAN_AMOUNTS[plan] / 100,
-    },
-  });
 
   return NextResponse.json({
     ok: true,

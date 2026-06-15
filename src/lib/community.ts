@@ -1,17 +1,17 @@
 /**
- * University name normalisation — shared by web registration and WhatsApp bot.
+ * Community name normalisation — shared by web registration and WhatsApp bot.
  *
- * Vendors type their campus name in any case.
+ * Vendors type their community name in any case.
  * We normalise to lowercase before every DB write so that:
  *
- *   "DOMINION UNIVERSITY"  →  stored as  "dominion university"
- *   "Dominion University"  →  stored as  "dominion university"
- *   "dominion university"  →  stored as  "dominion university"  ← same row, upserted
+ *   "YABA MARKET"  →  stored as  "yaba market"
+ *   "Yaba Market"  →  stored as  "yaba market"
+ *   "yaba market"  →  stored as  "yaba market"  ← same row, upserted
  *
- * University.name is @unique and always lowercase — no extra column needed.
+ * Community.name is @unique and always lowercase — no extra column needed.
  */
 
-export interface UniversityMeta {
+export interface CommunityMeta {
   /** Lowercase name — used as the unique key for upserts and all DB lookups */
   name:       string;
   /** Optional short code, e.g. "UNILAG". Extracted from parentheses if present. */
@@ -21,7 +21,7 @@ export interface UniversityMeta {
 }
 
 // Best-effort city/state enrichment keyed by uppercase short code.
-const UNI_META: Record<string, { city: string; state: string }> = {
+const COMM_META: Record<string, { city: string; state: string }> = {
   UNILAG:    { city: "Lagos",         state: "Lagos"    },
   OAU:       { city: "Ile-Ife",       state: "Osun"     },
   UI:        { city: "Ibadan",        state: "Oyo"      },
@@ -46,16 +46,16 @@ const UNI_META: Record<string, { city: string; state: string }> = {
 };
 
 /**
- * Normalise a free-text university name into its DB-ready form.
+ * Normalise a free-text community name into its DB-ready form.
  *
  * @example
- *   parseUniversity("DOMINION UNIVERSITY")
- *   // → { name: "dominion university", shortName: "DU", city: "Ibadan", state: "Oyo" }
+ *   parseCommunity("YABA MARKET")
+ *   // → { name: "yaba market", shortName: "YM", city: "Lagos", state: "Lagos" }
  *
- *   parseUniversity("University of Lagos (UNILAG)")
+ *   parseCommunity("University of Lagos (UNILAG)")
  *   // → { name: "university of lagos (unilag)", shortName: "UNILAG", city: "Lagos", state: "Lagos" }
  */
-export function parseUniversity(raw: string): UniversityMeta {
+export function parseCommunity(raw: string): CommunityMeta {
   // Collapse whitespace and lowercase the whole thing.
   const name = raw.trim().replace(/\s+/g, " ").toLowerCase();
 
@@ -81,14 +81,14 @@ export function parseUniversity(raw: string): UniversityMeta {
 
   // Resolve city/state: paren code wins, then single-word, then acronym
   const meta =
-    (parenCode  && UNI_META[parenCode])                       ? UNI_META[parenCode]!       :
-    (singleWord && UNI_META[singleWord])                      ? UNI_META[singleWord]!      :
-    (acronym.length <= 10 && UNI_META[acronym])               ? UNI_META[acronym]!         :
+    (parenCode  && COMM_META[parenCode])                       ? COMM_META[parenCode]!       :
+    (singleWord && COMM_META[singleWord])                      ? COMM_META[singleWord]!      :
+    (acronym.length <= 10 && COMM_META[acronym])               ? COMM_META[acronym]!         :
     { city: "Nigeria", state: "Nigeria" };
 
   const shortName =
     parenCode ??
-    (singleWord && UNI_META[singleWord] ? singleWord : undefined) ??
+    (singleWord && COMM_META[singleWord] ? singleWord : undefined) ??
     (acronym.length <= 8 ? acronym : undefined);
 
   return { name, shortName, ...meta };

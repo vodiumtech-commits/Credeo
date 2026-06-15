@@ -15,20 +15,20 @@ datasource db {
 // CORE ENTITIES
 // ─────────────────────────────────────────────
 
-model University {
+model Community {
   id        String           @id @default(cuid())
   name      String           @unique   // always stored lowercase — used for all upsert lookups
-  shortName String?                    // optional short code e.g. "UNILAG", "OAU"
+  shortName String?                    // optional short code e.g. "UNILAG", "Yaba"
   city      String
   state     String
-  status    UniversityStatus @default(PILOT)
+  status    CommunityStatus @default(PILOT)
   createdAt DateTime         @default(now())
 
   vendors  Vendor[]
   students Student[]
 }
 
-enum UniversityStatus {
+enum CommunityStatus {
   PILOT
   ACTIVE
   PAUSED
@@ -42,9 +42,9 @@ model Vendor {
   email         String   @unique
   passwordHash  String
   vendorType    VendorType
-  universityId  String
-  university    University @relation(fields: [universityId], references: [id])
-  campusLocation String?
+  communityId  String
+  community    Community @relation(fields: [communityId], references: [id])
+  location      String?
   status        VendorStatus @default(ACTIVE)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -54,7 +54,7 @@ model Vendor {
   scoreEvents   CreditScoreEvent[]
   notifications Notification[]
 
-  @@index([universityId])
+  @@index([communityId])
   @@index([phone])
   @@index([email])
 }
@@ -82,8 +82,8 @@ model Student {
   fullName      String
   matricNumber  String?
   phone         String   @unique
-  universityId  String?
-  university    University? @relation(fields: [universityId], references: [id])
+  communityId   String?
+  community     Community? @relation(fields: [communityId], references: [id])
   vodiumScore   Int      @default(500)  // 0–1000 scale, 500 = unscored baseline
   scoreUpdatedAt DateTime?
   createdAt     DateTime @default(now())
@@ -92,7 +92,7 @@ model Student {
   credits       Credit[]
   scoreEvents   CreditScoreEvent[]
 
-  @@index([universityId])
+  @@index([communityId])
   @@index([phone])
   @@index([matricNumber])
 }
@@ -213,9 +213,9 @@ model VendorSubscription {
 }
 
 enum SubscriptionPlan {
-  STARTER       // ₦2,000/mo — up to 50 students
-  GROWTH        // ₦5,000/mo — up to 200 students + scoring
-  CAMPUS_PRO    // ₦10,000/mo — unlimited + analytics
+  STARTER       // ₦2,000/mo — up to 50 customers
+  GROWTH        // ₦5,000/mo — up to 200 customers + scoring
+  PRO           // ₦10,000/mo — unlimited + analytics
 }
 
 enum SubscriptionStatus {
@@ -247,7 +247,7 @@ enum WhatsAppState {
   IDLE
   ONBOARDING_NAME
   ONBOARDING_BUSINESS
-  ONBOARDING_UNIVERSITY
+  ONBOARDING_COMMUNITY
   ADDING_CREDIT_STUDENT
   ADDING_CREDIT_PHONE
   ADDING_CREDIT_AMOUNT

@@ -80,11 +80,11 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
     case "ONBOARDING_BUSINESS":
       return {
         reply: messages.onboardingAskUniversity(),
-        nextState: "ONBOARDING_UNIVERSITY",
+        nextState: "ONBOARDING_COMMUNITY",
         contextPatch: { businessName: body },
       };
 
-    case "ONBOARDING_UNIVERSITY": {
+    case "ONBOARDING_COMMUNITY": {
       const businessName = String(session.context.businessName ?? "your shop");
       // Pass the raw input — parseUniversity() in the route handler normalises it.
       return {

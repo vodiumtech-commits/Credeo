@@ -31,7 +31,7 @@ export const messages = {
 
   onboardingAskUniversity: () =>
     `Which city or community is your shop in?\n\n` +
-    `Reply with the short code if it's a campus (e.g. *UNILAG*, *OAU*) or the city name (e.g. *Lagos*, *Ibadan*).`,
+    `Reply with the short code if it's a known hub (e.g. *UNILAG*, *OAU*) or the community name (e.g. *Lagos*, *Ibadan*).`,
 
   onboardingDone: (businessName: string) =>
     `✅ *${businessName}* is set up on Vodium Ledger!\n\n` +

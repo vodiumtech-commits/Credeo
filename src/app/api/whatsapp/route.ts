@@ -18,7 +18,7 @@ import { computeScore } from "../../../lib/credit-score/score";
 import { normalisePhone } from "../../../lib/utils";
 import { messages } from "../../../lib/whatsapp/messages";
 import { sendWhatsAppMessage } from "../../../lib/whatsapp/outbound";
-import { parseUniversity } from "../../../lib/university";
+import { parseCommunity } from "../../../lib/community";
 import {
   step,
   type SessionContext,
@@ -227,11 +227,11 @@ async function runSideEffect(
       const existing    = await prisma.vendor.findUnique({ where: { phone: normalPhone } });
       if (existing) return { newVendorId: existing.id };
 
-      const uniMeta    = parseUniversity(universityShortName);
-      const university = await prisma.university.upsert({
-        where:  { name: uniMeta.name },
+      const communityMeta    = parseCommunity(universityShortName);
+      const community = await prisma.community.upsert({
+        where:  { name: communityMeta.name },
         update: {},
-        create: { name: uniMeta.name, shortName: uniMeta.shortName ?? null, city: uniMeta.city, state: uniMeta.state, status: "PILOT" },
+        create: { name: communityMeta.name, shortName: communityMeta.shortName ?? null, city: communityMeta.city, state: communityMeta.state, status: "PILOT" },
       });
 
       const placeholderEmail = `${normalPhone.replace("+", "")}@wa.vodiumledger.com`;
@@ -242,7 +242,7 @@ async function runSideEffect(
         data: {
           ownerName: name, businessName, phone: normalPhone,
           email: placeholderEmail, passwordHash: placeholderHash,
-          universityId: university.id, vendorType: "OTHER", status: "ACTIVE",
+          communityId: community.id, vendorType: "OTHER", status: "ACTIVE",
           subscription: { create: { plan: "STARTER", status: "TRIAL", trialEndsAt, monthlyAmount: 2000 } },
         },
       });

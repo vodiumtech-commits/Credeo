@@ -5,7 +5,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/redis";
 import { normalisePhone } from "@/lib/utils";
-import { parseUniversity } from "@/lib/university";
+import { parseCommunity } from "@/lib/community";
 import { sendOtpEmail } from "@/lib/email/otp";
 import { setVendorSession } from "@/lib/session";
 import { setOtpCookie, verifyOtpCookie, clearOtpCookie } from "@/lib/otp-cookie";
@@ -20,8 +20,8 @@ const VENDOR_TYPES = [
 const formSchema = z.object({
   businessName:   z.string().min(2).max(100).trim(),
   vendorType:     z.enum(VENDOR_TYPES, { errorMap: () => ({ message: "Invalid vendor type" }) }),
-  campusLocation: z.string().min(3).max(200).trim(),
-  university:     z.string().min(2).max(200).trim(),
+  location:       z.string().min(3).max(200).trim(),
+  community:     z.string().min(2).max(200).trim(),
   ownerName:      z.string().min(2).max(100).trim(),
   phone:          z.string().min(7).max(20),
   email:          z.string().email().max(255).toLowerCase(),
@@ -119,7 +119,7 @@ async function handleVerify(json: unknown) {
   }
 
   const {
-    businessName, vendorType, campusLocation, university,
+    businessName, vendorType, location, community,
     ownerName, phone, email, password, otp,
   } = parsed.data;
 
@@ -155,16 +155,16 @@ async function handleVerify(json: unknown) {
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
-  const uniMeta      = parseUniversity(university);
+  const communityMeta      = parseCommunity(community);
 
-  const uni = await prisma.university.upsert({
-    where:  { name: uniMeta.name },
+  const communityObj = await prisma.community.upsert({
+    where:  { name: communityMeta.name },
     update: {},
     create: {
-      name:      uniMeta.name,
-      shortName: uniMeta.shortName ?? null,
-      city:      uniMeta.city,
-      state:     uniMeta.state,
+      name:      communityMeta.name,
+      shortName: communityMeta.shortName ?? null,
+      city:      communityMeta.city,
+      state:     communityMeta.state,
       status:    "PILOT",
     },
   });
@@ -179,8 +179,8 @@ async function handleVerify(json: unknown) {
       email,
       passwordHash,
       vendorType,
-      universityId:  uni.id,
-      campusLocation,
+      communityId:  communityObj.id,
+      location,
       status:        "ACTIVE",
       subscription: {
         create: {
