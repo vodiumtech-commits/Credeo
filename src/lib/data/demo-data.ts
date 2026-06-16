@@ -14,8 +14,8 @@ export const DEMO_VENDOR = {
   phone: "+2348012345678",
   email: "taiwo@mamataiwoprovisions.ng",
   vendorType: "PROVISION_SHOP" as const,
-  campusLocation: "Faculty of Arts Complex, Block C",
-  university: { name: "University of Lagos", shortName: "UNILAG" },
+  location: "Faculty of Arts Complex, Block C",
+  community: { name: "University of Lagos", shortName: "UNILAG" },
   subscription: { plan: "GROWTH" as const, status: "ACTIVE" as const, monthlyAmount: 5000 },
   createdAt: new Date("2025-11-15"),
   totalCreditsLogged: 183,
@@ -201,7 +201,7 @@ export type AdminVendorRow = {
   ownerName: string;
   university: string;
   vendorType: string;
-  plan: "STARTER" | "GROWTH" | "CAMPUS_PRO";
+  plan: "STARTER" | "GROWTH" | "PRO";
   status: "ACTIVE" | "TRIAL" | "INACTIVE" | "SUSPENDED";
   studentsCount: number;
   creditsLogged: number;
@@ -213,11 +213,11 @@ export type AdminVendorRow = {
 
 export const ADMIN_VENDORS: AdminVendorRow[] = [
   { id: "v1",  businessName: "Mama Taiwo's Provisions",  ownerName: "Taiwo Adeyemi",       university: "UNILAG",    vendorType: "Provision Shop",  plan: "GROWTH",      status: "ACTIVE",    studentsCount: 63,  creditsLogged: 183, totalTracked: 324_500, mrr: 5_000,  joinedAt: "Nov 15, 2025", lastActive: "2h ago" },
-  { id: "v2",  businessName: "Baba Wale's Food Canteen", ownerName: "Waheed Babatunde",    university: "UNILAG",    vendorType: "Food Canteen",    plan: "CAMPUS_PRO",  status: "ACTIVE",    studentsCount: 89,  creditsLogged: 312, totalTracked: 780_000, mrr: 10_000, joinedAt: "Oct 2, 2025",  lastActive: "1h ago" },
+  { id: "v2",  businessName: "Baba Wale's Food Canteen", ownerName: "Waheed Babatunde",    university: "UNILAG",    vendorType: "Food Canteen",    plan: "PRO",         status: "ACTIVE",    studentsCount: 89,  creditsLogged: 312, totalTracked: 780_000, mrr: 10_000, joinedAt: "Oct 2, 2025",  lastActive: "1h ago" },
   { id: "v3",  businessName: "FastPrint Solutions",       ownerName: "Emmanuel Osei",       university: "OAU",       vendorType: "Print Shop",      plan: "STARTER",     status: "TRIAL",     studentsCount: 12,  creditsLogged: 28,  totalTracked: 78_000,  mrr: 0,      joinedAt: "Apr 29, 2026", lastActive: "Yesterday" },
   { id: "v4",  businessName: "Campus Bites Canteen",      ownerName: "Ngozi Eze",           university: "UI",        vendorType: "Food Canteen",    plan: "GROWTH",      status: "ACTIVE",    studentsCount: 45,  creditsLogged: 134, totalTracked: 256_000, mrr: 5_000,  joinedAt: "Dec 10, 2025", lastActive: "3h ago" },
   { id: "v5",  businessName: "Kay Laundry Services",      ownerName: "Kayode Babatunde",    university: "Covenant",  vendorType: "Laundry",         plan: "STARTER",     status: "ACTIVE",    studentsCount: 28,  creditsLogged: 67,  totalTracked: 134_000, mrr: 2_000,  joinedAt: "Jan 5, 2026",  lastActive: "4h ago" },
-  { id: "v6",  businessName: "Oga Emeka's Mini Mart",     ownerName: "Emeka Chibueze",      university: "UNILAG",    vendorType: "Mini Mart",       plan: "CAMPUS_PRO",  status: "ACTIVE",    studentsCount: 102, creditsLogged: 289, totalTracked: 512_000, mrr: 10_000, joinedAt: "Sep 18, 2025", lastActive: "30m ago" },
+  { id: "v6",  businessName: "Oga Emeka's Mini Mart",     ownerName: "Emeka Chibueze",      university: "UNILAG",    vendorType: "Mini Mart",       plan: "PRO",         status: "ACTIVE",    studentsCount: 102, creditsLogged: 289, totalTracked: 512_000, mrr: 10_000, joinedAt: "Sep 18, 2025", lastActive: "30m ago" },
   { id: "v7",  businessName: "Ade's Barbing Salon",       ownerName: "Adewale Okon",        university: "OAU",       vendorType: "Barbing Salon",   plan: "STARTER",     status: "ACTIVE",    studentsCount: 19,  creditsLogged: 45,  totalTracked: 89_000,  mrr: 2_000,  joinedAt: "Feb 14, 2026", lastActive: "Yesterday" },
   { id: "v8",  businessName: "Queen's Hair Salon",         ownerName: "Queeneth Adeyemi",    university: "UI",        vendorType: "Hair Salon",      plan: "GROWTH",      status: "ACTIVE",    studentsCount: 35,  creditsLogged: 78,  totalTracked: 198_000, mrr: 5_000,  joinedAt: "Jan 22, 2026", lastActive: "5h ago" },
   { id: "v9",  businessName: "Campus Pharmacy Plus",       ownerName: "Pharmacist Chucks",   university: "FUTA",      vendorType: "Pharmacy",        plan: "GROWTH",      status: "TRIAL",     studentsCount: 8,   creditsLogged: 15,  totalTracked: 45_000,  mrr: 0,      joinedAt: "May 1, 2026",  lastActive: "2 days ago" },
@@ -233,7 +233,7 @@ export const ADMIN_ACTIVITY = [
   { id: "aa2", type: "credit_logged",  text: "287 credits logged across platform",    subtext: "Last 24 hours",                       at: "Today, 8:00 AM" },
   { id: "aa3", type: "payment",        text: "Baba Wale's collected ₦78,000",         subtext: "Top vendor this week",                at: "Today, 6:45 AM" },
   { id: "aa4", type: "vendor_joined",  text: "Campus Pharmacy Plus joined",           text2: "FUTA Growth plan trial",              subtext: "FUTA Growth plan trial",            at: "2 days ago" },
-  { id: "aa5", type: "subscription",   text: "Oga Emeka's Mini Mart upgraded",        subtext: "Starter → Campus Pro",                at: "3 days ago" },
+  { id: "aa5", type: "subscription",   text: "Oga Emeka's Mini Mart upgraded",        subtext: "Starter → Business Pro",              at: "3 days ago" },
   { id: "aa6", type: "milestone",      text: "Platform hit ₦47M total tracked",       subtext: "Up from ₦38M last month (+23.6%)",   at: "4 days ago" },
 ];
 
@@ -254,7 +254,7 @@ export function getPlanLabel(plan: string): string {
   const map: Record<string, string> = {
     STARTER: "Starter",
     GROWTH: "Growth",
-    CAMPUS_PRO: "Campus Pro",
+    PRO: "Business Pro",
   };
   return map[plan] ?? plan;
 }
@@ -263,7 +263,7 @@ export function getPlanAmount(plan: string): number {
   const map: Record<string, number> = {
     STARTER: 2_000,
     GROWTH: 5_000,
-    CAMPUS_PRO: 10_000,
+    PRO: 10_000,
   };
   return map[plan] ?? 0;
 }

@@ -1,35 +1,33 @@
-import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
-
-const prisma = new PrismaClient();
+import { prisma } from "../src/lib/prisma";
 
 async function main() {
   console.log("🌱 Seeding Vodium Ledger with rich pilot data…\n");
 
-  // ─── Universities ─────────────────────────────────────────────────────────
+  // ─── Communities ──────────────────────────────────────────────────────────
   // Names are always stored lowercase — that is the unique key.
-  const unilag = await prisma.university.upsert({
+  const unilag = await prisma.community.upsert({
     where:  { name: "university of lagos" },
     update: {},
     create: { name: "university of lagos", shortName: "UNILAG", city: "Lagos", state: "Lagos", status: "ACTIVE" },
   });
-  const oau = await prisma.university.upsert({
+  const oau = await prisma.community.upsert({
     where:  { name: "obafemi awolowo university" },
     update: {},
     create: { name: "obafemi awolowo university", shortName: "OAU", city: "Ile-Ife", state: "Osun", status: "ACTIVE" },
   });
-  await prisma.university.upsert({
+  await prisma.community.upsert({
     where:  { name: "university of ibadan" },
     update: {},
     create: { name: "university of ibadan", shortName: "UI", city: "Ibadan", state: "Oyo", status: "PILOT" },
   });
-  const covenant = await prisma.university.upsert({
+  const covenant = await prisma.community.upsert({
     where:  { name: "covenant university" },
     update: {},
     create: { name: "covenant university", shortName: "COVENANT", city: "Ota", state: "Ogun", status: "PILOT" },
   });
 
-  console.log("✅ Universities seeded");
+  console.log("✅ Communities seeded");
 
   // ─── Vendors ────────────────────────────────────────────────────────────────
   const seedHash = await bcrypt.hash("password123", 10);
@@ -43,9 +41,9 @@ async function main() {
       phone: "+2348012345678",
       email: "taiwo@mamataiwoprovisions.ng",
       passwordHash: seedHash,
-      universityId: unilag.id,
+      communityId: unilag.id,
       vendorType: "PROVISION_SHOP",
-      campusLocation: "Faculty of Arts Complex, Block C",
+      location: "Faculty of Arts Complex, Block C",
       status: "ACTIVE",
     },
   });
@@ -59,9 +57,9 @@ async function main() {
       phone: "+2348023456789",
       email: "babawale@foodcanteen.ng",
       passwordHash: seedHash,
-      universityId: unilag.id,
+      communityId: unilag.id,
       vendorType: "FOOD_CANTEEN",
-      campusLocation: "Student Union Building, Ground Floor",
+      location: "Student Union Building, Ground Floor",
       status: "ACTIVE",
     },
   });
@@ -75,9 +73,9 @@ async function main() {
       phone: "+2348034567890",
       email: "emmanuel@fastprint.ng",
       passwordHash: seedHash,
-      universityId: oau.id,
+      communityId: oau.id,
       vendorType: "PRINTING",
-      campusLocation: "Library Road, opposite gate 1",
+      location: "Library Road, opposite gate 1",
       status: "ACTIVE",
     },
   });
@@ -91,9 +89,9 @@ async function main() {
       phone: "+2348045678901",
       email: "kayode@kaylaundry.ng",
       passwordHash: seedHash,
-      universityId: covenant.id,
+      communityId: covenant.id,
       vendorType: "LAUNDRY",
-      campusLocation: "Hall 4 Block B",
+      location: "Hall 4 Block B",
       status: "ACTIVE",
     },
   });
@@ -122,7 +120,7 @@ async function main() {
     update: {},
     create: {
       vendorId: babaWale.id,
-      plan: "CAMPUS_PRO",
+      plan: "PRO",
       status: "ACTIVE",
       monthlyAmount: 10000,
       currentPeriodStart: new Date("2026-04-01"),
@@ -303,13 +301,13 @@ async function upsertStudent(
   phone: string,
   fullName: string,
   matricNumber: string,
-  universityId: string,
+  communityId: string,
   vodiumScore: number,
 ) {
   return prisma.student.upsert({
     where: { phone },
     update: {},
-    create: { phone, fullName, matricNumber, universityId, vodiumScore, scoreUpdatedAt: new Date() },
+    create: { phone, fullName, matricNumber, communityId, vodiumScore, scoreUpdatedAt: new Date() },
   });
 }
 
