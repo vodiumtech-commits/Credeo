@@ -249,10 +249,6 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
       return { reply: messages.scoreLookupAsk(), nextState: "LOOKING_UP_SCORE" };
     }
 
-
-    case "HELP":
-      return { reply: messages.help(), nextState: "IDLE" };
-
     case "DASHBOARD":
       return {
         reply: `Open your dashboard here:\n${process.env.NEXT_PUBLIC_APP_URL ?? "https://vodiumledger.com"}/dashboard`,
