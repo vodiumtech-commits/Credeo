@@ -187,4 +187,7 @@ export const messages = {
 
   unknown: () =>
     `Sorry, I didn't catch that. Reply *HELP* to see what I can do.`,
+
+  cancelled: () =>
+    `No problem. I've cancelled that flow.\n\nReply *ADD* to record a credit, or *HELP* to see all commands.`,
 };

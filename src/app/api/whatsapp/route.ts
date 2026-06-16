@@ -222,12 +222,12 @@ async function runSideEffect(
   switch (effect.type) {
 
     case "CREATE_VENDOR": {
-      const { name, businessName, universityShortName, phone } = effect.data;
+      const { name, businessName, communityName, phone } = effect.data;
       const normalPhone = phone.startsWith("+") ? phone : `+${phone}`;
       const existing    = await prisma.vendor.findUnique({ where: { phone: normalPhone } });
       if (existing) return { newVendorId: existing.id };
 
-      const communityMeta    = parseCommunity(universityShortName);
+      const communityMeta    = parseCommunity(communityName);
       const community = await prisma.community.upsert({
         where:  { name: communityMeta.name },
         update: {},
@@ -252,12 +252,20 @@ async function runSideEffect(
     case "CREATE_CREDIT": {
       if (!vendorId) return {};
       const { customerName, customerPhone, amount, dueInMinutes } = effect.data;
-      const normalCustomerPhone = normalisePhone(customerPhone) ?? `pending:${customerName.toLowerCase().replace(/\s+/g, "-")}`;
+      const normalCustomerPhone = normalisePhone(customerPhone) ?? `pending:${vendorId}:${Date.now()}`;
+      const vendor = await prisma.vendor.findUnique({
+        where: { id: vendorId },
+        select: { communityId: true },
+      });
       
       const customer = await prisma.student.upsert({
         where:  { phone: normalCustomerPhone },
         update: { fullName: customerName },
-        create: { fullName: customerName, phone: normalCustomerPhone },
+        create: {
+          fullName: customerName,
+          phone: normalCustomerPhone,
+          communityId: vendor?.communityId ?? null,
+        },
       });
 
       const dueDate = new Date(Date.now() + dueInMinutes * 60_000);

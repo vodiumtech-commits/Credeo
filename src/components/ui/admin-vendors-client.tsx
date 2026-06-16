@@ -13,23 +13,23 @@ export interface AdminVendorRow {
   ownerName:    string;
   phone:        string;
   status:       VendorStatus;
-  university:   { shortName: string | null; name: string };
+  community:    { shortName: string | null; name: string };
   subscription: { plan: string; status: string; monthlyAmount: number } | null;
   totalTracked: number;
   creditsLogged: number;
-  studentsCount: number;
+  customersCount: number;
   subMrr:        number;
   createdAt:     string;
 }
 
 const PLAN_LABELS: Record<string, string> = {
-  STARTER: "Starter", GROWTH: "Growth", CAMPUS_PRO: "Pro",
+  STARTER: "Starter", GROWTH: "Growth", PRO: "Pro",
 };
 
 const PLAN_COLORS: Record<string, string> = {
   STARTER:    "text-vodium-cream/50 bg-white/[0.06] border-white/[0.08]",
   GROWTH:     "text-vodium-gold bg-vodium-gold/10 border-vodium-gold/20",
-  CAMPUS_PRO: "text-purple-400 bg-purple-400/10 border-purple-400/20",
+  PRO:        "text-purple-400 bg-purple-400/10 border-purple-400/20",
 };
 
 type Filter = "All" | "Active" | "Trial" | "Inactive";
@@ -55,7 +55,7 @@ export function AdminVendorsClient({
         (v) =>
           v.businessName.toLowerCase().includes(q) ||
           v.ownerName.toLowerCase().includes(q) ||
-          (v.university.shortName ?? v.university.name).toLowerCase().includes(q) ||
+          (v.community.shortName ?? v.community.name).toLowerCase().includes(q) ||
           v.phone.includes(q)
       );
     }
@@ -73,7 +73,7 @@ export function AdminVendorsClient({
           <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-vodium-cream/30 pointer-events-none" />
           <input
             type="text"
-            placeholder="Search by name, owner, phone, or university…"
+            placeholder="Search by name, owner, phone, or community..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full bg-vodium-slate border border-white/[0.06] rounded-lg pl-9 pr-9 py-2 text-sm text-vodium-cream placeholder:text-vodium-cream/25 focus:outline-none focus:border-vodium-gold/40 transition-colors"
@@ -105,8 +105,8 @@ export function AdminVendorsClient({
       {/* Column headers */}
       <div className="hidden md:grid grid-cols-12 px-5 py-3 bg-black/20 text-[10px] font-semibold text-vodium-cream/22 uppercase tracking-[0.12em]">
         <span className="col-span-3">Vendor</span>
-        <span className="col-span-2">University</span>
-        <span className="col-span-1 text-center">Students</span>
+        <span className="col-span-2">Community</span>
+        <span className="col-span-1 text-center">Customers</span>
         <span className="col-span-2 text-right">Tracked</span>
         <span className="col-span-1 text-right">MRR</span>
         <span className="col-span-1 text-center">Status</span>
@@ -156,7 +156,7 @@ export function AdminVendorsClient({
                 <VendorRowMenu vendorId={v.id} businessName={v.businessName} currentStatus={v.status} />
               </div>
               <div className="flex items-center justify-between text-xs text-vodium-cream/40">
-                <span>{v.university.shortName ?? v.university.name}</span>
+                <span>{v.community.shortName ?? v.community.name}</span>
                 <span className={`badge ${statusCls}`}>{subStatus}</span>
               </div>
             </div>
@@ -174,12 +174,12 @@ export function AdminVendorsClient({
               </div>
 
               <div className="col-span-2 text-xs text-vodium-cream/45 truncate">
-                {v.university.shortName ?? v.university.name}
+                {v.community.shortName ?? v.community.name}
               </div>
 
               <div className="col-span-1 text-center">
                 <span className="inline-flex items-center gap-1 text-xs text-vodium-cream/50">
-                  <Users size={10} /> {v.studentsCount}
+                  <Users size={10} /> {v.customersCount}
                 </span>
               </div>
 

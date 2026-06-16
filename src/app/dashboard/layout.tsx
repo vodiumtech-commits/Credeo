@@ -14,8 +14,8 @@ import { NotificationBell } from "@/components/ui/notification-bell";
 type VendorInfo = {
   businessName: string;
   ownerName: string;
-  campusLocation: string | null;
-  university: { shortName: string | null } | null;
+  location: string | null;
+  community: { shortName: string | null; name: string } | null;
   subscription: { 
     plan: string; 
     status: string;
@@ -41,11 +41,11 @@ const PAGE_TITLES: Record<string, string> = {
 const PLAN_COLORS: Record<string, string> = {
   STARTER:    "text-vodium-cream/60 bg-white/[0.05] border-white/[0.10]",
   GROWTH:     "text-vodium-gold bg-vodium-gold/10 border-vodium-gold/25",
-  CAMPUS_PRO: "text-purple-400 bg-purple-400/10 border-purple-400/25",
+  PRO:        "text-purple-400 bg-purple-400/10 border-purple-400/25",
 };
 
 const PLAN_LABELS: Record<string, string> = {
-  STARTER: "Starter", GROWTH: "Growth", CAMPUS_PRO: "Pro",
+  STARTER: "Starter", GROWTH: "Growth", PRO: "Pro",
 };
 
 function initial(name: string) {
@@ -70,7 +70,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   const businessName = vendor?.businessName ?? "My Shop";
-  const campus       = vendor?.university?.shortName ?? vendor?.campusLocation ?? "Campus";
+  const community    = vendor?.community?.shortName ?? vendor?.community?.name ?? vendor?.location ?? "Community";
   const plan         = vendor?.subscription?.plan ?? "STARTER";
   const planLabel    = PLAN_LABELS[plan] ?? plan;
   const planColor    = PLAN_COLORS[plan] ?? PLAN_COLORS.STARTER;
@@ -190,7 +190,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-[13px] font-semibold text-vodium-cream truncate leading-tight">{businessName}</p>
-                <p className="text-[10px] text-vodium-cream/30 mt-0.5 truncate">{campus}</p>
+                <p className="text-[10px] text-vodium-cream/30 mt-0.5 truncate">{community}</p>
               </div>
             </div>
             <div className="mt-2.5">

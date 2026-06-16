@@ -80,7 +80,7 @@ export function CustomersClient({
         <div>
           <h1 className="font-serif text-2xl md:text-3xl text-vodium-cream">Customers</h1>
           <p className="text-sm text-vodium-cream/40 mt-1">
-            {totalCount} student{totalCount !== 1 ? "s" : ""} on your book
+            {totalCount} customer{totalCount !== 1 ? "s" : ""} on your book
           </p>
         </div>
         <Link
@@ -107,7 +107,7 @@ export function CustomersClient({
           <Search size={14} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-vodium-cream/30 pointer-events-none" />
           <input
             type="text"
-            placeholder="Search by name or matric number…"
+            placeholder="Search by name or customer ID..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="input-dark pl-9 pr-9 h-9 text-sm w-full"

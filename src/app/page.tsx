@@ -513,7 +513,7 @@ export default function LandingPage() {
                 number: "02",
                 icon: <Bell size={22} />,
                 title: "Auto-reminders to customers",
-                body: "2 days before repayment is due, a respectful WhatsApp message goes to the student. No chasing from you. Dignity intact for them.",
+                body: "2 days before repayment is due, a respectful WhatsApp message goes to the customer. No chasing from you. Dignity intact for them.",
               },
               {
                 number: "03",
@@ -578,7 +578,7 @@ export default function LandingPage() {
               {
                 icon: <TrendingUp size={20} />,
                 title: "Credit scores",
-                body: "See how reliably any student pays across every campus vendor on the Vodium network before you extend credit.",
+                body: "See how reliably any customer pays across the Vodium vendor network before you extend credit.",
                 delay: 0.1,
               },
               {
@@ -637,7 +637,7 @@ export default function LandingPage() {
               </div>
               <div>
                 <p className="text-vodium-cream text-sm font-medium">
-                  127 campus vendors trust Vodium Ledger
+                  127 vendors trust Vodium Ledger
                 </p>
                 <div className="flex items-center gap-1 mt-0.5">
                   {[...Array(5)].map((_, i) => (
@@ -657,7 +657,7 @@ export default function LandingPage() {
             <div className="flex items-center gap-3">
               <GlowBadge color="green">
                 <Globe size={10} />
-                Built for Nigerian campuses
+                Built for Nigerian vendors
               </GlowBadge>
               <GlowBadge color="gold">
                 <Zap size={10} />
@@ -692,7 +692,7 @@ export default function LandingPage() {
               },
               {
                 quote:
-                  "I check every student's Vodium score before I give credit now. One girl had a score of 320, I said no. Turned out she owed 4 other shops. Game changer.",
+                  "I check every customer's Vodium score before I give credit now. One customer had a score of 320, I said no. Turned out she owed 4 other shops. Game changer.",
                 name: "Baba Wale",
                 role: "Food Canteen, OAU, 89 customers tracked",
                 delay: 0.1,
@@ -778,7 +778,7 @@ export default function LandingPage() {
                 delay: 0.08,
               },
               {
-                plan: "Campus Pro",
+                plan: "Business Pro",
                 price: "₦10,000",
                 sub: "/month after trial",
                 description:
@@ -985,4 +985,3 @@ function FooterLinks({
     </div>
   );
 }
-

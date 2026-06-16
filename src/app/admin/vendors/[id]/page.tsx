@@ -30,7 +30,7 @@ export default async function VendorDetailPage({ params }: { params: { id: strin
   const vendor = await prisma.vendor.findUnique({
     where: { id: params.id },
     include: {
-      university:   { select: { name: true, shortName: true, city: true, state: true } },
+      community:    { select: { name: true, shortName: true, city: true, state: true } },
       subscription: true,
       credits: {
         orderBy: { createdAt: "desc" },
@@ -54,7 +54,7 @@ export default async function VendorDetailPage({ params }: { params: { id: strin
 
   const overdueCount  = await prisma.credit.count({ where: { vendorId: vendor.id, status: "OVERDUE" } });
   const paidCount     = await prisma.credit.count({ where: { vendorId: vendor.id, status: "PAID" } });
-  const studentCount  = await prisma.credit.findMany({
+  const customerCount = await prisma.credit.findMany({
     where: { vendorId: vendor.id }, select: { studentId: true }, distinct: ["studentId"],
   }).then((r) => r.length);
 
@@ -103,7 +103,7 @@ export default async function VendorDetailPage({ params }: { params: { id: strin
         {[
           { label: "Total tracked",   value: formatNaira(totalAmount),   icon: <CreditCard size={14} />,   color: "text-vodium-gold" },
           { label: "Recovered",       value: formatNaira(totalRepaid),    icon: <CheckCircle2 size={14} />, color: "text-emerald-400" },
-          { label: "Students",        value: String(studentCount),        icon: <User size={14} />,         color: "text-sky-400" },
+          { label: "Customers",       value: String(customerCount),       icon: <User size={14} />,         color: "text-sky-400" },
           { label: "Recovery rate",   value: `${recoveryRate}%`,         icon: <TrendingUp size={14} />,   color: "text-vodium-gold" },
         ].map((k) => (
           <div key={k.label} className="bg-vodium-charcoal border border-white/[0.06] rounded-xl p-4">
@@ -127,11 +127,11 @@ export default async function VendorDetailPage({ params }: { params: { id: strin
             <InfoRow icon={<Phone size={13} />}     label="Phone"        value={vendor.phone} />
             <InfoRow icon={<Mail size={13} />}      label="Email"        value={vendor.email} />
             <InfoRow icon={<BadgeCheck size={13} />} label="Type"        value={vendor.vendorType.replace(/_/g, " ")} />
-            <InfoRow icon={<MapPin size={13} />}    label="Campus"       value={vendor.campusLocation ?? "—"} />
+            <InfoRow icon={<MapPin size={13} />}    label="Location"     value={vendor.location ?? "—"} />
             <InfoRow
               icon={<Building2 size={13} />}
-              label="University"
-              value={`${vendor.university.shortName ?? vendor.university.name} — ${vendor.university.city}, ${vendor.university.state}`}
+              label="Community"
+              value={`${vendor.community.shortName ?? vendor.community.name} — ${vendor.community.city}, ${vendor.community.state}`}
             />
             <InfoRow
               icon={<Calendar size={13} />}

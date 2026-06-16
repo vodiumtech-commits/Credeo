@@ -77,8 +77,8 @@ const PHONE_COUNTRIES: Record<
 type FormData = {
   businessName: string;
   vendorType: string;
-  campusLocation: string;
-  university: string;
+  location: string;
+  community: string;
   ownerName: string;
   phone: string;
   email: string;
@@ -87,7 +87,7 @@ type FormData = {
 
 const STEPS = [
   { id: 1, label: "Business" },
-  { id: 2, label: "Campus" },
+  { id: 2, label: "Community" },
   { id: 3, label: "Contact" },
   { id: 4, label: "Verify" },
 ];
@@ -115,8 +115,8 @@ export default function RegisterPage() {
   const [form, setForm] = useState<FormData>({
     businessName: "",
     vendorType: "",
-    campusLocation: "",
-    university: "",
+    location: "",
+    community: "",
     ownerName: "",
     phone: "",
     email: "",
@@ -168,9 +168,9 @@ export default function RegisterPage() {
       return (
         form.businessName.length > 1 &&
         !!form.vendorType &&
-        form.campusLocation.length > 2
+        form.location.length > 2
       );
-    if (step === 2) return form.university.length > 1;
+    if (step === 2) return form.community.length > 1;
     if (step === 3)
       return (
         form.ownerName.length > 2 &&
@@ -186,8 +186,8 @@ export default function RegisterPage() {
   const formPayload = () => ({
     businessName: form.businessName,
     vendorType: form.vendorType,
-    campusLocation: form.campusLocation,
-    university: form.university,
+    location: form.location,
+    community: form.community,
     ownerName: form.ownerName,
     phone: fullPhone(), // always sent as +dialcode + digits
     email: form.email,
@@ -445,7 +445,7 @@ export default function RegisterPage() {
                     Tell us about your shop
                   </h1>
                   <p className="text-muted-foreground text-sm">
-                    This is how your business will appear to students.
+                    This is how your business will appear to customers.
                   </p>
                 </div>
                 <div className="space-y-4">
@@ -492,9 +492,9 @@ export default function RegisterPage() {
                     </div>
                   </Field>
                   <Field
-                    label="Campus location"
+                    label="Business location"
                     required
-                    hint="Where on campus can students find you?"
+                    hint="Where can customers find you?"
                   >
                     <div className="relative">
                       <MapPin
@@ -503,10 +503,10 @@ export default function RegisterPage() {
                       />
                       <input
                         type="text"
-                        placeholder="e.g. Faculty of Arts Complex, Block C"
-                        value={form.campusLocation}
+                        placeholder="e.g. Shop 12, Yaba Market"
+                        value={form.location}
                         onChange={(e) =>
-                          update("campusLocation", e.target.value)
+                          update("location", e.target.value)
                         }
                         className="input-premium pl-9"
                       />
@@ -527,14 +527,14 @@ export default function RegisterPage() {
                     Which community?
                   </h1>
                   <p className="text-muted-foreground text-sm">
-                    Type your community or institution name exactly as you know it.
+                    Type your community, market, area, or institution name.
                   </p>
                 </div>
 
                 <Field
-                  label="Community / Institution name"
+                  label="Community / market name"
                   required
-                  hint="e.g. UNILAG, Yaba, Victoria Island, or OAU"
+                  hint="e.g. Yaba, Balogun Market, Victoria Island, UNILAG"
                 >
                   <div className="relative">
                     <Building2
@@ -543,9 +543,9 @@ export default function RegisterPage() {
                     />
                     <input
                       type="text"
-                      placeholder="e.g. UNILAG or Victoria Island"
-                      value={form.university}
-                      onChange={(e) => update("university", e.target.value)}
+                      placeholder="e.g. Yaba or Victoria Island"
+                      value={form.community}
+                      onChange={(e) => update("community", e.target.value)}
                       className="input-premium pl-9"
                       autoFocus
                       autoComplete="off"
@@ -554,7 +554,7 @@ export default function RegisterPage() {
                 </Field>
 
                 {/* Live normalisation preview — shows exactly what will be stored */}
-                {form.university.trim().length > 1 && (
+                {form.community.trim().length > 1 && (
                   <div className="mt-3 flex items-center gap-2 px-3.5 py-2.5 bg-vodium-gold/5 border border-vodium-gold/20 rounded-xl">
                     <CheckCircle
                       size={13}
@@ -563,7 +563,7 @@ export default function RegisterPage() {
                     <p className="text-xs text-vodium-black/60">
                       Will be saved as{" "}
                       <span className="font-semibold text-vodium-black font-mono">
-                        {form.university
+                        {form.community
                           .trim()
                           .replace(/\s+/g, " ")
                           .toLowerCase()}

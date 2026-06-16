@@ -6,9 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
 }
 
 // ─────────────────────────────────────────────
@@ -247,6 +245,7 @@ enum WhatsAppState {
   IDLE
   ONBOARDING_NAME
   ONBOARDING_BUSINESS
+  ONBOARDING_UNIVERSITY // legacy state kept so old sessions can recover cleanly
   ONBOARDING_COMMUNITY
   ADDING_CREDIT_STUDENT
   ADDING_CREDIT_PHONE

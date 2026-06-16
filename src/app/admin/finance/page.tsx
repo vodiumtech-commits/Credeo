@@ -4,8 +4,8 @@ import { formatNaira } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-const PLAN_LABELS: Record<string, string> = { STARTER: "Starter ₦2k", GROWTH: "Growth ₦5k", CAMPUS_PRO: "Campus Pro ₦10k" };
-const PLAN_MRR:   Record<string, number>  = { STARTER: 2000, GROWTH: 5000, CAMPUS_PRO: 10000 };
+const PLAN_LABELS: Record<string, string> = { STARTER: "Starter ₦2k", GROWTH: "Growth ₦5k", PRO: "Business Pro ₦10k" };
+const PLAN_MRR:   Record<string, number>  = { STARTER: 2000, GROWTH: 5000, PRO: 10000 };
 
 const SUB_STATUS_COLOR: Record<string, string> = {
   TRIAL:      "text-amber-400 bg-amber-500/10 border-amber-500/20",
@@ -64,7 +64,7 @@ export default async function FinancePage() {
   const revenueAtRisk = pastDueSubs.reduce((s, sub) => s + Number(sub.monthlyAmount), 0);
 
   // Plan distribution
-  const planDist = (["STARTER", "GROWTH", "CAMPUS_PRO"] as const).map((plan) => {
+  const planDist = (["STARTER", "GROWTH", "PRO"] as const).map((plan) => {
     const planSubs  = subs.filter((s) => s.plan === plan);
     const active    = planSubs.filter((s) => s.status === "ACTIVE").length;
     const trial     = planSubs.filter((s) => s.status === "TRIAL").length;

@@ -9,7 +9,7 @@ export async function GET() {
 
   const vendor = await prisma.vendor.findUnique({
     where: { phone },
-    include: { subscription: true, university: true },
+    include: { subscription: true, community: true },
   });
   if (!vendor) return NextResponse.json({ error: "Vendor not found" }, { status: 404 });
 
@@ -19,7 +19,7 @@ export async function GET() {
 const patchSchema = z.object({
   businessName:   z.string().min(2).max(100).optional(),
   ownerName:      z.string().min(2).max(100).optional(),
-  campusLocation: z.string().min(3).max(200).optional(),
+  location:       z.string().min(3).max(200).optional(),
   email:          z.string().email().optional(),
 });
 
@@ -41,10 +41,10 @@ export async function PATCH(req: NextRequest) {
     data: {
       ...(parsed.data.businessName   && { businessName: parsed.data.businessName }),
       ...(parsed.data.ownerName      && { ownerName: parsed.data.ownerName }),
-      ...(parsed.data.campusLocation && { campusLocation: parsed.data.campusLocation }),
+      ...(parsed.data.location && { location: parsed.data.location }),
       ...(parsed.data.email && { email: parsed.data.email }),
     },
-    include: { subscription: true },
+    include: { subscription: true, community: true },
   });
 
   return NextResponse.json(updated);

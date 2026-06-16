@@ -17,7 +17,7 @@ const chatMessages = [
   { from: "user", text: "ADD" },
   {
     from: "bot",
-    text: "📋 Add new credit\n\nWhat's the student's name?",
+    text: "📋 Add new credit\n\nWhat's the customer's name?",
   },
   { from: "user", text: "Tunde Fashola" },
   { from: "bot", text: "Amount? (e.g. 2500)" },
@@ -36,7 +36,7 @@ const commands = [
     icon: MessageCircle,
     label: "Log a credit",
     description:
-      "Record a new credit for any student in seconds. Vodium captures the name, amount, and due date.",
+      "Record a new credit for any customer in seconds. Vodium captures the name, amount, and due date.",
   },
   {
     keyword: "LIST",
@@ -50,7 +50,7 @@ const commands = [
     icon: CheckCircle,
     label: "Mark as paid",
     description:
-      "When a student settles up, mark them paid instantly. Their Vodium Score updates automatically.",
+      "When a customer settles up, mark them paid instantly. Their Vodium Score updates automatically.",
   },
   {
     keyword: "HELP",
@@ -142,7 +142,7 @@ export default function WhatsAppPage() {
                 typing long commands just a natural conversation.
               </p>
               <p className="text-vodium-cream/55 text-base leading-relaxed">
-                Once saved, Vodium automatically messages the student a reminder
+                Once saved, Vodium automatically messages the customer a reminder
                 2 days before the due date so you don&apos;t have to.
               </p>
             </div>

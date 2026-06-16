@@ -66,7 +66,7 @@ export default async function AdminAnalyticsPage() {
       take: 5,
       orderBy: { credits: { _count: "desc" } },
       include: {
-        university: { select: { shortName: true, name: true } },
+        community: { select: { shortName: true, name: true } },
         _count: { select: { credits: true } },
       },
     }),
@@ -93,7 +93,7 @@ export default async function AdminAnalyticsPage() {
     fair:      { tier: "Fair (450–649)",        color: "#D97706" },
     poor:      { tier: "Poor (0–449)",          color: "#DC2626" },
   };
-  const totalStudentsScored = scoreDistribution.reduce((s, r) => s + Number(r.count), 0);
+  const totalCustomersScored = scoreDistribution.reduce((s, r) => s + Number(r.count), 0);
 
   const vendorTypeLabels: Record<string, string> = {
     PROVISION_SHOP: "Provision Shop",
@@ -200,15 +200,15 @@ export default async function AdminAnalyticsPage() {
         <div className="grid md:grid-cols-2 gap-4">
           <div className="bg-vodium-charcoal border border-white/[0.06] rounded-2xl p-6">
             <h3 className="text-sm font-semibold text-vodium-cream mb-1">Vodium score distribution</h3>
-            <p className="text-vodium-cream/35 text-xs mb-6">{totalStudentsScored} students scored</p>
-            {totalStudentsScored === 0 ? (
+            <p className="text-vodium-cream/35 text-xs mb-6">{totalCustomersScored} customers scored</p>
+            {totalCustomersScored === 0 ? (
               <div className="h-24 flex items-center justify-center text-vodium-cream/20 text-sm">No scores yet</div>
             ) : (
               <div className="space-y-3">
                 {(["excellent", "good", "fair", "poor"] as const).map((tier) => {
                   const row = scoreDistribution.find((r) => r.tier === tier);
                   const count = row ? Number(row.count) : 0;
-                  const pct = totalStudentsScored > 0 ? (count / totalStudentsScored) * 100 : 0;
+                  const pct = totalCustomersScored > 0 ? (count / totalCustomersScored) * 100 : 0;
                   const meta = scoreMap[tier];
                   return (
                     <div key={tier}>
@@ -261,7 +261,7 @@ export default async function AdminAnalyticsPage() {
                     <span className="text-vodium-cream/20 text-xs w-4">{i + 1}</span>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs text-vodium-cream/80 font-medium truncate">{v.businessName}</p>
-                      <p className="text-[10px] text-vodium-cream/35">{v.university.shortName ?? v.university.name}</p>
+                      <p className="text-[10px] text-vodium-cream/35">{v.community.shortName ?? v.community.name}</p>
                     </div>
                     <div className="flex items-center gap-1 text-xs text-vodium-gold">
                       <CreditCard size={11} /> {v._count.credits}

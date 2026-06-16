@@ -23,7 +23,7 @@ type Vendor = {
   ownerName: string;
   phone: string;
   email: string | null;
-  campusLocation: string | null;
+  location: string | null;
   subscription: {
     plan: SubscriptionPlan;
     status: SubscriptionStatus;
@@ -59,7 +59,7 @@ export default function SettingsPage() {
         body: JSON.stringify({
           businessName: fd.get("businessName") as string,
           ownerName: fd.get("ownerName") as string,
-          campusLocation: fd.get("campusLocation") as string,
+          location: fd.get("location") as string,
           email: fd.get("email") as string,
         }),
       });
@@ -82,8 +82,8 @@ export default function SettingsPage() {
       ? "Starter"
       : v?.subscription?.plan === "GROWTH"
         ? "Growth"
-        : v?.subscription?.plan === "CAMPUS_PRO"
-          ? "Campus Pro"
+        : v?.subscription?.plan === "PRO"
+          ? "Business Pro"
           : "Starter";
 
   const planPrice =
@@ -91,18 +91,18 @@ export default function SettingsPage() {
       ? "₦2,000 / month"
       : v?.subscription?.plan === "GROWTH"
         ? "₦5,000 / month"
-        : v?.subscription?.plan === "CAMPUS_PRO"
+        : v?.subscription?.plan === "PRO"
           ? "₦10,000 / month"
           : "₦2,000 / month";
 
   const planDesc =
     v?.subscription?.plan === "STARTER"
-      ? "Up to 50 students"
+      ? "Up to 50 customers"
       : v?.subscription?.plan === "GROWTH"
-        ? "Up to 200 students"
-        : v?.subscription?.plan === "CAMPUS_PRO"
-          ? "Unlimited students"
-          : "Up to 50 students";
+        ? "Up to 200 customers"
+        : v?.subscription?.plan === "PRO"
+          ? "Unlimited customers"
+          : "Up to 50 customers";
 
   const subStatus = v?.subscription?.status ?? "TRIAL";
 
@@ -158,7 +158,7 @@ export default function SettingsPage() {
                       Business profile
                     </h2>
                     <p className="text-xs text-vodium-cream/35">
-                      How your shop appears to students
+                      How your shop appears to customers
                     </p>
                   </div>
                 </div>
@@ -183,16 +183,16 @@ export default function SettingsPage() {
                     </DarkField>
                   </div>
 
-                  <DarkField label="Campus location">
+                  <DarkField label="Business location">
                     <div className="relative">
                       <MapPin
                         size={15}
                         className="absolute right-3.5 top-1/2 -translate-y-1/2 text-vodium-cream/30 pointer-events-none"
                       />
                       <input
-                        name="campusLocation"
+                        name="location"
                         type="text"
-                        defaultValue={v?.campusLocation ?? ""}
+                        defaultValue={v?.location ?? ""}
                         className="input-dark pl-9"
                       />
                     </div>
@@ -263,7 +263,7 @@ export default function SettingsPage() {
               <div className="space-y-1">
                 {[
                   {
-                    label: "Auto-reminders to students",
+                    label: "Auto-reminders to customers",
                     sub: "2 days before due date",
                     defaultOn: true,
                   },
@@ -274,7 +274,7 @@ export default function SettingsPage() {
                   },
                   {
                     label: "Payment confirmations",
-                    sub: "When a student marks credit paid",
+                    sub: "When a customer marks credit paid",
                     defaultOn: true,
                   },
                   {
@@ -487,8 +487,8 @@ export default function SettingsPage() {
                 Pro tip
               </p>
               <p className="text-xs text-vodium-cream/50 leading-relaxed">
-                Campus Pro vendors recover up to 3× more credit. Unlimited
-                students, priority WhatsApp delivery, and weekly recovery
+                Business Pro vendors recover up to 3× more credit. Unlimited
+                customers, priority WhatsApp delivery, and weekly recovery
                 reports.
               </p>
             </div>

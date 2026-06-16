@@ -22,7 +22,7 @@ interface VendorRow {
   status: string;
   vendorType: string;
   createdAt: string;
-  university: { name: string; shortName: string | null };
+  community: { name: string; shortName: string | null };
   subscription: { status: string; plan: string } | null;
   _count: { credits: number };
   overdueCount: number;
@@ -83,7 +83,7 @@ export default function SupportPage() {
       v.ownerName.toLowerCase().includes(q) ||
       v.phone.includes(q) ||
       v.email.toLowerCase().includes(q) ||
-      (v.university.shortName ?? v.university.name).toLowerCase().includes(q);
+      (v.community.shortName ?? v.community.name).toLowerCase().includes(q);
 
     const matchFilter =
       filter === "all"
@@ -111,7 +111,7 @@ export default function SupportPage() {
             Support Centre
           </h1>
           <p className="text-vodium-cream/35 text-sm mt-1">
-            Search and assist vendors across all campuses
+            Search and assist vendors across all communities
           </p>
         </div>
         <button
@@ -170,7 +170,7 @@ export default function SupportPage() {
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name, phone, email, university…"
+              placeholder="Search by name, phone, email, community..."
               className="w-full bg-black/30 border border-white/[0.08] rounded-xl pl-9 pr-4 py-2.5 text-sm text-vodium-cream placeholder:text-vodium-cream/20 focus:outline-none focus:border-vodium-gold/40 transition"
             />
           </div>
@@ -191,7 +191,7 @@ export default function SupportPage() {
         <div className="hidden lg:grid grid-cols-12 px-5 py-2.5 bg-black/20 text-[10px] font-medium text-vodium-cream/25 uppercase tracking-wider">
           <span className="col-span-3">Vendor</span>
           <span className="col-span-2">Contact</span>
-          <span className="col-span-2">University</span>
+          <span className="col-span-2">Community</span>
           <span className="col-span-1 text-center">Credits</span>
           <span className="col-span-1 text-center">Overdue</span>
           <span className="col-span-1 text-center">Status</span>
@@ -252,13 +252,13 @@ export default function SupportPage() {
                     </a>
                   </div>
 
-                  {/* University */}
+                  {/* Community */}
                   <div className="col-span-2 mb-1 lg:mb-0">
                     <div className="flex items-center gap-1.5 text-xs text-vodium-cream/50">
                       <Building2 size={11} className="flex-shrink-0" />
                       <span className="truncate">
-                        {v.university.shortName ??
-                          v.university.name.split(" ").slice(0, 2).join(" ")}
+                        {v.community.shortName ??
+                          v.community.name.split(" ").slice(0, 2).join(" ")}
                       </span>
                     </div>
                     <p className="text-[10px] text-vodium-cream/25 mt-0.5 ml-4">

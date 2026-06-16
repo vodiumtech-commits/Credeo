@@ -19,7 +19,7 @@ export async function GET() {
     const vendors = await prisma.vendor.findMany({
       orderBy: { createdAt: "desc" },
       include: {
-        university:   { select: { name: true, shortName: true } },
+        community:    { select: { name: true, shortName: true } },
         subscription: { select: { status: true, plan: true } },
         _count:       { select: { credits: true } },
       },
@@ -46,7 +46,7 @@ export async function GET() {
         status:       v.status,
         vendorType:   v.vendorType,
         createdAt:    v.createdAt,
-        university:   v.university,
+        community:    v.community,
         subscription: v.subscription,
         _count:       v._count,
         overdueCount: ov?._count._all ?? 0,

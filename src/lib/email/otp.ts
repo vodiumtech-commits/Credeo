@@ -79,7 +79,7 @@ function buildHtml(otp: string, action: string) {
         <tr>
           <td style="background:#F9F9F7;padding:20px 40px;border-top:1px solid #F0F0EC;">
             <p style="margin:0;font-size:12px;color:#9CA3AF;">
-              © ${new Date().getFullYear()} Vodium Ledger · For campus vendors across Nigeria
+              © ${new Date().getFullYear()} Vodium Ledger · For vendors across Nigeria
             </p>
           </td>
         </tr>

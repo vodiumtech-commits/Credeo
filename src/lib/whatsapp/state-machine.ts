@@ -40,7 +40,7 @@ export interface StepResult {
 }
 
 export type SideEffect =
-  | { type: "CREATE_VENDOR";  data: { name: string; businessName: string; universityShortName: string; phone: string } }
+  | { type: "CREATE_VENDOR";  data: { name: string; businessName: string; communityName: string; phone: string } }
   | { type: "CREATE_CREDIT";  data: { vendorId: string; customerName: string; customerPhone: string; amount: number; dueInMinutes: number } }
   | { type: "MARK_PAID";      data: { vendorId: string; customerName: string } }
   | { type: "FETCH_LIST";     data: { vendorId: string } }
@@ -66,6 +66,15 @@ export function detectIntent(body: string): Intent {
 export function step(session: SessionContext, msg: IncomingMessage): StepResult {
   const body = msg.body.trim();
   const intent = detectIntent(body);
+  const upperBody = body.toUpperCase();
+
+  if (intent === "HELP") {
+    return { reply: messages.help(), nextState: "IDLE", contextPatch: clearFlowContext() };
+  }
+
+  if (upperBody === "CANCEL" || upperBody === "STOP") {
+    return { reply: messages.cancelled(), nextState: "IDLE", contextPatch: clearFlowContext() };
+  }
 
   // ── mid-flow states (sticky — always take priority over intent) ──────────
 
@@ -84,20 +93,21 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
         contextPatch: { businessName: body },
       };
 
+    case "ONBOARDING_UNIVERSITY":
     case "ONBOARDING_COMMUNITY": {
       const businessName = String(session.context.businessName ?? "your shop");
-      // Pass the raw input — parseUniversity() in the route handler normalises it.
+      // Pass the raw input — parseCommunity() in the route handler normalises it.
       return {
         reply: messages.onboardingDone(businessName),
         nextState: "IDLE",
-        contextPatch: { universityShortName: body },
+        contextPatch: { communityName: body },
         sideEffects: [
           {
             type: "CREATE_VENDOR",
             data: {
               name: String(session.context.ownerName ?? "Vendor"),
               businessName,
-              universityShortName: body,
+              communityName: body,
               phone: msg.fromPhone,
             },
           },
@@ -309,4 +319,15 @@ export function parseDueDuration(input: string): number | null {
   }
 
   return null;
+}
+
+function clearFlowContext(): Record<string, null> {
+  return {
+    ownerName: null,
+    businessName: null,
+    communityName: null,
+    creditCustomerName: null,
+    creditCustomerPhone: null,
+    creditAmount: null,
+  };
 }

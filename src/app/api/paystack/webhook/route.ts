@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
-import type { SubscriptionPlan } from "@prisma/client";
+import {
+  activateSubscriptionFromPaystackData,
+  parseMetadata,
+  type PaystackPaymentData,
+} from "@/lib/paystack/subscription";
 
-interface PaystackData {
+interface PaystackData extends PaystackPaymentData {
   subscription_code?: string;
   customer?: { id: number | string };
-  metadata?: { plan?: string };
+  metadata?: unknown;
   next_payment_date?: string;
   paid_at?: string;
   subscription?: { subscription_code: string };
@@ -22,9 +26,9 @@ export async function POST(req: NextRequest) {
   const signature = req.headers.get("x-paystack-signature") ?? "";
 
   // Fail closed — reject all traffic if secret is not configured in production.
-  const secret = process.env.PAYSTACK_WEBHOOK_SECRET;
+  const secret = process.env.PAYSTACK_WEBHOOK_SECRET ?? process.env.PAYSTACK_SECRET_KEY;
   if (!secret && process.env.NODE_ENV === "production") {
-    console.error("[paystack/webhook] PAYSTACK_WEBHOOK_SECRET not set — rejecting all webhook traffic");
+    console.error("[paystack/webhook] Paystack secret not set — rejecting all webhook traffic");
     return new NextResponse("Webhook not configured", { status: 503 });
   }
 
@@ -56,29 +60,18 @@ export async function POST(req: NextRequest) {
     case "subscription.create": {
       const paystackCode = data.subscription_code;
       const customerId = data.customer?.id?.toString();
-      const planFromMetadata = data.metadata?.plan;
-      const nextPaymentDate = data.next_payment_date ? new Date(data.next_payment_date) : null;
+      const metadata = parseMetadata(data.metadata);
 
-      if (paystackCode && customerId) {
-        const sub = await prisma.vendorSubscription.findFirst({
-          where: { paystackCustomerId: customerId },
+      if (paystackCode && customerId && metadata.vendorId) {
+        const sub = await prisma.vendorSubscription.findUnique({
+          where: { vendorId: metadata.vendorId },
         });
         if (sub) {
           await prisma.vendorSubscription.update({
             where: { id: sub.id },
             data: {
+              paystackCustomerId: customerId,
               paystackSubscriptionCode: paystackCode,
-              status: "ACTIVE",
-              ...(planFromMetadata ? { plan: planFromMetadata as SubscriptionPlan } : {}),
-              ...(nextPaymentDate ? { currentPeriodEnd: nextPaymentDate } : {}),
-            },
-          });
-          await prisma.notification.create({
-            data: {
-              vendorId: sub.vendorId,
-              title: "Subscription Active",
-              message: `Your ${planFromMetadata || sub.plan} plan is now active. Thank you for choosing Vodium!`,
-              type: "SUCCESS",
             },
           });
         }
@@ -87,32 +80,14 @@ export async function POST(req: NextRequest) {
     }
 
     case "charge.success": {
-      const customerId = data.customer?.id?.toString();
-      const paidAt = data.paid_at ? new Date(data.paid_at) : new Date();
-      const nextMonth = new Date(paidAt);
-      nextMonth.setMonth(nextMonth.getMonth() + 1);
-
-      if (customerId) {
-        const sub = await prisma.vendorSubscription.findFirst({
-          where: { paystackCustomerId: customerId },
+      const metadata = parseMetadata(data.metadata);
+      if (metadata.vendorId) {
+        const activated = await activateSubscriptionFromPaystackData(metadata.vendorId, {
+          ...data,
+          status: "success",
         });
-        if (sub) {
-          await prisma.vendorSubscription.update({
-            where: { id: sub.id },
-            data: {
-              status: "ACTIVE",
-              currentPeriodStart: paidAt,
-              currentPeriodEnd: nextMonth,
-            },
-          });
-          await prisma.notification.create({
-            data: {
-              vendorId: sub.vendorId,
-              title: "Payment Successful",
-              message: "Your monthly subscription payment was processed successfully.",
-              type: "SUCCESS",
-            },
-          });
+        if (!activated.ok) {
+          console.error("[paystack/webhook] charge.success not activated:", activated.error);
         }
       }
       break;

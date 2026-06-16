@@ -49,7 +49,7 @@ export default async function DashboardPage() {
   const dueSoonList = credits
     .filter((c) => c.status === "DUE_SOON")
     .slice(0, 5);
-  const totalStudents = new Set(credits.map((c) => c.studentId)).size;
+  const totalCustomers = new Set(credits.map((c) => c.studentId)).size;
   const creditsOwing = outstanding.filter(
     (c) => Number(c.amount) - Number(c.amountRepaid) > 0,
   ).length;
@@ -114,7 +114,7 @@ export default async function DashboardPage() {
             {vendor.businessName}
           </h1>
           <p className="text-sm text-vodium-black/50 mt-0.5">
-            {vendor.campusLocation ?? "Campus"}
+            {vendor.location ?? vendor.community?.shortName ?? vendor.community?.name ?? "Community"}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -150,7 +150,7 @@ export default async function DashboardPage() {
         <StatCard
           label="Customers owing"
           value={String(creditsOwing)}
-          sub={`of ${totalStudents} total customers`}
+          sub={`of ${totalCustomers} total customers`}
           icon={<Users size={16} />}
           delay={0.16}
         />
@@ -292,7 +292,7 @@ export default async function DashboardPage() {
                 Customers
               </p>
               <p className="font-serif text-xl text-vodium-cream mt-1">
-                {totalStudents}
+                {totalCustomers}
               </p>
             </div>
             <div>

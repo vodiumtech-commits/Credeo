@@ -1,8 +1,13 @@
 -- CreateEnum
-CREATE TYPE "NotificationType" AS ENUM ('INFO', 'SUCCESS', 'WARNING', 'DANGER');
+DO $$
+BEGIN
+    CREATE TYPE "NotificationType" AS ENUM ('INFO', 'SUCCESS', 'WARNING', 'DANGER');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
 -- CreateTable
-CREATE TABLE "Notification" (
+CREATE TABLE IF NOT EXISTS "Notification" (
     "id" TEXT NOT NULL,
     "vendorId" TEXT NOT NULL,
     "title" TEXT NOT NULL,
@@ -15,13 +20,25 @@ CREATE TABLE "Notification" (
 );
 
 -- CreateIndex
-CREATE INDEX "Notification_vendorId_idx" ON "Notification"("vendorId");
+CREATE INDEX IF NOT EXISTS "Notification_vendorId_idx" ON "Notification"("vendorId");
 
 -- CreateIndex
-CREATE INDEX "Notification_read_idx" ON "Notification"("read");
+CREATE INDEX IF NOT EXISTS "Notification_read_idx" ON "Notification"("read");
 
 -- CreateIndex
-CREATE INDEX "Notification_createdAt_idx" ON "Notification"("createdAt");
+CREATE INDEX IF NOT EXISTS "Notification_createdAt_idx" ON "Notification"("createdAt");
 
 -- AddForeignKey
-ALTER TABLE "Notification" ADD CONSTRAINT "Notification_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints
+        WHERE table_name = 'Notification'
+          AND constraint_name = 'Notification_vendorId_fkey'
+    ) THEN
+        ALTER TABLE "Notification"
+            ADD CONSTRAINT "Notification_vendorId_fkey"
+            FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id")
+            ON DELETE RESTRICT ON UPDATE CASCADE;
+    END IF;
+END $$;

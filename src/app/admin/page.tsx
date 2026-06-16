@@ -16,8 +16,8 @@ export default async function AdminPage() {
 
   const [
     vendorStats,
-    totalStudents,
-    studentsWithHistory,
+    totalCustomers,
+    customersWithHistory,
     creditAmounts,
     totalRepaid,
     activeSubs,
@@ -26,17 +26,17 @@ export default async function AdminPage() {
     paidCredits,
     writtenOffCredits,
     recentVendors,
-    universityBreakdown,
+    communityBreakdown,
     recentAudit,
     monthlyCredits,
   ] = await Promise.all([
     // Vendor counts by status
     prisma.vendor.groupBy({ by: ["status"], _count: { _all: true } }),
 
-    // Total students
+    // Total customers
     prisma.student.count(),
 
-    // Students who have at least one credit event (have history)
+    // Customers who have at least one credit event (have history)
     prisma.student.count({ where: { credits: { some: {} } } }),
 
     // Sum of all credit amounts
@@ -68,14 +68,14 @@ export default async function AdminPage() {
       take: 6,
       orderBy: { createdAt: "desc" },
       include: {
-        university: { select: { shortName: true, name: true } },
+        community: { select: { shortName: true, name: true } },
         subscription: { select: { plan: true, status: true, monthlyAmount: true } },
         _count: { select: { credits: true } },
       },
     }),
 
-    // University breakdown
-    prisma.university.findMany({
+    // Community breakdown
+    prisma.community.findMany({
       include: {
         _count: { select: { vendors: true, students: true } },
       },
@@ -118,13 +118,13 @@ export default async function AdminPage() {
   const repaymentRate = totalCredits > 0 ? Math.round((paidCredits / totalCredits) * 100) : 0;
   const defaultRate = totalCredits > 0 ? Math.round((writtenOffCredits / totalCredits) * 100) : 0;
 
-  // Aggregate student counts per university for recent credits
-  const uniData = universityBreakdown.map((u) => ({
+  // Aggregate customer counts per community for recent credits
+  const communityData = communityBreakdown.map((u) => ({
     shortName: u.shortName ?? u.name.split(" ").map((w) => w[0]).join(""),
     vendors: u._count.vendors,
-    students: u._count.students,
+    customers: u._count.students,
   }));
-  const maxUniVendors = Math.max(...uniData.map((u) => u.vendors), 1);
+  const maxCommunityVendors = Math.max(...communityData.map((u) => u.vendors), 1);
 
   // Monthly chart data
   const chartMax = Math.max(...monthlyCredits.map((m) => m.total), 1);
@@ -166,9 +166,9 @@ export default async function AdminPage() {
           icon={<Store size={18} />}
         />
         <AdminKpi
-          label="Total Students"
-          value={totalStudents.toLocaleString()}
-          sub={`${studentsWithHistory.toLocaleString()} with credit history`}
+          label="Total Customers"
+          value={totalCustomers.toLocaleString()}
+          sub={`${customersWithHistory.toLocaleString()} with credit history`}
           icon={<Users size={18} />}
         />
         <AdminKpi
@@ -262,31 +262,31 @@ export default async function AdminPage() {
           )}
         </div>
 
-        {/* University coverage bars */}
+        {/* Community coverage bars */}
         <div className="bg-vodium-charcoal border border-white/[0.06] rounded-2xl p-6">
           <div className="flex items-start justify-between mb-6">
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <Shield size={15} className="text-vodium-gold" />
                 <h2 className="font-semibold text-vodium-cream text-sm">
-                  University Coverage
+                  Community Coverage
                 </h2>
               </div>
-              <p className="text-vodium-cream/40 text-xs">Vendor penetration by campus</p>
+              <p className="text-vodium-cream/40 text-xs">Vendor coverage by community</p>
             </div>
             <span className="badge-active text-[10px] px-2.5 py-1 rounded-full font-medium">
-              {uniData.length} campuses
+              {communityData.length} communities
             </span>
           </div>
 
-          {uniData.length === 0 ? (
+          {communityData.length === 0 ? (
             <div className="h-36 flex flex-col items-center justify-center gap-2 text-vodium-cream/20">
               <Shield size={28} />
-              <span className="text-sm">No university data yet</span>
+              <span className="text-sm">No community data yet</span>
             </div>
           ) : (
             <div className="space-y-4">
-              {uniData.map((u) => (
+              {communityData.map((u) => (
                 <div key={u.shortName}>
                   <div className="flex items-center justify-between mb-1.5 text-xs">
                     <span className="text-vodium-cream/80 font-medium truncate max-w-[120px]">
@@ -294,14 +294,14 @@ export default async function AdminPage() {
                     </span>
                     <div className="flex items-center gap-3 text-vodium-cream/40 flex-shrink-0">
                       <span>{u.vendors} vendor{u.vendors !== 1 ? "s" : ""}</span>
-                      <span>{u.students.toLocaleString()} students</span>
+                      <span>{u.customers.toLocaleString()} customers</span>
                     </div>
                   </div>
                   <div className="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
                     <div
                       className="h-full rounded-full transition-all"
                       style={{
-                        width: `${(u.vendors / maxUniVendors) * 100}%`,
+                        width: `${(u.vendors / maxCommunityVendors) * 100}%`,
                         background: "linear-gradient(to right, #C9A961, rgba(201,169,97,0.6))",
                       }}
                     />
@@ -357,7 +357,7 @@ export default async function AdminPage() {
                           {v.businessName}
                         </p>
                         <p className="text-xs text-vodium-cream/40 mt-0.5">
-                          {v.university.shortName ?? v.university.name} ·{" "}
+                          {v.community.shortName ?? v.community.name} ·{" "}
                           {v.vendorType.replace(/_/g, " ")}
                         </p>
                       </div>
@@ -594,12 +594,12 @@ function PlanBadge({ plan }: { plan: string }) {
   const map: Record<string, string> = {
     STARTER:    "text-vodium-cream/50 bg-white/[0.06]",
     GROWTH:     "text-vodium-gold bg-vodium-gold/10",
-    CAMPUS_PRO: "text-purple-400 bg-purple-400/10",
+    PRO:        "text-purple-400 bg-purple-400/10",
   };
   const labels: Record<string, string> = {
     STARTER: "Starter",
     GROWTH: "Growth",
-    CAMPUS_PRO: "Pro",
+    PRO: "Pro",
   };
   return (
     <span

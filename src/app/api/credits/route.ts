@@ -30,6 +30,7 @@ export async function GET(req: NextRequest) {
             OR: [
               { fullName: { contains: search, mode: "insensitive" as const } },
               { matricNumber: { contains: search, mode: "insensitive" as const } },
+              { phone: { contains: search, mode: "insensitive" as const } },
             ],
           },
         }
@@ -109,7 +110,7 @@ export async function POST(req: NextRequest) {
       fullName: customerName,
       phone: normalisedCustomerPhone,
       matricNumber: customerID ?? null,
-      universityId: vendor.universityId,
+      communityId: vendor.communityId,
     },
   });
 

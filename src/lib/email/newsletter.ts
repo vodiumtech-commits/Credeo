@@ -50,9 +50,9 @@ function buildWelcomeHtml(email: string) {
               You're in.
             </h1>
             <p style="margin:0 0 24px;font-size:15px;color:#6B7280;line-height:1.6;">
-              Thanks for subscribing. We write about campus credit data, Nigerian fintech,
+              Thanks for subscribing. We write about vendor credit data, Nigerian fintech,
               and what we're learning building Vodium Ledger — the WhatsApp-first credit ledger for
-              Nigerian campus vendors.
+              Nigerian vendors.
             </p>
             <p style="margin:0 0 32px;font-size:15px;color:#6B7280;line-height:1.6;">
               Expect one article every 2–4 weeks. No spam. Unsubscribe any time.
@@ -63,7 +63,7 @@ function buildWelcomeHtml(email: string) {
                 <td style="padding:24px 32px;">
                   <p style="margin:0 0 4px;font-size:11px;color:#C9A961;letter-spacing:0.2em;text-transform:uppercase;">Next up</p>
                   <p style="margin:0;font-family:Georgia,serif;font-size:16px;color:#FAFAF7;line-height:1.5;">
-                    Why Nigerian campus vendors lose ₦2.4 billion to informal credit every year
+                    Why Nigerian vendors lose billions to informal credit every year
                   </p>
                 </td>
               </tr>
@@ -79,7 +79,7 @@ function buildWelcomeHtml(email: string) {
         <tr>
           <td style="background:#F9F9F7;padding:20px 40px;border-top:1px solid #F0F0EC;">
             <p style="margin:0;font-size:12px;color:#9CA3AF;">
-              © ${new Date().getFullYear()} Vodium Ledger · For campus vendors across Nigeria
+              © ${new Date().getFullYear()} Vodium Ledger · For vendors across Nigeria
             </p>
           </td>
         </tr>

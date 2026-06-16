@@ -1,8 +1,13 @@
 -- Migration: add AdminUser table for multi-role admin team
 
-CREATE TYPE "AdminRole" AS ENUM ('SUPER_ADMIN', 'CFO', 'CUSTOMER_CARE', 'ANALYTICS');
+DO $$
+BEGIN
+    CREATE TYPE "AdminRole" AS ENUM ('SUPER_ADMIN', 'CFO', 'CUSTOMER_CARE', 'ANALYTICS');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
-CREATE TABLE "AdminUser" (
+CREATE TABLE IF NOT EXISTS "AdminUser" (
     "id"             TEXT          NOT NULL,
     "name"           TEXT          NOT NULL,
     "email"          TEXT          NOT NULL,
@@ -18,7 +23,7 @@ CREATE TABLE "AdminUser" (
     CONSTRAINT "AdminUser_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "AdminUser_email_key"       ON "AdminUser"("email");
-CREATE UNIQUE INDEX "AdminUser_inviteToken_key" ON "AdminUser"("inviteToken");
-CREATE INDEX        "AdminUser_email_idx"       ON "AdminUser"("email");
-CREATE INDEX        "AdminUser_inviteToken_idx" ON "AdminUser"("inviteToken");
+CREATE UNIQUE INDEX IF NOT EXISTS "AdminUser_email_key"       ON "AdminUser"("email");
+CREATE UNIQUE INDEX IF NOT EXISTS "AdminUser_inviteToken_key" ON "AdminUser"("inviteToken");
+CREATE INDEX        IF NOT EXISTS "AdminUser_email_idx"       ON "AdminUser"("email");
+CREATE INDEX        IF NOT EXISTS "AdminUser_inviteToken_idx" ON "AdminUser"("inviteToken");

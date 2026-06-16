@@ -7,7 +7,7 @@ import type { SubscriptionPlan, SubscriptionStatus } from "@prisma/client";
 const PLAN_LABELS: Record<SubscriptionPlan, string> = {
   STARTER:    "Starter",
   GROWTH:     "Growth",
-  CAMPUS_PRO: "Campus Pro",
+  PRO:        "Business Pro",
 };
 
 export function SubscriptionActions({
@@ -23,12 +23,12 @@ export function SubscriptionActions({
   const isExpired = currentStatus === "CANCELLED" || currentStatus === "EXPIRED";
   const isPastDue = currentStatus === "PAST_DUE";
 
-  // If on Campus Pro already, no upgrade available
+  // If on Business Pro already, no upgrade available
   const upgradePlans: SubscriptionPlan[] =
     currentPlan === "STARTER"
-      ? ["GROWTH", "CAMPUS_PRO"]
+      ? ["GROWTH", "PRO"]
       : currentPlan === "GROWTH"
-      ? ["CAMPUS_PRO"]
+      ? ["PRO"]
       : [];
 
   async function handleSubscribe(plan: SubscriptionPlan) {
@@ -51,7 +51,7 @@ export function SubscriptionActions({
     }
   }
 
-  if (currentPlan === "CAMPUS_PRO" && currentStatus === "ACTIVE") {
+  if (currentPlan === "PRO" && currentStatus === "ACTIVE") {
     return (
       <p className="text-xs text-vodium-cream/35 text-center py-1">
         You&rsquo;re on the highest plan.
@@ -86,7 +86,7 @@ export function SubscriptionActions({
           onClick={() => handleSubscribe(plan)}
           disabled={!!loading}
           className={`w-full py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 ${
-            plan === "CAMPUS_PRO"
+            plan === "PRO"
               ? "btn-gold"
               : "border border-white/[0.12] text-vodium-cream hover:border-vodium-gold hover:text-vodium-gold"
           }`}

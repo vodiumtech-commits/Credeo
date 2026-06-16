@@ -8,10 +8,10 @@ export const dynamic = "force-dynamic";
 const PLAN_COLORS: Record<string, string> = {
   STARTER:    "text-vodium-cream/50 bg-vodium-slate border-vodium-slate",
   GROWTH:     "text-vodium-gold bg-vodium-gold/10 border-vodium-gold/20",
-  CAMPUS_PRO: "text-purple-400 bg-purple-400/10 border-purple-400/20",
+  PRO:        "text-purple-400 bg-purple-400/10 border-purple-400/20",
 };
 const PLAN_LABELS: Record<string, string> = {
-  STARTER: "Starter", GROWTH: "Growth", CAMPUS_PRO: "Campus Pro",
+  STARTER: "Starter", GROWTH: "Growth", PRO: "Business Pro",
 };
 
 export default async function AdminVendorsPage() {
@@ -19,7 +19,7 @@ export default async function AdminVendorsPage() {
     prisma.vendor.findMany({
       orderBy: { createdAt: "desc" },
       include: {
-        university: { select: { shortName: true, name: true } },
+        community: { select: { shortName: true, name: true } },
         subscription: { select: { plan: true, status: true, monthlyAmount: true } },
       },
     }),
@@ -32,7 +32,7 @@ export default async function AdminVendorsPage() {
 
   const vendorIds = vendors.map((v) => v.id);
 
-  const [creditAggs, studentAggs] = await Promise.all([
+  const [creditAggs, customerAggs] = await Promise.all([
     prisma.credit.groupBy({
       by:    ["vendorId"],
       where: { vendorId: { in: vendorIds } },
@@ -47,9 +47,9 @@ export default async function AdminVendorsPage() {
   ]);
 
   const aggMap = new Map(creditAggs.map((a) => [a.vendorId, a]));
-  const studentCountMap = new Map<string, number>();
-  for (const { vendorId } of studentAggs) {
-    studentCountMap.set(vendorId, (studentCountMap.get(vendorId) ?? 0) + 1);
+  const customerCountMap = new Map<string, number>();
+  for (const { vendorId } of customerAggs) {
+    customerCountMap.set(vendorId, (customerCountMap.get(vendorId) ?? 0) + 1);
   }
 
   const activeVendors   = vendors.filter((v) => v.status === "ACTIVE" && v.subscription?.status !== "TRIAL").length;
@@ -60,7 +60,7 @@ export default async function AdminVendorsPage() {
   const mrr    = planCounts.filter((p) => p.status === "ACTIVE").reduce((s, p) => s + Number(p._sum.monthlyAmount ?? 0), 0);
   const avgMrr = activeVendors > 0 ? Math.round(mrr / activeVendors) : 0;
 
-  const planSummary = (["STARTER", "GROWTH", "CAMPUS_PRO"] as const).map((plan) => {
+  const planSummary = (["STARTER", "GROWTH", "PRO"] as const).map((plan) => {
     const rows       = planCounts.filter((p) => p.plan === plan);
     const count      = rows.reduce((s, p) => s + p._count._all, 0);
     const mrrContrib = rows.filter((p) => p.status === "ACTIVE").reduce((s, p) => s + Number(p._sum.monthlyAmount ?? 0), 0);
@@ -76,13 +76,13 @@ export default async function AdminVendorsPage() {
       ownerName:    v.ownerName,
       phone:        v.phone,
       status:       v.status as VendorStatus,
-      university:   { shortName: v.university.shortName ?? null, name: v.university.name },
+      community:    { shortName: v.community.shortName ?? null, name: v.community.name },
       subscription: v.subscription
         ? { plan: v.subscription.plan, status: v.subscription.status, monthlyAmount: Number(v.subscription.monthlyAmount) }
         : null,
       totalTracked:  Number(agg?._sum.amount ?? 0),
       creditsLogged: agg?._count._all ?? 0,
-      studentsCount: studentCountMap.get(v.id) ?? 0,
+      customersCount: customerCountMap.get(v.id) ?? 0,
       subMrr:        v.subscription?.status === "ACTIVE" ? Number(v.subscription.monthlyAmount ?? 0) : 0,
       createdAt:     v.createdAt.toISOString(),
     };
