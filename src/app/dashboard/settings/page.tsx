@@ -264,7 +264,7 @@ export default function SettingsPage() {
                 {[
                   {
                     label: "Auto-reminders to customers",
-                    sub: "2 days before due date",
+                    sub: "Adaptive timing before the due date or time",
                     defaultOn: true,
                   },
                   {

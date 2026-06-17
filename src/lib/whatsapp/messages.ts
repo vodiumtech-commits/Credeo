@@ -65,10 +65,11 @@ export const messages = {
     customerName: string,
     amount: number,
     dueDateText: string,
+    reminderText: string,
   ) =>
     `✅ Saved.\n\n` +
     `*${customerName}* owes you *${formatNaira(amount)}*, due ${dueDateText}.\n\n` +
-    `I'll send them a polite reminder 2 days before the due date.\n\n` +
+    `${reminderText}\n\n` +
     `Reply *ADD* for another, or *LIST* to see everyone who owes you.`,
 
   invalidAmount: () =>

@@ -132,7 +132,13 @@ export default function RegisterPage() {
 
   // Build full E.164 phone: dial code + stripped digits
   const fullPhone = (): string => {
-    const digits = form.phone.replace(/\D/g, "");
+    let digits = form.phone.replace(/\D/g, "");
+    if (phoneCountry === "NG" && digits.startsWith("0")) {
+      digits = digits.slice(1);
+    }
+    if (phoneCountry === "US" && digits.length === 11 && digits.startsWith("1")) {
+      digits = digits.slice(1);
+    }
     return `${country.dial}${digits}`;
   };
 
@@ -190,7 +196,7 @@ export default function RegisterPage() {
     community: form.community,
     ownerName: form.ownerName,
     phone: fullPhone(), // always sent as +dialcode + digits
-    email: form.email,
+    email: form.email.trim().toLowerCase(),
     password: form.password,
   });
 

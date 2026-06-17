@@ -137,7 +137,7 @@ export default function NewCreditPage() {
               , due {dueDate()}.
             </p>
             <p className="text-xs text-vodium-cream/30 mb-8">
-              A polite reminder will be sent 2 days before the due date.
+              A polite reminder will be sent before the due time.
             </p>
             <div className="space-y-3">
               <ShimmerButton
@@ -499,7 +499,7 @@ export default function NewCreditPage() {
               <span className="text-vodium-cream/70 font-medium">
                 {form.customerName}
               </span>{" "}
-              2 days before the due date. Their Vodium score will be updated
+              before the due time. Their Vodium score will be updated
               when they pay.
             </div>
 

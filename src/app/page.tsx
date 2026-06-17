@@ -513,7 +513,7 @@ export default function LandingPage() {
                 number: "02",
                 icon: <Bell size={22} />,
                 title: "Auto-reminders to customers",
-                body: "2 days before repayment is due, a respectful WhatsApp message goes to the customer. No chasing from you. Dignity intact for them.",
+                body: "Before repayment is due, a respectful WhatsApp message goes to the customer at the right time. No chasing from you. Dignity intact for them.",
               },
               {
                 number: "03",

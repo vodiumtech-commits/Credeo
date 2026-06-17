@@ -95,21 +95,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       last:  i === arr.length - 1,
     }));
 
-  function SidebarContent({ onClose }: { onClose?: () => void }) {
+  function SidebarContent({ onClose, showLogo = true }: { onClose?: () => void; showLogo?: boolean }) {
     return (
       <div className="flex flex-col h-full">
         {/* Logo */}
-        <div className="px-5 py-5 border-b border-white/[0.05] flex-shrink-0">
-          <Link href="/" className="flex items-center gap-3 group" onClick={onClose}>
-            <div className="w-9 h-9 rounded-2xl bg-vodium-charcoal border border-vodium-gold/30 flex items-center justify-center group-hover:border-vodium-gold/60 transition-all duration-200 shadow-[0_0_12px_rgba(201,169,97,0.08)]">
-              <span className="font-serif text-vodium-gold text-lg leading-none">V</span>
-            </div>
-            <div>
-              <p className="font-serif text-[11px] tracking-[0.28em] text-vodium-gold leading-none">VODIUM</p>
-              <p className="text-[9px] text-vodium-cream/20 tracking-[0.22em] mt-1.5 uppercase font-medium">Ledger</p>
-            </div>
-          </Link>
-        </div>
+        {showLogo && (
+          <div className="px-5 py-5 border-b border-white/[0.05] flex-shrink-0">
+            <Link href="/" className="flex items-center gap-3 group" onClick={onClose}>
+              <div className="w-9 h-9 rounded-2xl bg-vodium-charcoal border border-vodium-gold/30 flex items-center justify-center group-hover:border-vodium-gold/60 transition-all duration-200 shadow-[0_0_12px_rgba(201,169,97,0.08)]">
+                <span className="font-serif text-vodium-gold text-lg leading-none">V</span>
+              </div>
+              <div>
+                <p className="font-serif text-[11px] tracking-[0.28em] text-vodium-gold leading-none">VODIUM</p>
+                <p className="text-[9px] text-vodium-cream/20 tracking-[0.22em] mt-1.5 uppercase font-medium">Ledger</p>
+              </div>
+            </Link>
+          </div>
+        )}
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-5 space-y-0.5 overflow-y-auto">
@@ -248,7 +250,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <X size={18} />
           </button>
         </div>
-        <SidebarContent onClose={() => setSidebarOpen(false)} />
+        <SidebarContent onClose={() => setSidebarOpen(false)} showLogo={false} />
       </aside>
 
       {/* Main */}

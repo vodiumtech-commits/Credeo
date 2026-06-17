@@ -169,7 +169,12 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
       }
 
       return {
-        reply: messages.addCreditConfirmed(customerName, amount, dueText),
+        reply: messages.addCreditConfirmed(
+          customerName,
+          amount,
+          dueText,
+          reminderPromiseForDue(dueInMinutes),
+        ),
         nextState: "IDLE",
         contextPatch: { creditCustomerName: null, creditCustomerPhone: null, creditAmount: null },
         sideEffects: [
@@ -315,6 +320,25 @@ export function parseDueDuration(input: string): number | null {
   }
 
   return null;
+}
+
+export function reminderLeadMinutesForDue(dueInMinutes: number): number {
+  if (dueInMinutes <= 30) return 5;
+  if (dueInMinutes <= 120) return 10;
+  if (dueInMinutes <= 1440) return 60;
+  return 2880;
+}
+
+export function reminderPromiseForDue(dueInMinutes: number): string {
+  const lead = reminderLeadMinutesForDue(dueInMinutes);
+  if (lead < 60) {
+    return `I'll send them a polite reminder about ${lead} minute${lead === 1 ? "" : "s"} before the due time.`;
+  }
+  if (lead < 1440) {
+    const hours = Math.round(lead / 60);
+    return `I'll send them a polite reminder about ${hours} hour${hours === 1 ? "" : "s"} before the due time.`;
+  }
+  return "I'll send them a polite reminder 2 days before the due date.";
 }
 
 function clearFlowContext(): Record<string, null> {

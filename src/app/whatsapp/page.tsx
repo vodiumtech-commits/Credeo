@@ -26,7 +26,7 @@ const chatMessages = [
   { from: "user", text: "20/07" },
   {
     from: "bot",
-    text: "✅ Credit saved!\nTunde Fashola owes ₦3,500 due 20 Jul. I'll remind them 2 days before.",
+    text: "✅ Credit saved!\nTunde Fashola owes ₦3,500 due 20 Jul. I'll remind them before the due date.",
   },
 ];
 
@@ -143,7 +143,7 @@ export default function WhatsAppPage() {
               </p>
               <p className="text-vodium-cream/55 text-base leading-relaxed">
                 Once saved, Vodium automatically messages the customer a reminder
-                2 days before the due date so you don&apos;t have to.
+                before the due date or time so you don&apos;t have to.
               </p>
             </div>
 

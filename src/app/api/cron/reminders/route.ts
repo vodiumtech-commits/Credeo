@@ -1,8 +1,8 @@
 /**
  * GET /api/cron/reminders
  *
- * Called daily by Vercel Cron (see vercel.json).
- * Finds every credit due within 2 days that hasn't been reminded yet,
+ * Called frequently by Vercel Cron (see vercel.json).
+ * Finds every credit within its reminder window that hasn't been reminded yet,
  * sends a WhatsApp message to the student, and stamps reminderSentAt.
  *
  * Protected by CRON_SECRET (Vercel injects this automatically).
@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppMessage } from "@/lib/whatsapp/outbound";
 import { messages } from "@/lib/whatsapp/messages";
+import { reminderLeadMinutesForDue } from "@/lib/whatsapp/state-machine";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,7 +34,9 @@ export async function GET(req: NextRequest) {
   const now     = new Date();
   const in2Days = new Date(now.getTime() + 2 * 86_400_000);
 
-  // Find all outstanding credits due within the next 2 days, not yet reminded.
+  // Find possible reminder candidates. Each credit is filtered below using
+  // its own adaptive reminder lead time, so hour-based debts are not told
+  // about "2 days before" reminders.
   const credits = await prisma.credit.findMany({
     where: {
       status:        { in: ["OUTSTANDING", "DUE_SOON"] },
@@ -59,6 +62,15 @@ export async function GET(req: NextRequest) {
     const vendor   = credit.vendor;
     const diffMs   = credit.dueDate.getTime() - now.getTime();
     const diffMins = Math.ceil(diffMs / 60_000);
+    const originalDueMins = Math.max(
+      1,
+      Math.ceil((credit.dueDate.getTime() - credit.dateExtended.getTime()) / 60_000)
+    );
+    const leadMins = reminderLeadMinutesForDue(originalDueMins);
+
+    if (diffMins > leadMins) {
+      continue;
+    }
     
     let dueTxt = "";
     if (diffMins < 0) {

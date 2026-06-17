@@ -117,7 +117,7 @@ export default async function DashboardPage() {
             {vendor.location ?? vendor.community?.shortName ?? vendor.community?.name ?? "Community"}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <GlowBadge color="green">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
             {vendor.subscription?.plan ?? "STARTER"} plan
@@ -329,12 +329,12 @@ export default async function DashboardPage() {
 
       {/* Overdue table */}
       <div className="bg-vodium-charcoal border border-rose-500/10 rounded-2xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-rose-500/10 flex items-center justify-between gap-4 flex-wrap">
+        <div className="px-4 sm:px-6 py-4 border-b border-rose-500/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <h2 className="font-semibold text-vodium-cream flex items-center gap-2">
             <AlertCircle size={16} className="text-rose-400" />
             Overdue credits
           </h2>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <BulkRemindButton
               overdueCount={
                 credits.filter((c) => c.status === "OVERDUE").length
@@ -359,13 +359,13 @@ export default async function DashboardPage() {
               return (
                 <div
                   key={c.id}
-                  className="px-6 py-4 flex items-center justify-between hover:bg-white/[0.02] transition-colors"
+                  className="px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:bg-white/[0.02] transition-colors"
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
                     <div className="w-8 h-8 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center flex-shrink-0">
                       <AlertCircle size={14} className="text-rose-400" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <p className="font-medium text-sm text-vodium-cream">
                         {c.student.fullName}
                       </p>
@@ -377,7 +377,7 @@ export default async function DashboardPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="text-right">
+                  <div className="text-left sm:text-right sm:pl-4">
                     <p className="font-serif text-base text-rose-400">
                       {formatNaira(Number(c.amount) - Number(c.amountRepaid))}
                     </p>
@@ -391,7 +391,7 @@ export default async function DashboardPage() {
           </div>
         )}
 
-        <div className="px-6 py-3 border-t border-white/[0.04]">
+        <div className="px-4 sm:px-6 py-3 border-t border-white/[0.04]">
           <Link
             href="/dashboard/credits"
             className="text-sm text-vodium-gold hover:text-vodium-gold/80 flex items-center gap-1 transition-colors"
@@ -403,7 +403,7 @@ export default async function DashboardPage() {
 
       {/* Due soon */}
       <div className="bg-vodium-charcoal border border-amber-500/10 rounded-2xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-amber-500/10 flex items-center justify-between">
+        <div className="px-4 sm:px-6 py-4 border-b border-amber-500/10 flex items-center justify-between gap-3">
           <h2 className="font-semibold text-vodium-cream flex items-center gap-2">
             <Clock size={16} className="text-amber-400" />
             Due soon
@@ -423,13 +423,13 @@ export default async function DashboardPage() {
               return (
                 <div
                   key={c.id}
-                  className="px-6 py-4 flex items-center justify-between hover:bg-white/[0.02] transition-colors"
+                  className="px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:bg-white/[0.02] transition-colors"
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
                     <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
                       <Clock size={14} className="text-amber-400" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <p className="font-medium text-sm text-vodium-cream">
                         {c.student.fullName}
                       </p>
@@ -442,7 +442,7 @@ export default async function DashboardPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="text-right">
+                  <div className="text-left sm:text-right sm:pl-4">
                     <p className="font-serif text-base text-amber-400">
                       {formatNaira(Number(c.amount) - Number(c.amountRepaid))}
                     </p>
@@ -456,7 +456,7 @@ export default async function DashboardPage() {
             })}
           </div>
         )}
-        <div className="px-6 py-3 border-t border-white/[0.04]">
+        <div className="px-4 sm:px-6 py-3 border-t border-white/[0.04]">
           <Link
             href="/dashboard/credits"
             className="text-sm text-vodium-gold hover:text-vodium-gold/80 flex items-center gap-1 transition-colors"

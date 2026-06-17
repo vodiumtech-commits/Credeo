@@ -51,17 +51,19 @@ export async function DELETE(
     await prisma.$transaction([
       // 1. Score events that reference this vendor's credits
       prisma.creditScoreEvent.deleteMany({ where: { vendorId: params.id } }),
-      // 2. Repayments for this vendor's credits
+      // 2. Notifications owned by this vendor
+      prisma.notification.deleteMany({ where: { vendorId: params.id } }),
+      // 3. Repayments for this vendor's credits
       prisma.repayment.deleteMany({
         where: { credit: { vendorId: params.id } },
       }),
-      // 3. Credits
+      // 4. Credits
       prisma.credit.deleteMany({ where: { vendorId: params.id } }),
-      // 4. Subscription
+      // 5. Subscription
       prisma.vendorSubscription.deleteMany({ where: { vendorId: params.id } }),
-      // 5. WhatsApp session (vendorId not FK but clean up anyway)
+      // 6. WhatsApp session (vendorId not FK but clean up anyway)
       prisma.whatsAppSession.deleteMany({ where: { vendorId: params.id } }),
-      // 6. Vendor
+      // 7. Vendor
       prisma.vendor.delete({ where: { id: params.id } }),
     ]);
 

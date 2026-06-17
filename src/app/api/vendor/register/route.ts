@@ -24,7 +24,7 @@ const formSchema = z.object({
   community:     z.string().min(2).max(200).trim(),
   ownerName:      z.string().min(2).max(100).trim(),
   phone:          z.string().min(7).max(20),
-  email:          z.string().email().max(255).toLowerCase(),
+  email:          z.string().trim().email().max(255).toLowerCase(),
   password:       z.string().min(8, "Password must be at least 8 characters").max(128),
 });
 
@@ -77,16 +77,8 @@ async function handleRequest(json: unknown) {
     return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
   }
 
-  // Check for existing account before generating OTP.
-  const existing = await prisma.vendor.findFirst({
-    where: { OR: [{ email }, { phone: normalisedPhone }] },
-  });
-  if (existing) {
-    return NextResponse.json(
-      { error: "An account with this email or phone already exists. Please log in." },
-      { status: 409 }
-    );
-  }
+  const conflict = await findVendorConflict(email, normalisedPhone);
+  if (conflict) return duplicateResponse(conflict);
 
   // Rate-limit: max 3 OTP sends per email per 10 min (best-effort — no-ops if Redis is down).
   const rl = await rateLimit(`rl:register-otp:${email}`, 3, 600);
@@ -143,16 +135,8 @@ async function handleVerify(json: unknown) {
     return NextResponse.json({ error: "Invalid phone number" }, { status: 400 });
   }
 
-  // Final duplicate check (race condition safety).
-  const existing = await prisma.vendor.findFirst({
-    where: { OR: [{ email }, { phone: normalisedPhone }] },
-  });
-  if (existing) {
-    return NextResponse.json(
-      { error: "An account with this email or phone already exists. Please log in." },
-      { status: 409 }
-    );
-  }
+  const conflict = await findVendorConflict(email, normalisedPhone);
+  if (conflict) return duplicateResponse(conflict);
 
   const passwordHash = await bcrypt.hash(password, 12);
   const communityMeta      = parseCommunity(community);
@@ -196,4 +180,27 @@ async function handleVerify(json: unknown) {
   setVendorSession(normalisedPhone);
 
   return NextResponse.json({ ok: true, vendorId: vendor.id });
+}
+
+async function findVendorConflict(email: string, phone: string) {
+  const existing = await prisma.vendor.findFirst({
+    where: { OR: [{ email }, { phone }] },
+    select: { email: true, phone: true },
+  });
+  if (!existing) return null;
+  if (existing.email === email) return "email" as const;
+  if (existing.phone === phone) return "phone" as const;
+  return "account" as const;
+}
+
+function duplicateResponse(conflict: "email" | "phone" | "account") {
+  const label =
+    conflict === "email" ? "email address"
+    : conflict === "phone" ? "phone number"
+    : "email or phone";
+
+  return NextResponse.json(
+    { error: `An account with this ${label} already exists. Please log in.` },
+    { status: 409 }
+  );
 }
