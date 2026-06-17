@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { prisma } from "../../../lib/prisma";
 import { computeScore } from "../../../lib/credit-score/score";
+import { nextVendorCustomerId } from "../../../lib/customer-id";
 import { normalisePhone } from "../../../lib/utils";
 import { messages } from "../../../lib/whatsapp/messages";
 import { sendWhatsAppMessage } from "../../../lib/whatsapp/outbound";
@@ -252,21 +253,57 @@ async function runSideEffect(
     case "CREATE_CREDIT": {
       if (!vendorId) return {};
       const { customerName, customerPhone, amount, dueInMinutes } = effect.data;
-      const normalCustomerPhone = normalisePhone(customerPhone) ?? `pending:${vendorId}:${Date.now()}`;
+      const normalCustomerPhone = normalisePhone(customerPhone);
+      if (!normalCustomerPhone) {
+        return {
+          replyOverride: "That customer phone number is not valid. Please restart with ADD and enter a valid WhatsApp number.",
+        };
+      }
       const vendor = await prisma.vendor.findUnique({
         where: { id: vendorId },
-        select: { communityId: true },
+        select: { businessName: true, communityId: true },
       });
-      
-      const customer = await prisma.student.upsert({
-        where:  { phone: normalCustomerPhone },
-        update: { fullName: customerName },
-        create: {
-          fullName: customerName,
-          phone: normalCustomerPhone,
-          communityId: vendor?.communityId ?? null,
-        },
+
+      const existingVendor = await prisma.vendor.findUnique({
+        where: { phone: normalCustomerPhone },
+        select: { businessName: true },
       });
+      if (existingVendor) {
+        return {
+          replyOverride: "That phone number belongs to a vendor account. Please use the customer's WhatsApp number and try ADD again.",
+        };
+      }
+
+      const existingCustomer = await prisma.student.findUnique({
+        where: { phone: normalCustomerPhone },
+      });
+      const generatedCustomerId = await nextVendorCustomerId(vendorId, vendor?.businessName ?? "Customer");
+      let customer = existingCustomer;
+
+      if (existingCustomer) {
+        if (existingCustomer.fullName.trim().toLowerCase() !== customerName.trim().toLowerCase()) {
+          return {
+            replyOverride: `That phone number is already saved for ${existingCustomer.fullName}. Use that customer name or restart with a different phone number.`,
+          };
+        }
+
+        if (!existingCustomer.matricNumber) {
+          customer = await prisma.student.update({
+            where: { id: existingCustomer.id },
+            data: { matricNumber: generatedCustomerId },
+          });
+        }
+      } else {
+        customer = await prisma.student.create({
+          data: {
+            fullName: customerName,
+            phone: normalCustomerPhone,
+            matricNumber: generatedCustomerId,
+            communityId: vendor?.communityId ?? null,
+          },
+        });
+      }
+      if (!customer) return {};
 
       const dueDate = new Date(Date.now() + dueInMinutes * 60_000);
       await prisma.credit.create({ data: { vendorId, studentId: customer.id, amount, dueDate, status: "OUTSTANDING" } });

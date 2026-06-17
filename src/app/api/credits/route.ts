@@ -5,6 +5,7 @@ import { getSessionPhone } from "@/lib/session";
 import { rateLimit } from "@/lib/redis";
 import { normalisePhoneNG } from "@/lib/utils";
 import { getStudentLimit, isPlanActive } from "@/lib/plan";
+import { nextVendorCustomerId } from "@/lib/customer-id";
 import type { CreditStatus } from "@prisma/client";
 
 // GET /api/credits?status=OVERDUE&search=emeka&page=1&limit=20
@@ -53,7 +54,6 @@ export async function GET(req: NextRequest) {
 
 const createSchema = z.object({
   customerName:   z.string().min(2).max(100),
-  customerID:     z.string().optional(),
   customerPhone:  z.string().optional(),
   amount:         z.number().positive(),
   description:    z.string().max(200).optional(),
@@ -94,25 +94,60 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid input", issues: parsed.error.issues }, { status: 400 });
   }
 
-  const { customerName, customerID, customerPhone, amount, description, dueDate } = parsed.data;
+  const { customerName, customerPhone, amount, description, dueDate } = parsed.data;
 
-  // Normalise customer phone if provided
-  const normalisedCustomerPhone =
-    customerPhone ? (normalisePhoneNG(customerPhone) ?? `pending:${Date.now()}`) : `pending:${Date.now()}`;
+  const normalisedCustomerPhone = customerPhone ? normalisePhoneNG(customerPhone) : null;
+  if (customerPhone && !normalisedCustomerPhone) {
+    return NextResponse.json({ error: "Enter a valid customer WhatsApp number." }, { status: 400 });
+  }
+  const customerPhoneKey = normalisedCustomerPhone ?? `pending:${Date.now()}`;
 
-  // Upsert customer — prefer matching by phone, fall back to ID placeholder
-  const student = await prisma.student.upsert({
-    where: { phone: normalisedCustomerPhone },
-    update: {
-      ...(customerID && { matricNumber: customerID }),
-    },
-    create: {
-      fullName: customerName,
-      phone: normalisedCustomerPhone,
-      matricNumber: customerID ?? null,
-      communityId: vendor.communityId,
-    },
+  const existingVendor = await prisma.vendor.findUnique({
+    where: { phone: customerPhoneKey },
+    select: { businessName: true },
   });
+  if (existingVendor) {
+    return NextResponse.json(
+      { error: "This phone number belongs to a vendor account. Use the customer's WhatsApp number." },
+      { status: 409 }
+    );
+  }
+
+  const existingStudent = await prisma.student.findUnique({
+    where: { phone: customerPhoneKey },
+  });
+  const generatedCustomerId = await nextVendorCustomerId(vendor.id, vendor.businessName);
+  let student = existingStudent;
+
+  if (existingStudent) {
+    if (existingStudent.fullName.trim().toLowerCase() !== customerName.trim().toLowerCase()) {
+      return NextResponse.json(
+        {
+          error: `This phone number is already saved for ${existingStudent.fullName}. Use that customer name or enter a different phone number.`,
+        },
+        { status: 409 }
+      );
+    }
+
+    if (!existingStudent.matricNumber) {
+      student = await prisma.student.update({
+        where: { id: existingStudent.id },
+        data: { matricNumber: generatedCustomerId },
+      });
+    }
+  } else {
+    student = await prisma.student.create({
+      data: {
+        fullName: customerName,
+        phone: customerPhoneKey,
+        matricNumber: generatedCustomerId,
+        communityId: vendor.communityId,
+      },
+    });
+  }
+  if (!student) {
+    return NextResponse.json({ error: "Could not create customer" }, { status: 500 });
+  }
 
   // ── Customer count gating (only for new customers) ─────────────────────────
   const plan = vendor.subscription?.plan ?? "STARTER";

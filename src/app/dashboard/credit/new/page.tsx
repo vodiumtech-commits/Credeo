@@ -36,36 +36,50 @@ export default function NewCreditPage() {
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     customerName: "",
-    customerID: "",
     phone: "",
     amount: "",
     description: "",
     dueDays: "",
     customDue: "",
+    dueTime: "18:00",
   });
 
   function update(f: keyof typeof form, v: string) {
     setForm((p) => ({ ...p, [f]: v }));
   }
 
-  const dueDate = (): string => {
+  const getDueDateTime = (): Date | null => {
     const days =
       form.dueDays === "custom"
         ? parseInt(form.customDue || "0")
         : parseInt(form.dueDays || "0");
-    if (!days) return "—";
+    if (!days) return null;
     const d = new Date();
     d.setDate(d.getDate() + days);
+    const [hours, minutes] = form.dueTime.split(":").map((v) => parseInt(v, 10));
+    if (!Number.isNaN(hours) && !Number.isNaN(minutes)) {
+      d.setHours(hours, minutes, 0, 0);
+    }
+    return d;
+  };
+
+  const dueDate = (): string => {
+    const d = getDueDateTime();
+    if (!d) return "—";
     return d.toLocaleDateString("en-NG", {
       day: "numeric",
       month: "short",
       year: "numeric",
+    }) + " at " + d.toLocaleTimeString("en-NG", {
+      hour: "numeric",
+      minute: "2-digit",
     });
   };
 
   const isStep1Valid = form.customerName.length > 1;
   const isStep2Valid =
     parseFloat(form.amount) > 0 &&
+    !!form.dueTime &&
     (form.dueDays === "custom"
       ? parseInt(form.customDue) > 0
       : form.dueDays !== "");
@@ -83,19 +97,14 @@ export default function NewCreditPage() {
     setLoading(true);
     setError(null);
     try {
-      const days =
-        form.dueDays === "custom"
-          ? parseInt(form.customDue || "0")
-          : parseInt(form.dueDays || "0");
-      const dueDateTime = new Date();
-      dueDateTime.setDate(dueDateTime.getDate() + days);
+      const dueDateTime = getDueDateTime();
+      if (!dueDateTime) throw new Error("Choose a valid due date and time");
 
       const res = await fetch("/api/credits", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customerName: form.customerName,
-          customerID: form.customerID || undefined,
           customerPhone: form.phone || undefined,
           amount: parseFloat(form.amount),
           description: form.description || undefined,
@@ -137,7 +146,7 @@ export default function NewCreditPage() {
               , due {dueDate()}.
             </p>
             <p className="text-xs text-vodium-cream/30 mb-8">
-              A polite reminder will be sent before the due time.
+              A polite reminder will be timed to match the due duration.
             </p>
             <div className="space-y-3">
               <ShimmerButton
@@ -146,12 +155,12 @@ export default function NewCreditPage() {
                   setStep("customer");
                   setForm({
                     customerName: "",
-                    customerID: "",
                     phone: "",
                     amount: "",
                     description: "",
                     dueDays: "",
                     customDue: "",
+                    dueTime: "18:00",
                   });
                 }}
               >
@@ -287,18 +296,9 @@ export default function NewCreditPage() {
               />
             </StepField>
 
-            <StepField
-              label="Customer ID"
-              hint="Optional : helps identify the customer."
-            >
-              <input
-                type="text"
-                placeholder="e.g. LGS/23/042"
-                value={form.customerID}
-                onChange={(e) => update("customerID", e.target.value)}
-                className="input-dark"
-              />
-            </StepField>
+            <p className="rounded-xl border border-vodium-gold/15 bg-vodium-gold/[0.05] px-4 py-3 text-xs text-vodium-cream/45">
+              Customer ID is generated automatically from your store name and customer order.
+            </p>
 
             <StepField
               label="WhatsApp number"
@@ -345,7 +345,7 @@ export default function NewCreditPage() {
 
             <StepField label="Amount" required>
               <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-vodium-gold font-semibold pointer-events-none">
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-vodium-gold font-semibold pointer-events-none">
                   ₦
                 </span>
                 <input
@@ -355,7 +355,7 @@ export default function NewCreditPage() {
                   min={0}
                   value={form.amount}
                   onChange={(e) => update("amount", e.target.value)}
-                  className="input-dark pl-8"
+                  className="input-dark pr-8"
                 />
               </div>
               {form.amount && parseFloat(form.amount) > 0 && (
@@ -375,7 +375,7 @@ export default function NewCreditPage() {
               />
             </StepField>
 
-            <StepField label="Due date" required>
+            <StepField label="Due date and time" required>
               <div className="grid grid-cols-2 gap-2 mb-2">
                 {DURATION_OPTIONS.map((o) => (
                   <button
@@ -420,6 +420,17 @@ export default function NewCreditPage() {
                   />
                 )}
               </div>
+              <div className="mt-3">
+                <label className="block text-xs font-medium text-vodium-cream/45 mb-1.5">
+                  Due time
+                </label>
+                <input
+                  type="time"
+                  value={form.dueTime}
+                  onChange={(e) => update("dueTime", e.target.value)}
+                  className="input-dark text-sm"
+                />
+              </div>
               {form.dueDays && (
                 <p className="text-xs text-vodium-cream/35 mt-2 flex items-center gap-1">
                   <Calendar size={11} className="text-vodium-gold" /> Due:{" "}
@@ -460,11 +471,15 @@ export default function NewCreditPage() {
 
             {/* Review rows */}
             <div className="space-y-0 mb-6 rounded-xl border border-white/[0.06] overflow-hidden">
-              {/* FIXED: Changed form.studentName and form.matricNumber to form.customerName and form.customerID */}
               <ReviewRow
                 icon={<User size={14} />}
                 label="Customer"
-                value={`${form.customerName}${form.customerID ? ` · ${form.customerID}` : ""}`}
+                value={form.customerName}
+              />
+              <ReviewRow
+                icon={<span className="text-xs leading-none">#</span>}
+                label="Customer ID"
+                value="Generated on save"
               />
               {form.phone && (
                 <ReviewRow
@@ -499,8 +514,8 @@ export default function NewCreditPage() {
               <span className="text-vodium-cream/70 font-medium">
                 {form.customerName}
               </span>{" "}
-              before the due time. Their Vodium score will be updated
-              when they pay.
+              at the right time based on the duration you picked. Their Vodium
+              score will be updated when they pay.
             </div>
 
             {/* Error */}

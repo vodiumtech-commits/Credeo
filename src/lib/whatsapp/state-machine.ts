@@ -323,10 +323,14 @@ export function parseDueDuration(input: string): number | null {
 }
 
 export function reminderLeadMinutesForDue(dueInMinutes: number): number {
-  if (dueInMinutes <= 30) return 5;
-  if (dueInMinutes <= 120) return 10;
-  if (dueInMinutes <= 1440) return 60;
-  return 2880;
+  if (dueInMinutes <= 10) return 1;
+  if (dueInMinutes <= 30) return 10;
+  if (dueInMinutes <= 120) return 30;
+  if (dueInMinutes <= 1440) return 120;
+  if (dueInMinutes <= 3 * 1440) return 12 * 60;
+  if (dueInMinutes <= 7 * 1440) return 24 * 60;
+  if (dueInMinutes <= 30 * 1440) return 2 * 1440;
+  return 7 * 1440;
 }
 
 export function reminderPromiseForDue(dueInMinutes: number): string {
@@ -338,7 +342,8 @@ export function reminderPromiseForDue(dueInMinutes: number): string {
     const hours = Math.round(lead / 60);
     return `I'll send them a polite reminder about ${hours} hour${hours === 1 ? "" : "s"} before the due time.`;
   }
-  return "I'll send them a polite reminder 2 days before the due date.";
+  const days = Math.round(lead / 1440);
+  return `I'll send them a polite reminder about ${days} day${days === 1 ? "" : "s"} before the due date.`;
 }
 
 function clearFlowContext(): Record<string, null> {

@@ -17,6 +17,8 @@ import { reminderLeadMinutesForDue } from "@/lib/whatsapp/state-machine";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const MAX_REMINDER_LOOKAHEAD_MINUTES = 7 * 1440;
+
 export async function GET(req: NextRequest) {
   // Auth: Vercel passes Authorization: Bearer <CRON_SECRET>
   const cronSecret = process.env.CRON_SECRET;
@@ -31,8 +33,8 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const now     = new Date();
-  const in2Days = new Date(now.getTime() + 2 * 86_400_000);
+  const now = new Date();
+  const maxLookahead = new Date(now.getTime() + MAX_REMINDER_LOOKAHEAD_MINUTES * 60_000);
 
   // Find possible reminder candidates. Each credit is filtered below using
   // its own adaptive reminder lead time, so hour-based debts are not told
@@ -40,7 +42,7 @@ export async function GET(req: NextRequest) {
   const credits = await prisma.credit.findMany({
     where: {
       status:        { in: ["OUTSTANDING", "DUE_SOON"] },
-      dueDate:       { gte: now, lte: in2Days },
+      dueDate:       { gte: now, lte: maxLookahead },
       reminderSentAt: null,
       student: {
         // Only send to students with a real phone number (not a pending: placeholder)

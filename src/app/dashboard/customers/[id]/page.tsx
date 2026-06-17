@@ -497,7 +497,7 @@ export default async function CustomerProfilePage({
       {/* Add new credit CTA */}
       <div className="flex justify-end">
         <Link
-          href={`/dashboard/credit/new?customer=${encodeURIComponent(customer.fullName)}${customer.matricNumber ? `&customerID=${encodeURIComponent(customer.matricNumber)}` : ""}`}
+          href={`/dashboard/credit/new?customer=${encodeURIComponent(customer.fullName)}`}
           className="btn-gold px-5 py-2.5 rounded-xl text-sm flex items-center gap-2"
         >
           <CreditCard size={14} /> Record new credit
