@@ -13,6 +13,7 @@ import { prisma } from "@/lib/prisma";
 import { sendWhatsAppMessage } from "@/lib/whatsapp/outbound";
 import { messages } from "@/lib/whatsapp/messages";
 import { reminderLeadMinutesForDue } from "@/lib/whatsapp/state-machine";
+import { markOverdueCredits, sendOverdueReminders } from "@/lib/credit-lifecycle";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,6 +36,8 @@ export async function GET(req: NextRequest) {
 
   const now = new Date();
   const maxLookahead = new Date(now.getTime() + MAX_REMINDER_LOOKAHEAD_MINUTES * 60_000);
+  const overdueLifecycle = await markOverdueCredits({ now });
+  const overdueReminders = await sendOverdueReminders({ now });
 
   // Find possible reminder candidates. Each credit is filtered below using
   // its own adaptive reminder lead time, so hour-based debts are not told
@@ -112,7 +115,12 @@ export async function GET(req: NextRequest) {
   }
 
   // Notify vendors about the sent reminders
+  const combinedVendorSentCount = { ...overdueReminders.vendorSentCount };
   for (const [vendorId, count] of Object.entries(vendorSentCount)) {
+    combinedVendorSentCount[vendorId] = (combinedVendorSentCount[vendorId] ?? 0) + count;
+  }
+
+  for (const [vendorId, count] of Object.entries(combinedVendorSentCount)) {
     await prisma.notification.create({
       data: {
         vendorId,
@@ -123,6 +131,21 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  console.log(`[cron/reminders] sent=${sent} failed=${failed} total=${credits.length}`);
-  return NextResponse.json({ ok: true, sent, failed, total: credits.length });
+  const totalSent = sent + overdueReminders.sent;
+  const totalFailed = failed + overdueReminders.failed;
+  console.log(
+    `[cron/reminders] sent=${totalSent} failed=${totalFailed} total=${credits.length + overdueReminders.total}`
+  );
+  return NextResponse.json({
+    ok: true,
+    sent: totalSent,
+    failed: totalFailed,
+    total: credits.length + overdueReminders.total,
+    overdue: overdueLifecycle,
+    overdueReminders: {
+      sent: overdueReminders.sent,
+      failed: overdueReminders.failed,
+      total: overdueReminders.total,
+    },
+  });
 }

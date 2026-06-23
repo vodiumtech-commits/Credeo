@@ -15,6 +15,7 @@ import {
 import { getVendorSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { formatNaira } from "@/lib/utils";
+import { markOverdueCredits } from "@/lib/credit-lifecycle";
 import { GlowBadge } from "@/components/ui/glow-badge";
 import type { CreditStatus, ScoreEventType } from "@prisma/client";
 
@@ -173,6 +174,8 @@ export default async function CustomerProfilePage({
 }) {
   const vendor = await getVendorSession();
   if (!vendor) redirect("/login");
+
+  await markOverdueCredits({ vendorId: vendor.id });
 
   // FIXED: Renamed this variable from 'student' to 'customer'
   const customer = await prisma.student.findUnique({

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getVendorSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { markOverdueCredits } from "@/lib/credit-lifecycle";
 import { CustomersClient } from "@/components/ui/customers-client";
 
 export const dynamic = "force-dynamic";
@@ -8,6 +9,8 @@ export const dynamic = "force-dynamic";
 export default async function CustomersPage() {
   const vendor = await getVendorSession();
   if (!vendor) redirect("/login");
+
+  await markOverdueCredits({ vendorId: vendor.id });
 
   const students = await prisma.student.findMany({
     where: { credits: { some: { vendorId: vendor.id } } },

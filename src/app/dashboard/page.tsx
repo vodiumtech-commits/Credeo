@@ -15,6 +15,7 @@ import {
 import { getVendorSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { formatNaira } from "@/lib/utils";
+import { markOverdueCredits } from "@/lib/credit-lifecycle";
 import { StatCard } from "@/components/ui/stat-card";
 import { GlowBadge } from "@/components/ui/glow-badge";
 import { RevenueChart } from "@/components/ui/revenue-chart";
@@ -23,6 +24,8 @@ import { BulkRemindButton } from "@/components/ui/bulk-remind-button";
 export default async function DashboardPage() {
   const vendor = await getVendorSession();
   if (!vendor) redirect("/login");
+
+  await markOverdueCredits({ vendorId: vendor.id });
 
   const credits = await prisma.credit.findMany({
     where: { vendorId: vendor.id },

@@ -6,6 +6,7 @@ import { rateLimit } from "@/lib/redis";
 import { normalisePhoneNG } from "@/lib/utils";
 import { getStudentLimit, isPlanActive } from "@/lib/plan";
 import { nextVendorCustomerId } from "@/lib/customer-id";
+import { markOverdueCredits } from "@/lib/credit-lifecycle";
 import type { CreditStatus } from "@prisma/client";
 
 // GET /api/credits?status=OVERDUE&search=emeka&page=1&limit=20
@@ -15,6 +16,8 @@ export async function GET(req: NextRequest) {
 
   const vendor = await prisma.vendor.findUnique({ where: { phone } });
   if (!vendor) return NextResponse.json({ error: "Vendor not found" }, { status: 404 });
+
+  await markOverdueCredits({ vendorId: vendor.id });
 
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status") as CreditStatus | null;

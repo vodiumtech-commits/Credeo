@@ -114,7 +114,8 @@ model Credit {
   amountRepaid    Decimal  @default(0) @db.Decimal(12, 2)
   closedAt        DateTime?
   notes           String?
-  reminderSentAt  DateTime?            // set when 2-day-before reminder is dispatched
+  reminderSentAt        DateTime?      // set when a pre-due reminder is dispatched
+  overdueReminderSentAt DateTime?      // set when the latest overdue reminder is dispatched
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -125,6 +126,7 @@ model Credit {
   @@index([studentId])
   @@index([status])
   @@index([dueDate])
+  @@index([overdueReminderSentAt])
 }
 
 enum CreditStatus {

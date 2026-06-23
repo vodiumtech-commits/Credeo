@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getVendorSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { markOverdueCredits } from "@/lib/credit-lifecycle";
 import { CreditsClient } from "@/components/ui/credits-client";
 import type { CreditStatus } from "@prisma/client";
 
@@ -9,6 +10,8 @@ export const dynamic = "force-dynamic";
 export default async function CreditsPage() {
   const vendor = await getVendorSession();
   if (!vendor) redirect("/login");
+
+  await markOverdueCredits({ vendorId: vendor.id });
 
   const credits = await prisma.credit.findMany({
     where: { vendorId: vendor.id },
