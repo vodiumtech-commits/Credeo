@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { applyDailyDefaultDecay, markOverdueCredits } from "@/lib/credit-lifecycle";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,6 +15,12 @@ export async function GET(req: NextRequest) {
   }
 
   const now = new Date();
+
+  // 0. Credit lifecycle: mark new defaults and apply the daily default-score
+  // decay. Guaranteed to run daily via this Vercel cron; idempotent if the
+  // reminders cron already ran it today.
+  const overdue = await markOverdueCredits({ now });
+  const defaultDecay = await applyDailyDefaultDecay({ now });
 
   // 1. Expire trials that have passed their end date
   const expiredTrials = await prisma.vendorSubscription.updateMany({
@@ -75,5 +82,7 @@ export async function GET(req: NextRequest) {
     expiredTrials: expiredTrials.count,
     overdueSubs: overdueSubs.count,
     notificationsSent: expiredSubs.length,
+    overdue,
+    defaultDecay,
   });
 }

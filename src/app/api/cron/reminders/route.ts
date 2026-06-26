@@ -13,7 +13,7 @@ import { prisma } from "@/lib/prisma";
 import { sendWhatsAppMessage } from "@/lib/whatsapp/outbound";
 import { messages } from "@/lib/whatsapp/messages";
 import { reminderLeadMinutesForDue } from "@/lib/whatsapp/state-machine";
-import { markOverdueCredits, sendOverdueReminders } from "@/lib/credit-lifecycle";
+import { applyDailyDefaultDecay, markOverdueCredits, sendOverdueReminders } from "@/lib/credit-lifecycle";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,6 +37,7 @@ export async function GET(req: NextRequest) {
   const now = new Date();
   const maxLookahead = new Date(now.getTime() + MAX_REMINDER_LOOKAHEAD_MINUTES * 60_000);
   const overdueLifecycle = await markOverdueCredits({ now });
+  const defaultDecay = await applyDailyDefaultDecay({ now });
   const overdueReminders = await sendOverdueReminders({ now });
 
   // Find possible reminder candidates. Each credit is filtered below using
@@ -142,6 +143,7 @@ export async function GET(req: NextRequest) {
     failed: totalFailed,
     total: credits.length + overdueReminders.total,
     overdue: overdueLifecycle,
+    defaultDecay,
     overdueReminders: {
       sent: overdueReminders.sent,
       failed: overdueReminders.failed,

@@ -6,6 +6,11 @@ import { messages } from "@/lib/whatsapp/messages";
 const DEFAULT_SCORE_DELTA = -80;
 const OVERDUE_REMINDER_INTERVAL_MS = 3 * 86_400_000;
 
+// Ongoing penalty: a customer who stays in default loses points every day until
+// they pay. Floored so default decay alone can't zero out a score.
+const DAILY_DEFAULT_DECAY = 5;
+const MIN_DEFAULT_SCORE = 300;
+
 type LifecycleScope = {
   vendorId?: string;
   now?: Date;
@@ -75,6 +80,77 @@ export async function markOverdueCredits(scope: LifecycleScope = {}) {
   }
 
   return { marked, penalized };
+}
+
+/**
+ * Daily score decay for customers still in default.
+ *
+ * Every customer with an unpaid OVERDUE credit loses `DAILY_DEFAULT_DECAY`
+ * points once per day (floored at `MIN_DEFAULT_SCORE`) until they pay it down.
+ * Idempotent per day: a customer who already has a DEFAULTED score event today
+ * (either the initial default hit or an earlier decay run) is skipped, so the
+ * cron can run multiple times a day without stacking penalties.
+ */
+export async function applyDailyDefaultDecay(scope: LifecycleScope = {}) {
+  const now = scope.now ?? new Date();
+  const startOfDay = new Date(now);
+  startOfDay.setHours(0, 0, 0, 0);
+
+  const overdue = await prisma.credit.findMany({
+    where: {
+      status: "OVERDUE",
+      ...(scope.vendorId ? { vendorId: scope.vendorId } : {}),
+    },
+    select: { studentId: true, vendorId: true, amount: true, amountRepaid: true },
+  });
+
+  // One representative vendor per still-owing customer (for event attribution).
+  const owingStudents = new Map<string, string>();
+  for (const credit of overdue) {
+    if (Number(credit.amount) - Number(credit.amountRepaid) <= 0) continue;
+    if (!owingStudents.has(credit.studentId)) owingStudents.set(credit.studentId, credit.vendorId);
+  }
+
+  const studentIds = [...owingStudents.keys()];
+  if (studentIds.length === 0) return { decayed: 0, eligible: 0 };
+
+  const decayedToday = await prisma.creditScoreEvent.findMany({
+    where: { studentId: { in: studentIds }, eventType: "DEFAULTED", occurredAt: { gte: startOfDay } },
+    select: { studentId: true },
+  });
+  const skip = new Set(decayedToday.map((e) => e.studentId));
+
+  const targets = await prisma.student.findMany({
+    where: { id: { in: studentIds.filter((id) => !skip.has(id)) } },
+    select: { id: true, vodiumScore: true },
+  });
+
+  let decayed = 0;
+  for (const student of targets) {
+    if (student.vodiumScore <= MIN_DEFAULT_SCORE) continue;
+    const newScore = Math.max(MIN_DEFAULT_SCORE, student.vodiumScore - DAILY_DEFAULT_DECAY);
+    const delta = newScore - student.vodiumScore;
+    if (delta === 0) continue;
+
+    await prisma.$transaction([
+      prisma.creditScoreEvent.create({
+        data: {
+          studentId: student.id,
+          vendorId: owingStudents.get(student.id)!,
+          eventType: "DEFAULTED",
+          scoreDelta: delta,
+          occurredAt: now,
+        },
+      }),
+      prisma.student.update({
+        where: { id: student.id },
+        data: { vodiumScore: newScore, scoreUpdatedAt: now },
+      }),
+    ]);
+    decayed++;
+  }
+
+  return { decayed, eligible: studentIds.length };
 }
 
 export async function sendOverdueReminders(scope: LifecycleScope & { force?: boolean } = {}) {
