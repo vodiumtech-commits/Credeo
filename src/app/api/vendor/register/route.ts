@@ -8,6 +8,7 @@ import { normalisePhone } from "@/lib/utils";
 import { parseCommunity } from "@/lib/community";
 import { sendOtpEmail } from "@/lib/email/otp";
 import { setVendorSession } from "@/lib/session";
+import { createSoloOrganizationForVendor, trialEndsAt } from "@/lib/tenant";
 import { setOtpCookie, verifyOtpCookie, clearOtpCookie } from "@/lib/otp-cookie";
 
 // ─── shared form schema ───────────────────────────────────────────────────────
@@ -153,7 +154,7 @@ async function handleVerify(json: unknown) {
     },
   });
 
-  const trialEndsAt = new Date(Date.now() + 60 * 86_400_000);
+  const subscriptionTrialEndsAt = trialEndsAt();
 
   const vendor = await prisma.vendor.create({
     data: {
@@ -170,12 +171,14 @@ async function handleVerify(json: unknown) {
         create: {
           plan:          "STARTER",
           status:        "TRIAL",
-          trialEndsAt,
+          trialEndsAt:    subscriptionTrialEndsAt,
           monthlyAmount: 2000,
         },
       },
     },
   });
+
+  await createSoloOrganizationForVendor(vendor);
 
   setVendorSession(normalisedPhone);
 

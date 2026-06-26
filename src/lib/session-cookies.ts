@@ -13,6 +13,8 @@ export const ADMIN_ROUTE_ROLES: Array<{ prefix: string; roles: string[] }> = [
   { prefix: "/admin/support",   roles: ["SUPER_ADMIN", "CUSTOMER_CARE"] },
   { prefix: "/admin/analytics", roles: ["SUPER_ADMIN", "CFO", "ANALYTICS"] },
   { prefix: "/admin/vendors",   roles: ["SUPER_ADMIN", "CUSTOMER_CARE"] },
+  { prefix: "/admin/organizations", roles: ["SUPER_ADMIN"] },
+  { prefix: "/api/admin/organizations", roles: ["SUPER_ADMIN"] },
   { prefix: "/api/admin/team",  roles: ["SUPER_ADMIN"] },
   { prefix: "/api/admin/vendors", roles: ["SUPER_ADMIN", "CUSTOMER_CARE"] },
   { prefix: "/admin",           roles: ["SUPER_ADMIN", "CFO", "CUSTOMER_CARE", "ANALYTICS"] },

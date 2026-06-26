@@ -9,7 +9,7 @@ export async function GET() {
 
   const vendor = await prisma.vendor.findUnique({
     where: { phone },
-    include: { subscription: true, community: true },
+    include: { subscription: true, community: true, organization: true, branch: true, memberships: true },
   });
   if (!vendor) return NextResponse.json({ error: "Vendor not found" }, { status: 404 });
 
@@ -58,7 +58,7 @@ export async function PATCH(req: NextRequest) {
         ...(parsed.data.location && { location: parsed.data.location }),
         ...(parsed.data.email && { email: parsed.data.email }),
       },
-      include: { subscription: true, community: true },
+      include: { subscription: true, community: true, organization: true, branch: true, memberships: true },
     });
 
     return NextResponse.json(updated);

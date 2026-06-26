@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppMessage } from "@/lib/whatsapp/outbound";
+import { getOrgChannelCredentials, type ChannelCredentials } from "@/lib/whatsapp/channel-token";
 import { messages } from "@/lib/whatsapp/messages";
 
 const DEFAULT_SCORE_DELTA = -80;
@@ -126,6 +127,14 @@ export async function sendOverdueReminders(scope: LifecycleScope & { force?: boo
     }
   }
 
+  // Resolve outbound credentials once per organization (cached for this run).
+  const credsCache = new Map<string, ChannelCredentials | null>();
+  async function credsFor(organizationId: string | null): Promise<ChannelCredentials | null> {
+    const key = organizationId ?? "__global__";
+    if (!credsCache.has(key)) credsCache.set(key, await getOrgChannelCredentials(organizationId));
+    return credsCache.get(key) ?? null;
+  }
+
   for (const item of grouped.values()) {
     const daysOverdue = Math.max(
       1,
@@ -134,6 +143,7 @@ export async function sendOverdueReminders(scope: LifecycleScope & { force?: boo
     const dueText = `overdue by ${daysOverdue} day${daysOverdue === 1 ? "" : "s"}`;
 
     try {
+      const creds = await credsFor(item.vendor.organizationId);
       await sendWhatsAppMessage(
         item.student.phone,
         messages.reminderToCustomer(
@@ -141,7 +151,8 @@ export async function sendOverdueReminders(scope: LifecycleScope & { force?: boo
           item.vendor.businessName,
           item.totalOwed,
           dueText
-        )
+        ),
+        creds ?? undefined
       );
 
       await prisma.credit.updateMany({

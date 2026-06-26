@@ -14,13 +14,16 @@
 import { cookies } from "next/headers";
 import { prisma } from "./prisma";
 import crypto from "crypto";
-import type { Community, Vendor, VendorSubscription } from "@prisma/client";
+import type { Branch, Community, Organization, OrganizationMembership, Vendor, VendorSubscription } from "@prisma/client";
 export { VENDOR_COOKIE, ADMIN_COOKIE, VENDOR_COOKIE_AGE, ADMIN_COOKIE_AGE } from "./session-cookies";
 import { VENDOR_COOKIE, ADMIN_COOKIE, VENDOR_COOKIE_AGE, ADMIN_COOKIE_AGE } from "./session-cookies";
 
 export type VendorWithSub = Vendor & {
   subscription: VendorSubscription | null;
   community: Community | null;
+  organization: Organization | null;
+  branch: Branch | null;
+  memberships: OrganizationMembership[];
 };
 
 export type AdminRole = "SUPER_ADMIN" | "CFO" | "CUSTOMER_CARE" | "ANALYTICS";
@@ -115,7 +118,7 @@ export async function getVendorSession(): Promise<VendorWithSub | null> {
   if (!phone) return null;
   return prisma.vendor.findUnique({
     where:   { phone },
-    include: { subscription: true, community: true },
+    include: { subscription: true, community: true, organization: true, branch: true, memberships: true },
   });
 }
 

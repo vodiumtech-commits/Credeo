@@ -18,6 +18,7 @@ import {
   Users,
   ChevronRight,
   Activity,
+  Building2,
 } from "lucide-react";
 import type { AdminRole } from "@/lib/session";
 
@@ -47,6 +48,7 @@ const NAV_BY_ROLE: Record<
 > = {
   SUPER_ADMIN: [
     { href: "/admin", icon: LayoutDashboard, label: "Overview" },
+    { href: "/admin/organizations", icon: Building2, label: "Organizations" },
     { href: "/admin/vendors", icon: Store, label: "Vendors" },
     { href: "/admin/finance", icon: TrendingUp, label: "Finance" },
     { href: "/admin/support", icon: Headphones, label: "Support" },

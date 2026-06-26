@@ -14,7 +14,11 @@ interface PaystackData extends PaystackPaymentData {
   next_payment_date?: string;
   paid_at?: string;
   subscription?: { subscription_code: string };
+  reference?: string;
+  authorization?: { authorization_code?: string; reusable?: boolean };
 }
+
+type MandateMetadata = { purpose?: string; mandateId?: string; organizationId?: string };
 
 interface PaystackEvent {
   event: string;
@@ -81,6 +85,29 @@ export async function POST(req: NextRequest) {
 
     case "charge.success": {
       const metadata = parseMetadata(data.metadata);
+      const mandateMeta = metadata as MandateMetadata;
+
+      // Payment-mandate authorization (customer tokenised a card). Handle this
+      // before subscription logic — mandate metadata also carries a vendorId.
+      if (mandateMeta.purpose === "payment_mandate") {
+        const mandate = mandateMeta.mandateId
+          ? await prisma.paymentMandate.findUnique({ where: { id: mandateMeta.mandateId } })
+          : data.reference
+            ? await prisma.paymentMandate.findFirst({ where: { mandateReference: data.reference } })
+            : null;
+        if (mandate && mandate.status !== "ACTIVE") {
+          await prisma.paymentMandate.update({
+            where: { id: mandate.id },
+            data: {
+              status: "ACTIVE",
+              authorizationReference: data.authorization?.authorization_code ?? mandate.authorizationReference,
+              reusable: data.authorization?.reusable ?? mandate.reusable,
+            },
+          });
+        }
+        break;
+      }
+
       if (metadata.vendorId) {
         const activated = await activateSubscriptionFromPaystackData(metadata.vendorId, {
           ...data,

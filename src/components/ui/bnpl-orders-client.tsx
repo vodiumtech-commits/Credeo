@@ -1,0 +1,413 @@
+"use client";
+
+import { Fragment, useMemo, useState } from "react";
+import { Check, Copy, Download, Loader2, Plus, ReceiptText, Trash2, X } from "lucide-react";
+import { formatNaira } from "@/lib/utils";
+
+export type BnplBranch = { id: string; name: string; code: string };
+
+export type BnplOrderRow = {
+  id: string;
+  orderNumber: string;
+  studentName: string;
+  branchName: string;
+  status: string;
+  totalAmount: number;
+  outstanding: number;
+  dueDate: string;
+  canRepay: boolean;
+  consentAccepted: boolean;
+  consentPath: string;
+};
+
+type ItemDraft = { name: string; quantity: number; unitPrice: number };
+
+const OPEN_STATUSES = ["ACTIVE", "PARTIALLY_PAID", "OVERDUE"];
+
+export function BnplOrdersClient({
+  orders,
+  branches,
+  canWrite,
+  canSeeAllBranches,
+  defaultBranchId,
+}: {
+  orders: BnplOrderRow[];
+  branches: BnplBranch[];
+  canWrite: boolean;
+  canSeeAllBranches: boolean;
+  defaultBranchId: string | null;
+}) {
+  const [showForm, setShowForm] = useState(false);
+  const [repayFor, setRepayFor] = useState<string | null>(null);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs uppercase tracking-[0.2em] text-vodium-gold">BNPL</p>
+          <h1 className="font-serif text-2xl md:text-3xl text-vodium-cream mt-1">Orders</h1>
+          <p className="text-sm text-vodium-cream/45 mt-1">Create instalment orders and record customer repayments.</p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {orders.length > 0 && (
+            <a
+              href="/api/bnpl/orders/export"
+              className="px-4 py-2 rounded-lg text-sm border border-white/10 text-vodium-cream/70 hover:text-vodium-gold hover:border-vodium-gold/30 inline-flex items-center gap-2"
+            >
+              <Download size={15} /> Export
+            </a>
+          )}
+          {canWrite && (
+            <button
+              onClick={() => setShowForm((v) => !v)}
+              className="btn-gold px-4 py-2 rounded-lg text-sm inline-flex items-center gap-2"
+            >
+              {showForm ? <X size={15} /> : <Plus size={15} />}
+              {showForm ? "Close" : "New order"}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {showForm && canWrite && (
+        <NewOrderForm
+          branches={branches}
+          canSeeAllBranches={canSeeAllBranches}
+          defaultBranchId={defaultBranchId}
+          onClose={() => setShowForm(false)}
+        />
+      )}
+
+      <section className="rounded-xl border border-white/[0.06] bg-vodium-charcoal overflow-hidden">
+        <div className="px-5 py-4 border-b border-white/[0.06] flex items-center gap-2">
+          <ReceiptText size={16} className="text-vodium-gold" />
+          <h2 className="text-sm font-semibold text-vodium-cream">Recent BNPL orders</h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-left text-xs uppercase tracking-wider text-vodium-cream/35">
+              <tr>
+                <th className="px-5 py-3">Order</th>
+                <th className="px-5 py-3">Customer</th>
+                <th className="px-5 py-3">Branch</th>
+                <th className="px-5 py-3">Status</th>
+                <th className="px-5 py-3">Consent</th>
+                <th className="px-5 py-3">Outstanding</th>
+                <th className="px-5 py-3">Total</th>
+                <th className="px-5 py-3">Due</th>
+                <th className="px-5 py-3" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/[0.05]">
+              {orders.length === 0 ? (
+                <tr><td colSpan={9} className="px-5 py-8 text-center text-vodium-cream/35">No BNPL orders yet.</td></tr>
+              ) : orders.map((order) => (
+                <Fragment key={order.id}>
+                  <tr className="text-vodium-cream/70">
+                    <td className="px-5 py-3 text-vodium-cream">{order.orderNumber}</td>
+                    <td className="px-5 py-3">{order.studentName}</td>
+                    <td className="px-5 py-3">{order.branchName}</td>
+                    <td className="px-5 py-3">{order.status}</td>
+                    <td className="px-5 py-3">
+                      <ConsentCell accepted={order.consentAccepted} path={order.consentPath} />
+                    </td>
+                    <td className="px-5 py-3">{formatNaira(order.outstanding)}</td>
+                    <td className="px-5 py-3 text-vodium-gold">{formatNaira(order.totalAmount)}</td>
+                    <td className="px-5 py-3">{new Date(order.dueDate).toLocaleDateString("en-NG")}</td>
+                    <td className="px-5 py-3 text-right">
+                      {canWrite && order.canRepay && OPEN_STATUSES.includes(order.status) && (
+                        <button
+                          onClick={() => setRepayFor(repayFor === order.id ? null : order.id)}
+                          className="text-xs text-vodium-gold hover:underline"
+                        >
+                          {repayFor === order.id ? "Cancel" : "Record payment"}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                  {repayFor === order.id && (
+                    <tr>
+                      <td colSpan={9} className="px-5 py-3 bg-black/20">
+                        <RepayForm order={order} onClose={() => setRepayFor(null)} />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function NewOrderForm({
+  branches,
+  canSeeAllBranches,
+  defaultBranchId,
+  onClose,
+}: {
+  branches: BnplBranch[];
+  canSeeAllBranches: boolean;
+  defaultBranchId: string | null;
+  onClose: () => void;
+}) {
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [branchId, setBranchId] = useState(defaultBranchId ?? branches[0]?.id ?? "");
+  const [dueDate, setDueDate] = useState(defaultDueDate());
+  const [downPayment, setDownPayment] = useState(0);
+  const [couponCode, setCouponCode] = useState("");
+  const [notes, setNotes] = useState("");
+  const [items, setItems] = useState<ItemDraft[]>([{ name: "", quantity: 1, unitPrice: 0 }]);
+  const [consent, setConsent] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const subtotal = useMemo(
+    () => items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0),
+    [items]
+  );
+
+  function updateItem(index: number, patch: Partial<ItemDraft>) {
+    setItems((current) => current.map((item, i) => (i === index ? { ...item, ...patch } : item)));
+  }
+
+  async function submit() {
+    setError(null);
+    const cleanItems = items
+      .filter((item) => item.name.trim() && item.unitPrice > 0)
+      .map((item) => ({ name: item.name.trim(), quantity: item.quantity, unitPrice: item.unitPrice }));
+    if (cleanItems.length === 0) return setError("Add at least one item with a price.");
+    if (!customerName.trim() || !customerPhone.trim()) return setError("Enter the customer's name and phone.");
+    if (!branchId) return setError("Select a branch.");
+    if (!consent) return setError("Confirm the customer accepted the BNPL terms.");
+
+    setSaving(true);
+    const res = await fetch("/api/bnpl/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        branchId,
+        customerName: customerName.trim(),
+        customerPhone: customerPhone.trim(),
+        dueDate: new Date(dueDate).toISOString(),
+        downPayment,
+        couponCode: couponCode.trim() || undefined,
+        notes: notes.trim() || undefined,
+        items: cleanItems,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setSaving(false);
+    if (!res.ok) return setError(data.error ?? "Could not create the order.");
+    onClose();
+    window.location.reload();
+  }
+
+  return (
+    <div className="rounded-xl border border-vodium-gold/20 bg-vodium-gold/[0.04] p-5 space-y-4">
+      <h3 className="text-sm font-semibold text-vodium-cream">New BNPL order</h3>
+
+      <div className="grid md:grid-cols-2 gap-3">
+        <Field label="Customer name">
+          <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} className={inputClass} />
+        </Field>
+        <Field label="Customer phone">
+          <input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="0803... or +234..." className={inputClass} />
+        </Field>
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-3">
+        {canSeeAllBranches && branches.length > 0 ? (
+          <Field label="Branch">
+            <select value={branchId} onChange={(e) => setBranchId(e.target.value)} className={inputClass}>
+              {branches.map((branch) => (
+                <option key={branch.id} value={branch.id}>{branch.name} ({branch.code})</option>
+              ))}
+            </select>
+          </Field>
+        ) : null}
+        <Field label="Due date">
+          <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={inputClass} />
+        </Field>
+        <Field label="Down payment (₦)">
+          <input type="number" min={0} value={downPayment} onChange={(e) => setDownPayment(Number(e.target.value))} className={inputClass} />
+        </Field>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-xs text-vodium-cream/40">Items</p>
+        {items.map((item, index) => (
+          <div key={index} className="grid grid-cols-12 gap-2">
+            <input
+              value={item.name}
+              onChange={(e) => updateItem(index, { name: e.target.value })}
+              placeholder="Item name"
+              className={`col-span-6 ${inputClass}`}
+            />
+            <input
+              type="number" min={1}
+              value={item.quantity}
+              onChange={(e) => updateItem(index, { quantity: Math.max(1, Number(e.target.value)) })}
+              placeholder="Qty"
+              className={`col-span-2 ${inputClass}`}
+            />
+            <input
+              type="number" min={0}
+              value={item.unitPrice}
+              onChange={(e) => updateItem(index, { unitPrice: Number(e.target.value) })}
+              placeholder="Unit ₦"
+              className={`col-span-3 ${inputClass}`}
+            />
+            <button
+              onClick={() => setItems((c) => c.filter((_, i) => i !== index))}
+              disabled={items.length === 1}
+              className="col-span-1 flex items-center justify-center text-vodium-cream/40 hover:text-rose-300 disabled:opacity-30"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        ))}
+        <button
+          onClick={() => setItems((c) => [...c, { name: "", quantity: 1, unitPrice: 0 }])}
+          className="text-xs text-vodium-gold hover:underline inline-flex items-center gap-1"
+        >
+          <Plus size={12} /> Add item
+        </button>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-3">
+        <Field label="Coupon code (optional)">
+          <input value={couponCode} onChange={(e) => setCouponCode(e.target.value)} className={`${inputClass} uppercase`} />
+        </Field>
+        <Field label="Notes (optional)">
+          <input value={notes} onChange={(e) => setNotes(e.target.value)} className={inputClass} />
+        </Field>
+      </div>
+
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-vodium-cream/45">Subtotal</span>
+        <span className="text-vodium-gold font-semibold">{formatNaira(subtotal)}</span>
+      </div>
+
+      <label className="flex items-start gap-2.5 rounded-lg bg-black/20 border border-white/[0.06] p-3 cursor-pointer">
+        <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 accent-vodium-gold" />
+        <span className="text-xs text-vodium-cream/55">
+          The customer has reviewed and accepted this store&apos;s Buy-Now-Pay-Later repayment terms, including the
+          due date and instalment schedule. This consent is recorded with the order.
+        </span>
+      </label>
+
+      {error && <p className="text-sm text-rose-300">{error}</p>}
+
+      <div className="flex items-center justify-end gap-2">
+        <button onClick={onClose} className="px-4 py-2 rounded-lg border border-white/10 text-xs text-vodium-cream/60 hover:text-vodium-cream">
+          Cancel
+        </button>
+        <button
+          disabled={saving}
+          onClick={submit}
+          className="px-4 py-2 rounded-lg bg-vodium-gold text-vodium-black text-xs font-bold disabled:opacity-50 inline-flex items-center gap-2"
+        >
+          {saving && <Loader2 size={13} className="animate-spin" />}
+          Create order
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function RepayForm({ order, onClose }: { order: BnplOrderRow; onClose: () => void }) {
+  const [amount, setAmount] = useState(order.outstanding);
+  const [method, setMethod] = useState("CASH");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    setError(null);
+    if (amount <= 0) return setError("Enter an amount greater than zero.");
+    setSaving(true);
+    const res = await fetch(`/api/bnpl/orders/${order.id}/repayments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount, method }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setSaving(false);
+    if (!res.ok) return setError(data.error ?? "Could not record the payment.");
+    onClose();
+    window.location.reload();
+  }
+
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+      <Field label={`Amount (outstanding ${formatNaira(order.outstanding)})`}>
+        <input type="number" min={0} value={amount} onChange={(e) => setAmount(Number(e.target.value))} className={inputClass} />
+      </Field>
+      <Field label="Method">
+        <select value={method} onChange={(e) => setMethod(e.target.value)} className={inputClass}>
+          {["CASH", "BANK_TRANSFER", "POS", "USSD", "MOBILE_MONEY", "OTHER"].map((m) => (
+            <option key={m} value={m}>{m.replace("_", " ")}</option>
+          ))}
+        </select>
+      </Field>
+      <button
+        disabled={saving}
+        onClick={submit}
+        className="px-4 py-2 rounded-lg bg-vodium-gold text-vodium-black text-xs font-bold disabled:opacity-50 inline-flex items-center gap-2 h-9"
+      >
+        {saving && <Loader2 size={13} className="animate-spin" />}
+        Record
+      </button>
+      {error && <p className="text-sm text-rose-300 self-center">{error}</p>}
+    </div>
+  );
+}
+
+function ConsentCell({ accepted, path }: { accepted: boolean; path: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    const url = `${window.location.origin}${path}`;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      window.prompt("Copy the customer link:", url);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
+  return (
+    <span className="inline-flex items-center gap-2">
+      {accepted ? (
+        <span className="text-emerald-300 text-xs inline-flex items-center gap-1"><Check size={12} /> Accepted</span>
+      ) : (
+        <span className="text-amber-300 text-xs">Pending</span>
+      )}
+      <button onClick={copy} title="Copy customer link" className="text-vodium-cream/40 hover:text-vodium-gold">
+        {copied ? <Check size={13} /> : <Copy size={13} />}
+      </button>
+    </span>
+  );
+}
+
+const inputClass =
+  "w-full bg-black/25 border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-vodium-cream focus:outline-none focus:border-vodium-gold/40";
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="space-y-1 block flex-1">
+      <span className="text-xs text-vodium-cream/40">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function defaultDueDate(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 14);
+  return d.toISOString().slice(0, 10);
+}

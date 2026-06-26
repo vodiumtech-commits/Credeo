@@ -7,7 +7,7 @@ import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-type Purpose = "login" | "register";
+type Purpose = "login" | "register" | "reset";
 
 export async function sendOtpEmail(to: string, otp: string, purpose: Purpose) {
   if (!process.env.RESEND_API_KEY) {
@@ -18,10 +18,16 @@ export async function sendOtpEmail(to: string, otp: string, purpose: Purpose) {
   const subject =
     purpose === "login"
       ? "Your Vodium Ledger login code"
-      : "Verify your Vodium Ledger account";
+      : purpose === "reset"
+        ? "Your Vodium Ledger password reset code"
+        : "Verify your Vodium Ledger account";
 
   const action =
-    purpose === "login" ? "complete your sign-in to" : "verify your";
+    purpose === "login"
+      ? "complete your sign-in to"
+      : purpose === "reset"
+        ? "reset the password for"
+        : "verify your";
 
   await resend.emails.send({
     from:    "Vodium Ledger <noreply@vodiumledger.com>",   // verify vodiumledger.com in Resend dashboard

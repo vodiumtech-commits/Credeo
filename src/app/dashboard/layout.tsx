@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, CreditCard, Settings, LogOut,
   MessageCircle, Menu, X, Plus, ChevronRight, Zap,
+  Building2, ReceiptText, TicketPercent, WalletCards, SlidersHorizontal,
 } from "lucide-react";
 import { NpsWidget } from "@/components/ui/nps-widget";
 import { NavProgress } from "@/components/ui/nav-progress";
@@ -16,6 +17,8 @@ type VendorInfo = {
   ownerName: string;
   location: string | null;
   community: { shortName: string | null; name: string } | null;
+  organization: { name: string; type: string; status: string; trialEndsAt: string | null; logoUrl: string | null; brandColor: string | null } | null;
+  branch: { name: string; code: string } | null;
   subscription: { 
     plan: string; 
     status: string;
@@ -30,12 +33,25 @@ const NAV_ITEMS = [
   { href: "/dashboard/settings",  icon: Settings,        label: "Settings",  emoji: "◌" },
 ];
 
+const ENTERPRISE_NAV_ITEMS = [
+  { href: "/dashboard/supermarket", icon: Building2,     label: "HQ" },
+  { href: "/dashboard/bnpl",        icon: ReceiptText,   label: "BNPL" },
+  { href: "/dashboard/coupons",     icon: TicketPercent, label: "Coupons" },
+  { href: "/dashboard/ledger",      icon: WalletCards,   label: "Ledger" },
+  { href: "/dashboard/supermarket/settings", icon: SlidersHorizontal, label: "Org settings" },
+];
+
 const PAGE_TITLES: Record<string, string> = {
   "/dashboard":            "Overview",
   "/dashboard/credits":    "Credits",
   "/dashboard/customers":  "Customers",
   "/dashboard/settings":   "Settings",
   "/dashboard/credit/new": "New Credit",
+  "/dashboard/supermarket": "Supermarket",
+  "/dashboard/supermarket/settings": "Org settings",
+  "/dashboard/bnpl":       "BNPL",
+  "/dashboard/coupons":    "Coupons",
+  "/dashboard/ledger":     "Ledger",
 };
 
 const PLAN_COLORS: Record<string, string> = {
@@ -70,7 +86,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   const businessName = vendor?.businessName ?? "My Shop";
-  const community    = vendor?.community?.shortName ?? vendor?.community?.name ?? vendor?.location ?? "Community";
+  const isEnterprise = vendor?.organization && vendor.organization.type !== "SOLO_VENDOR";
+  const brandColor   = (isEnterprise && vendor?.organization?.brandColor) || null;
+  const orgLogo      = isEnterprise ? vendor?.organization?.logoUrl ?? null : null;
+  const orgName      = isEnterprise ? vendor?.organization?.name ?? null : null;
+  const community    = isEnterprise
+    ? vendor?.branch?.name ?? vendor?.organization?.name ?? "Organization"
+    : vendor?.community?.shortName ?? vendor?.community?.name ?? vendor?.location ?? "Community";
   const plan         = vendor?.subscription?.plan ?? "STARTER";
   const planLabel    = PLAN_LABELS[plan] ?? plan;
   const planColor    = PLAN_COLORS[plan] ?? PLAN_COLORS.STARTER;
@@ -102,12 +124,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {showLogo && (
           <div className="px-5 py-5 border-b border-white/[0.05] flex-shrink-0">
             <Link href="/" className="flex items-center gap-3 group" onClick={onClose}>
-              <div className="w-9 h-9 rounded-2xl bg-vodium-charcoal border border-vodium-gold/30 flex items-center justify-center group-hover:border-vodium-gold/60 transition-all duration-200 shadow-[0_0_12px_rgba(201,169,97,0.08)]">
-                <span className="font-serif text-vodium-gold text-lg leading-none">V</span>
-              </div>
+              {orgLogo ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={orgLogo} alt={orgName ?? "Logo"} className="w-9 h-9 rounded-2xl object-cover border" style={{ borderColor: `${brandColor ?? "#C9A961"}4d` }} />
+              ) : (
+                <div
+                  className="w-9 h-9 rounded-2xl bg-vodium-charcoal border flex items-center justify-center transition-all duration-200"
+                  style={{ borderColor: `${brandColor ?? "#C9A961"}4d` }}
+                >
+                  <span className="font-serif text-lg leading-none" style={{ color: brandColor ?? "#C9A961" }}>
+                    {orgName ? orgName.trim().charAt(0).toUpperCase() : "V"}
+                  </span>
+                </div>
+              )}
               <div>
-                <p className="font-serif text-[11px] tracking-[0.28em] text-vodium-gold leading-none">VODIUM</p>
-                <p className="text-[9px] text-vodium-cream/20 tracking-[0.22em] mt-1.5 uppercase font-medium">Ledger</p>
+                <p className="font-serif text-[11px] tracking-[0.28em] leading-none" style={{ color: brandColor ?? "#C9A961" }}>
+                  {orgName ? orgName.toUpperCase().slice(0, 16) : "VODIUM"}
+                </p>
+                <p className="text-[9px] text-vodium-cream/20 tracking-[0.22em] mt-1.5 uppercase font-medium">
+                  {orgName ? "powered by Vodium" : "Ledger"}
+                </p>
               </div>
             </Link>
           </div>
@@ -138,6 +174,33 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </Link>
             );
           })}
+          {isEnterprise && (
+            <>
+              <p className="text-[9px] font-bold tracking-[0.18em] text-vodium-cream/20 uppercase px-3 pt-5 mb-3">Enterprise</p>
+              {ENTERPRISE_NAV_ITEMS.map(({ href, icon: Icon, label }) => {
+                const isActive = pathname === href || pathname.startsWith(`${href}/`);
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={onClose}
+                    className={[
+                      "group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150",
+                      isActive
+                        ? "bg-vodium-gold/[0.08] text-vodium-gold border border-vodium-gold/15 shadow-[0_1px_8px_rgba(201,169,97,0.06)]"
+                        : "text-vodium-cream/40 hover:text-vodium-cream/80 hover:bg-white/[0.04] border border-transparent",
+                    ].join(" ")}
+                  >
+                    <Icon size={16} className="flex-shrink-0" />
+                    <span className="flex-1">{label}</span>
+                    {isActive && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-vodium-gold/70 flex-shrink-0" />
+                    )}
+                  </Link>
+                );
+              })}
+            </>
+          )}
         </nav>
 
         {/* WhatsApp shortcut */}
@@ -235,12 +298,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.05] flex-shrink-0">
           <Link href="/" className="flex items-center gap-3" onClick={() => setSidebarOpen(false)}>
-            <div className="w-8 h-8 rounded-xl bg-vodium-charcoal border border-vodium-gold/30 flex items-center justify-center">
-              <span className="font-serif text-vodium-gold text-base leading-none">V</span>
-            </div>
+            {orgLogo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={orgLogo} alt={orgName ?? "Logo"} className="w-8 h-8 rounded-xl object-cover border" style={{ borderColor: `${brandColor ?? "#C9A961"}4d` }} />
+            ) : (
+              <div className="w-8 h-8 rounded-xl bg-vodium-charcoal border flex items-center justify-center" style={{ borderColor: `${brandColor ?? "#C9A961"}4d` }}>
+                <span className="font-serif text-base leading-none" style={{ color: brandColor ?? "#C9A961" }}>
+                  {orgName ? orgName.trim().charAt(0).toUpperCase() : "V"}
+                </span>
+              </div>
+            )}
             <div>
-              <p className="font-serif text-[11px] tracking-[0.25em] text-vodium-gold leading-none">VODIUM</p>
-              <p className="text-[9px] text-vodium-cream/25 tracking-[0.2em] mt-1 uppercase">Ledger</p>
+              <p className="font-serif text-[11px] tracking-[0.25em] leading-none" style={{ color: brandColor ?? "#C9A961" }}>
+                {orgName ? orgName.toUpperCase().slice(0, 16) : "VODIUM"}
+              </p>
+              <p className="text-[9px] text-vodium-cream/25 tracking-[0.2em] mt-1 uppercase">{orgName ? "powered by Vodium" : "Ledger"}</p>
             </div>
           </Link>
           <button

@@ -20,6 +20,7 @@ import { normalisePhone } from "../../../lib/utils";
 import { messages } from "../../../lib/whatsapp/messages";
 import { sendWhatsAppMessage } from "../../../lib/whatsapp/outbound";
 import { parseCommunity } from "../../../lib/community";
+import { createSoloOrganizationForVendor, trialEndsAt } from "../../../lib/tenant";
 import {
   step,
   type SessionContext,
@@ -114,6 +115,7 @@ export async function POST(req: NextRequest) {
   const change  = payload.entry?.[0]?.changes?.[0];
   const value   = change?.value;
   const message = value?.messages?.[0];
+  const phoneNumberId = value?.metadata?.phone_number_id;
 
   // Silently ack status updates, delivery receipts, etc.
   if (!message || message.type !== "text" || !message.text?.body) {
@@ -127,11 +129,26 @@ export async function POST(req: NextRequest) {
 
   // ── Process message (wrapped so errors never escape) ────────────────────────
   try {
+    const channel = phoneNumberId
+      ? await prisma.whatsAppChannel.findUnique({
+          where: { phoneNumberId },
+          select: { id: true, organizationId: true, status: true },
+        })
+      : null;
+
     // Load or create session
     const session = await prisma.whatsAppSession.upsert({
       where:  { phone: fromPhone },
-      update: { lastInteractionAt: new Date() },
-      create: { phone: fromPhone, state: "IDLE", context: {} },
+      update: {
+        lastInteractionAt: new Date(),
+        ...(channel ? { channelId: channel.id, organizationId: channel.organizationId } : {}),
+      },
+      create: {
+        phone: fromPhone,
+        state: "IDLE",
+        context: {},
+        ...(channel ? { channelId: channel.id, organizationId: channel.organizationId } : {}),
+      },
     });
 
     // Resolve vendor — restrict BOT to registered vendors only
@@ -165,6 +182,7 @@ export async function POST(req: NextRequest) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         context: { ...sessionCtx.context, ...(result.contextPatch ?? {}) } as any,
         vendorId: vendor?.id,
+        ...(channel ? { channelId: channel.id, organizationId: channel.organizationId } : {}),
       },
     });
 
@@ -237,16 +255,17 @@ async function runSideEffect(
 
       const placeholderEmail = `${normalPhone.replace("+", "")}@wa.vodiumledger.com`;
       const placeholderHash  = `$2a$12$whatsapp${crypto.randomBytes(16).toString("hex")}`;
-      const trialEndsAt      = new Date(Date.now() + 60 * 86_400_000);
+      const subscriptionTrialEndsAt = trialEndsAt();
 
       const newVendor = await prisma.vendor.create({
         data: {
           ownerName: name, businessName, phone: normalPhone,
           email: placeholderEmail, passwordHash: placeholderHash,
           communityId: community.id, vendorType: "OTHER", status: "ACTIVE",
-          subscription: { create: { plan: "STARTER", status: "TRIAL", trialEndsAt, monthlyAmount: 2000 } },
+          subscription: { create: { plan: "STARTER", status: "TRIAL", trialEndsAt: subscriptionTrialEndsAt, monthlyAmount: 2000 } },
         },
       });
+      await createSoloOrganizationForVendor(newVendor);
       return { newVendorId: newVendor.id };
     }
 
@@ -261,7 +280,7 @@ async function runSideEffect(
       }
       const vendor = await prisma.vendor.findUnique({
         where: { id: vendorId },
-        select: { businessName: true, communityId: true },
+        select: { businessName: true, communityId: true, organizationId: true, branchId: true },
       });
 
       const existingVendor = await prisma.vendor.findUnique({
@@ -300,13 +319,24 @@ async function runSideEffect(
             phone: normalCustomerPhone,
             matricNumber: generatedCustomerId,
             communityId: vendor?.communityId ?? null,
+            organizationId: vendor?.organizationId ?? null,
           },
         });
       }
       if (!customer) return {};
 
       const dueDate = new Date(Date.now() + dueInMinutes * 60_000);
-      await prisma.credit.create({ data: { vendorId, studentId: customer.id, amount, dueDate, status: "OUTSTANDING" } });
+      await prisma.credit.create({
+        data: {
+          vendorId,
+          organizationId: vendor?.organizationId ?? null,
+          branchId: vendor?.branchId ?? null,
+          studentId: customer.id,
+          amount,
+          dueDate,
+          status: "OUTSTANDING",
+        },
+      });
       await prisma.creditScoreEvent.create({ data: { studentId: customer.id, vendorId, eventType: "CREDIT_EXTENDED", amount, scoreDelta: 0 } });
 
       // Notify vendor on web dashboard

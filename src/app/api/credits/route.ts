@@ -145,6 +145,7 @@ export async function POST(req: NextRequest) {
         phone: customerPhoneKey,
         matricNumber: generatedCustomerId,
         communityId: vendor.communityId,
+        organizationId: vendor.organizationId,
       },
     });
   }
@@ -182,6 +183,8 @@ export async function POST(req: NextRequest) {
   const credit = await prisma.credit.create({
     data: {
       vendorId: vendor.id,
+      organizationId: vendor.organizationId,
+      branchId: vendor.branchId,
       studentId: student.id,
       amount,
       description: description ?? null,

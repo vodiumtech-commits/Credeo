@@ -24,6 +24,173 @@ model Community {
 
   vendors  Vendor[]
   students Student[]
+  organizations Organization[]
+}
+
+// ─────────────────────────────────────────────
+// ORGANIZATIONS / ENTERPRISE TENANTS
+// ─────────────────────────────────────────────
+
+model Organization {
+  id          String             @id @default(cuid())
+  name        String
+  slug        String             @unique
+  type        OrganizationType   @default(SOLO_VENDOR)
+  status      OrganizationStatus @default(TRIAL)
+  trialEndsAt DateTime?
+  plan        OrganizationPlan   @default(FREE)
+  logoUrl     String?
+  brandColor  String?
+  communityId String?
+  community   Community?         @relation(fields: [communityId], references: [id])
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  branches    Branch[]
+  vendors     Vendor[]
+  students    Student[]
+  credits     Credit[]
+  bnplOrders  BnplOrder[]
+  paymentMandates PaymentMandate[]
+  couponCampaigns CouponCampaign[]
+  couponRedemptions CouponRedemption[]
+  ledgerEntries WalletLedgerEntry[]
+  members     OrganizationMembership[]
+  domains     TenantDomain[]
+  whatsAppChannels WhatsAppChannel[]
+  whatsAppSessions WhatsAppSession[]
+
+  @@index([type])
+  @@index([status])
+  @@index([communityId])
+}
+
+enum OrganizationType {
+  SOLO_VENDOR
+  SUPERMARKET
+  ENTERPRISE
+}
+
+enum OrganizationStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  SUSPENDED
+  CANCELLED
+}
+
+enum OrganizationPlan {
+  FREE
+  STARTER
+  GROWTH
+  PRO
+  ENTERPRISE
+}
+
+model Branch {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  code           String
+  phone          String?
+  address        String?
+  city           String?
+  state          String?
+  status         BranchStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  vendors        Vendor[]
+  credits        Credit[]
+  memberships    OrganizationMembership[]
+  bnplOrders     BnplOrder[]
+  couponCampaigns CouponCampaign[]
+  ledgerEntries  WalletLedgerEntry[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+  @@index([status])
+}
+
+enum BranchStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+model OrganizationMembership {
+  id             String           @id @default(cuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id])
+  vendorId       String
+  vendor         Vendor           @relation(fields: [vendorId], references: [id])
+  branchId       String?
+  branch         Branch?          @relation(fields: [branchId], references: [id])
+  role           OrganizationRole @default(BRANCH_STAFF)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@unique([organizationId, vendorId])
+  @@index([organizationId])
+  @@index([vendorId])
+  @@index([branchId])
+  @@index([role])
+}
+
+enum OrganizationRole {
+  OWNER
+  HQ_ADMIN
+  BRANCH_MANAGER
+  BRANCH_STAFF
+  FINANCE
+  AUDITOR
+}
+
+model TenantDomain {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  host           String       @unique
+  status         DomainStatus @default(PENDING)
+  verifiedAt     DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId])
+  @@index([status])
+}
+
+enum DomainStatus {
+  PENDING
+  VERIFIED
+  DISABLED
+}
+
+model WhatsAppChannel {
+  id             String                @id @default(cuid())
+  organizationId String
+  organization   Organization          @relation(fields: [organizationId], references: [id])
+  displayName    String
+  phoneNumber    String?
+  phoneNumberId  String?               @unique
+  businessAccountId String?
+  accessTokenRef String?               // name of an env var holding the token (env-first strategy)
+  accessTokenEnc String?               // AES-256-GCM encrypted access token (never plaintext)
+  status         WhatsAppChannelStatus @default(TEST)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  sessions       WhatsAppSession[]
+
+  @@index([organizationId])
+  @@index([status])
+}
+
+enum WhatsAppChannelStatus {
+  TEST
+  ACTIVE
+  DISABLED
 }
 
 enum CommunityStatus {
@@ -40,10 +207,16 @@ model Vendor {
   email         String   @unique
   passwordHash  String
   vendorType    VendorType
+  organizationId String?
+  organization  Organization? @relation(fields: [organizationId], references: [id])
+  branchId      String?
+  branch        Branch? @relation(fields: [branchId], references: [id])
   communityId  String
   community    Community @relation(fields: [communityId], references: [id])
   location      String?
   status        VendorStatus @default(ACTIVE)
+  inviteToken          String?   @unique  // set when a staff member is invited; cleared on accept
+  inviteTokenExpiresAt DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -51,8 +224,13 @@ model Vendor {
   subscription  VendorSubscription?
   scoreEvents   CreditScoreEvent[]
   notifications Notification[]
+  memberships   OrganizationMembership[]
+  bnplOrders    BnplOrder[]
+  ledgerEntries WalletLedgerEntry[]
 
   @@index([communityId])
+  @@index([organizationId])
+  @@index([branchId])
   @@index([phone])
   @@index([email])
 }
@@ -82,6 +260,8 @@ model Student {
   phone         String   @unique
   communityId   String?
   community     Community? @relation(fields: [communityId], references: [id])
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
   vodiumScore   Int      @default(500)  // 0–1000 scale, 500 = unscored baseline
   scoreUpdatedAt DateTime?
   createdAt     DateTime @default(now())
@@ -89,8 +269,12 @@ model Student {
 
   credits       Credit[]
   scoreEvents   CreditScoreEvent[]
+  bnplOrders    BnplOrder[]
+  paymentMandates PaymentMandate[]
+  couponRedemptions CouponRedemption[]
 
   @@index([communityId])
+  @@index([organizationId])
   @@index([phone])
   @@index([matricNumber])
 }
@@ -103,6 +287,10 @@ model Credit {
   id              String   @id @default(cuid())
   vendorId        String
   vendor          Vendor   @relation(fields: [vendorId], references: [id])
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id])
+  branchId        String?
+  branch          Branch? @relation(fields: [branchId], references: [id])
   studentId       String
   student         Student  @relation(fields: [studentId], references: [id])
   amount          Decimal  @db.Decimal(12, 2)  // ₦
@@ -121,8 +309,11 @@ model Credit {
 
   repayments      Repayment[]
   scoreEvents     CreditScoreEvent[]
+  bnplOrders      BnplOrder[]
 
   @@index([vendorId])
+  @@index([organizationId])
+  @@index([branchId])
   @@index([studentId])
   @@index([status])
   @@index([dueDate])
@@ -150,6 +341,226 @@ model Repayment {
   createdAt   DateTime @default(now())
 
   @@index([creditId])
+}
+
+// ─────────────────────────────────────────────
+// BNPL, COUPONS, PAYMENT MANDATES & LEDGER
+// ─────────────────────────────────────────────
+
+model BnplOrder {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  branchId        String?
+  branch          Branch?      @relation(fields: [branchId], references: [id])
+  vendorId        String
+  vendor          Vendor       @relation(fields: [vendorId], references: [id])
+  studentId       String
+  student         Student      @relation(fields: [studentId], references: [id])
+  creditId        String?
+  credit          Credit?      @relation(fields: [creditId], references: [id])
+  orderNumber     String
+  status          BnplOrderStatus @default(DRAFT)
+  subtotal        Decimal      @db.Decimal(12, 2)
+  discountAmount  Decimal      @default(0) @db.Decimal(12, 2)
+  totalAmount     Decimal      @db.Decimal(12, 2)
+  downPayment     Decimal      @default(0) @db.Decimal(12, 2)
+  currency        String       @default("NGN")
+  dueDate         DateTime
+  termsAcceptedAt DateTime?
+  couponCode      String?
+  paymentReference String?
+  notes           String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  items           BnplOrderItem[]
+  schedules       RepaymentSchedule[]
+  couponRedemptions CouponRedemption[]
+
+  @@unique([organizationId, orderNumber])
+  @@index([organizationId])
+  @@index([branchId])
+  @@index([vendorId])
+  @@index([studentId])
+  @@index([creditId])
+  @@index([status])
+  @@index([dueDate])
+}
+
+enum BnplOrderStatus {
+  DRAFT
+  ACTIVE
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+  WRITTEN_OFF
+}
+
+model BnplOrderItem {
+  id          String    @id @default(cuid())
+  orderId     String
+  order       BnplOrder @relation(fields: [orderId], references: [id])
+  name        String
+  sku         String?
+  quantity    Int       @default(1)
+  unitPrice   Decimal   @db.Decimal(12, 2)
+  totalPrice  Decimal   @db.Decimal(12, 2)
+  createdAt   DateTime  @default(now())
+
+  @@index([orderId])
+}
+
+model RepaymentSchedule {
+  id          String   @id @default(cuid())
+  orderId     String
+  order       BnplOrder @relation(fields: [orderId], references: [id])
+  dueAt       DateTime
+  amount      Decimal  @db.Decimal(12, 2)
+  status      RepaymentScheduleStatus @default(PENDING)
+  paidAt      DateTime?
+  providerReference String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([status])
+  @@index([dueAt])
+}
+
+enum RepaymentScheduleStatus {
+  PENDING
+  PAID
+  FAILED
+  OVERDUE
+  CANCELLED
+}
+
+model PaymentMandate {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  studentId      String
+  student        Student      @relation(fields: [studentId], references: [id])
+  provider       PaymentProvider
+  status         PaymentMandateStatus @default(PENDING)
+  customerReference String?
+  authorizationReference String?
+  mandateReference String?
+  reusable       Boolean      @default(false)
+  expiresAt      DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId])
+  @@index([studentId])
+  @@index([provider])
+  @@index([status])
+}
+
+enum PaymentProvider {
+  PAYSTACK
+  MANUAL
+}
+
+enum PaymentMandateStatus {
+  PENDING
+  ACTIVE
+  FAILED
+  REVOKED
+  EXPIRED
+}
+
+model CouponCampaign {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  branchId       String?
+  branch         Branch?      @relation(fields: [branchId], references: [id])
+  name           String
+  code           String
+  type           CouponDiscountType
+  value          Decimal      @db.Decimal(12, 2)
+  minimumSpend   Decimal?     @db.Decimal(12, 2)
+  maxRedemptions Int?
+  perCustomerLimit Int?
+  startsAt       DateTime     @default(now())
+  endsAt         DateTime?
+  active         Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  redemptions    CouponRedemption[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+  @@index([branchId])
+  @@index([active])
+  @@index([endsAt])
+}
+
+enum CouponDiscountType {
+  FIXED
+  PERCENTAGE
+}
+
+model CouponRedemption {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  campaignId     String
+  campaign       CouponCampaign @relation(fields: [campaignId], references: [id])
+  studentId      String
+  student        Student      @relation(fields: [studentId], references: [id])
+  orderId        String?
+  order          BnplOrder?   @relation(fields: [orderId], references: [id])
+  amount         Decimal      @db.Decimal(12, 2)
+  redeemedAt     DateTime     @default(now())
+
+  @@index([organizationId])
+  @@index([campaignId])
+  @@index([studentId])
+  @@index([orderId])
+}
+
+model WalletLedgerEntry {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  branchId       String?
+  branch         Branch?      @relation(fields: [branchId], references: [id])
+  vendorId       String?
+  vendor         Vendor?      @relation(fields: [vendorId], references: [id])
+  entryType      LedgerEntryType
+  direction      LedgerDirection
+  amount         Decimal      @db.Decimal(12, 2)
+  currency       String       @default("NGN")
+  sourceType     String
+  sourceId       String?
+  description    String?
+  balanceAfter   Decimal?     @db.Decimal(12, 2)
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
+  @@index([branchId])
+  @@index([vendorId])
+  @@index([entryType])
+  @@index([createdAt])
+}
+
+enum LedgerEntryType {
+  BNPL_ISSUED
+  PAYMENT_RECEIVED
+  COUPON_DISCOUNT
+  REFUND
+  ADJUSTMENT
+  SETTLEMENT
+}
+
+enum LedgerDirection {
+  DEBIT
+  CREDIT
 }
 
 enum RepaymentMethod {
@@ -234,6 +645,10 @@ model WhatsAppSession {
   id              String   @id @default(cuid())
   phone           String   @unique  // E.164, includes whatsapp:+234...
   vendorId        String?
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id])
+  channelId       String?
+  channel         WhatsAppChannel? @relation(fields: [channelId], references: [id])
   state           WhatsAppState @default(IDLE)
   context         Json?    // free-form per-flow state
   lastInteractionAt DateTime @default(now())
@@ -241,6 +656,8 @@ model WhatsAppSession {
   updatedAt       DateTime @updatedAt
 
   @@index([phone])
+  @@index([organizationId])
+  @@index([channelId])
 }
 
 enum WhatsAppState {

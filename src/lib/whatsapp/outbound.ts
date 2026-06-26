@@ -11,9 +11,13 @@
 
 const META_API_VERSION = "v19.0";
 
-export async function sendWhatsAppMessage(to: string, body: string): Promise<void> {
-  const token   = process.env.WHATSAPP_ACCESS_TOKEN;
-  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+export async function sendWhatsAppMessage(
+  to: string,
+  body: string,
+  creds?: { token: string; phoneId: string }
+): Promise<void> {
+  const token   = creds?.token  ?? process.env.WHATSAPP_ACCESS_TOKEN;
+  const phoneId = creds?.phoneId ?? process.env.WHATSAPP_PHONE_NUMBER_ID;
 
   if (!token || !phoneId) {
     // Dev fallback — print to terminal instead of crashing.

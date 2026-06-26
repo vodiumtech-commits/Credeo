@@ -31,6 +31,7 @@ export default function LoginPage() {
   const [resending, setResending] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [tenant, setTenant] = useState<{ name: string; logoUrl: string | null; brandColor: string | null } | null>(null);
   const submitting = useRef(false);
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -40,6 +41,16 @@ export default function LoginPage() {
     const t = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
     return () => clearTimeout(t);
   }, [resendCooldown]);
+
+  // White-label: if this host belongs to a supermarket tenant, brand the page.
+  useEffect(() => {
+    fetch("/api/tenant/current")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d?.organization && setTenant(d.organization))
+      .catch(() => {});
+  }, []);
+
+  const brand = tenant?.brandColor || "#C9A961";
 
   // ── Step 1: verify credentials, request OTP ────────────────────────────
 
@@ -164,13 +175,18 @@ export default function LoginPage() {
       <Spotlight className="-top-60 left-0 opacity-20" />
 
       <Link href="/" className="relative z-10 flex items-center gap-3 group">
-        <div className="w-10 h-10 rounded-full bg-vodium-charcoal border border-vodium-gold/40 flex items-center justify-center group-hover:border-vodium-gold/70 transition-colors">
-          <span className="font-serif text-vodium-gold text-xl leading-none">
-            V
-          </span>
-        </div>
-        <span className="font-serif tracking-[0.18em] text-vodium-gold text-sm">
-          VODIUM LEDGER
+        {tenant?.logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={tenant.logoUrl} alt={tenant.name} className="w-10 h-10 rounded-full object-cover border" style={{ borderColor: `${brand}66` }} />
+        ) : (
+          <div className="w-10 h-10 rounded-full bg-vodium-charcoal border flex items-center justify-center transition-colors" style={{ borderColor: `${brand}66` }}>
+            <span className="font-serif text-xl leading-none" style={{ color: brand }}>
+              {tenant ? tenant.name.trim().charAt(0).toUpperCase() : "V"}
+            </span>
+          </div>
+        )}
+        <span className="font-serif tracking-[0.18em] text-sm" style={{ color: brand }}>
+          {tenant ? tenant.name.toUpperCase() : "VODIUM LEDGER"}
         </span>
       </Link>
 
@@ -314,9 +330,14 @@ export default function LoginPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-vodium-black mb-1.5">
-                    Password
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-sm font-medium text-vodium-black">
+                      Password
+                    </label>
+                    <Link href="/forgot-password" className="text-xs text-vodium-black/50 hover:text-vodium-black underline underline-offset-2">
+                      Forgot password?
+                    </Link>
+                  </div>
                   <div className="relative">
                     <Lock
                       size={15}

@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "vercel-build": "prisma migrate deploy && next build",
     "postinstall": "prisma generate",
     "start": "next start",
     "lint": "next lint",
@@ -12,6 +13,7 @@
     "db:generate": "node --env-file=.env.local node_modules/.bin/prisma generate",
     "db:push": "node --env-file=.env.local node_modules/.bin/prisma db push",
     "db:migrate": "node --env-file=.env.local node_modules/.bin/prisma migrate dev",
+    "db:deploy": "node --env-file=.env.local node_modules/.bin/prisma migrate deploy",
     "db:studio": "node --env-file=.env.local node_modules/.bin/prisma studio",
     "db:reset": "node --env-file=.env.local node_modules/.bin/prisma migrate reset",
     "seed": "node --env-file=.env.local node_modules/.bin/tsx scripts/seed.ts"
