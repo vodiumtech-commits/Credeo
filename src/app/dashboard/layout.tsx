@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, CreditCard, Settings, LogOut,
   MessageCircle, Menu, X, Plus, ChevronRight, Zap,
-  Building2, ReceiptText, TicketPercent, WalletCards, SlidersHorizontal,
+  Building2, ReceiptText, TicketPercent, WalletCards, SlidersHorizontal, Package,
 } from "lucide-react";
 import { NpsWidget } from "@/components/ui/nps-widget";
 import { NavProgress } from "@/components/ui/nav-progress";
@@ -35,6 +35,7 @@ const NAV_ITEMS = [
 
 const ENTERPRISE_NAV_ITEMS = [
   { href: "/dashboard/supermarket", icon: Building2,     label: "HQ" },
+  { href: "/dashboard/products",    icon: Package,       label: "Products" },
   { href: "/dashboard/bnpl",        icon: ReceiptText,   label: "BNPL" },
   { href: "/dashboard/coupons",     icon: TicketPercent, label: "Coupons" },
   { href: "/dashboard/ledger",      icon: WalletCards,   label: "Ledger" },
@@ -49,6 +50,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/dashboard/credit/new": "New Credit",
   "/dashboard/supermarket": "Supermarket",
   "/dashboard/supermarket/settings": "Org settings",
+  "/dashboard/products":   "Products",
   "/dashboard/bnpl":       "BNPL",
   "/dashboard/coupons":    "Coupons",
   "/dashboard/ledger":     "Ledger",
@@ -72,7 +74,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [vendor, setVendor]           = useState<VendorInfo | null>(null);
   const pathname = usePathname();
-  const router   = useRouter();
 
   useEffect(() => {
     fetch("/api/vendor/me")
@@ -82,7 +83,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   async function handleSignOut() {
     await fetch("/api/auth/signout", { method: "POST" });
-    router.push("/login");
+    // Full navigation (not router.push) so no authenticated client state or
+    // cached view can be restored via the browser back button.
+    window.location.replace("/login");
   }
 
   const businessName = vendor?.businessName ?? "My Shop";

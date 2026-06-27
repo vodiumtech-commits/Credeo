@@ -19,6 +19,7 @@ import { nextVendorCustomerId } from "../../../lib/customer-id";
 import { normalisePhone } from "../../../lib/utils";
 import { messages } from "../../../lib/whatsapp/messages";
 import { sendWhatsAppMessage } from "../../../lib/whatsapp/outbound";
+import { getOrgChannelCredentials } from "../../../lib/whatsapp/channel-token";
 import { parseCommunity } from "../../../lib/community";
 import { createSoloOrganizationForVendor, trialEndsAt } from "../../../lib/tenant";
 import {
@@ -136,6 +137,10 @@ export async function POST(req: NextRequest) {
         })
       : null;
 
+    // Reply from the store's own WhatsApp number when this message arrived on a
+    // store channel; otherwise fall back to the global Vodium number.
+    const creds = (await getOrgChannelCredentials(channel?.organizationId)) ?? undefined;
+
     // Load or create session
     const session = await prisma.whatsAppSession.upsert({
       where:  { phone: fromPhone },
@@ -160,7 +165,8 @@ export async function POST(req: NextRequest) {
       console.log(`[whatsapp] Rejected: unregistered user ${fromPhone}`);
       await sendWhatsAppMessage(
         fromPhone,
-        "You are not registered as a vendor on Vodium Ledger. Please sign up at vodium.ng or contact support."
+        "You are not registered as a vendor on Vodium Ledger. Please sign up at vodium.ng or contact support.",
+        creds
       );
       return NextResponse.json({ ok: true });
     }
@@ -207,7 +213,7 @@ export async function POST(req: NextRequest) {
     console.log(`[whatsapp] → ${fromPhone}: "${finalReply.slice(0, 80)}..."`);
 
     // Send reply
-    await sendWhatsAppMessage(fromPhone, finalReply);
+    await sendWhatsAppMessage(fromPhone, finalReply, creds);
 
   } catch (err) {
     console.error("[whatsapp] Error processing message from", fromPhone, ":", err);

@@ -31,7 +31,14 @@ export type AuditAction =
   | "member.accepted"
   // bnpl / credit
   | "bnpl.order_created"
+  | "bnpl.order_submitted"
+  | "bnpl.order_approved"
+  | "bnpl.order_declined"
   | "bnpl.repayment_recorded"
+  // catalog
+  | "product.created"
+  | "product.updated"
+  | "product.deleted"
   | "bnpl.consent_accepted"
   // coupons
   | "coupon.created"

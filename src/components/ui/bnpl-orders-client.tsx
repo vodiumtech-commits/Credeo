@@ -39,6 +39,7 @@ export function BnplOrdersClient({
 }) {
   const [showForm, setShowForm] = useState(false);
   const [repayFor, setRepayFor] = useState<string | null>(null);
+  const pending = orders.filter((o) => o.status === "DRAFT");
 
   return (
     <div className="space-y-6">
@@ -76,6 +77,20 @@ export function BnplOrdersClient({
           defaultBranchId={defaultBranchId}
           onClose={() => setShowForm(false)}
         />
+      )}
+
+      {canWrite && pending.length > 0 && (
+        <section className="rounded-xl border border-amber-300/20 bg-amber-300/[0.04] overflow-hidden">
+          <div className="px-5 py-4 border-b border-amber-300/15 flex items-center gap-2">
+            <span className="text-sm font-semibold text-amber-200">Pending approval</span>
+            <span className="text-xs text-amber-200/50">{pending.length} customer request{pending.length === 1 ? "" : "s"} from your store page</span>
+          </div>
+          <div className="divide-y divide-white/[0.05]">
+            {pending.map((order) => (
+              <PendingRow key={order.id} order={order} />
+            ))}
+          </div>
+        </section>
       )}
 
       <section className="rounded-xl border border-white/[0.06] bg-vodium-charcoal overflow-hidden">
@@ -313,6 +328,44 @@ function NewOrderForm({
         >
           {saving && <Loader2 size={13} className="animate-spin" />}
           Create order
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PendingRow({ order }: { order: BnplOrderRow }) {
+  const [busy, setBusy] = useState<"approve" | "decline" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function act(kind: "approve" | "decline") {
+    if (kind === "decline" && !confirm(`Decline order ${order.orderNumber}?`)) return;
+    setError(null);
+    setBusy(kind);
+    const res = await fetch(`/api/bnpl/orders/${order.id}/${kind}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    const data = await res.json().catch(() => ({}));
+    setBusy(null);
+    if (!res.ok) return setError(data.error ?? `Could not ${kind} the order.`);
+    window.location.reload();
+  }
+
+  return (
+    <div className="px-5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="min-w-0">
+        <p className="text-sm text-vodium-cream">{order.studentName} <span className="text-vodium-cream/35">· {order.orderNumber}</span></p>
+        <p className="text-xs text-vodium-cream/40">{formatNaira(order.totalAmount)} · requested online</p>
+        {error && <p className="text-xs text-rose-300 mt-1">{error}</p>}
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <button onClick={() => act("decline")} disabled={busy !== null} className="px-3 py-1.5 rounded-lg border border-white/10 text-xs text-rose-300 hover:border-rose-300/30 disabled:opacity-50 inline-flex items-center gap-1.5">
+          {busy === "decline" && <Loader2 size={12} className="animate-spin" />} Decline
+        </button>
+        <button onClick={() => act("approve")} disabled={busy !== null} className="px-3 py-1.5 rounded-lg bg-vodium-gold text-vodium-black text-xs font-bold disabled:opacity-50 inline-flex items-center gap-1.5">
+          {busy === "approve" && <Loader2 size={12} className="animate-spin" />} Approve
         </button>
       </div>
     </div>

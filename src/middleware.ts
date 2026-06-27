@@ -17,6 +17,7 @@ const PUBLIC_API_PREFIXES = [
   "/api/admin/invite",
   "/api/staff/accept",
   "/api/public",
+  "/api/storefront",
 ];
 
 const VENDOR_API_PREFIXES = [
@@ -37,6 +38,7 @@ const VENDOR_API_PREFIXES = [
   "/api/tenant/branches",
   "/api/tenant/members",
   "/api/tenant/organization",
+  "/api/products",
   "/api/user",
 ];
 
@@ -71,7 +73,7 @@ export async function middleware(req: NextRequest) {
         : NextResponse.redirect(new URL("/admin", req.url));
     }
 
-    return withSecurityHeaders(NextResponse.next());
+    return noStore(withSecurityHeaders(NextResponse.next()));
   }
 
   if (pathname.startsWith("/dashboard")) {
@@ -79,7 +81,7 @@ export async function middleware(req: NextRequest) {
     if (!token || !(await verifyVendorToken(token))) {
       return unauthorized(req, "/login");
     }
-    return withSecurityHeaders(NextResponse.next());
+    return noStore(withSecurityHeaders(NextResponse.next()));
   }
 
   if (VENDOR_API_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
@@ -125,6 +127,15 @@ function withSecurityHeaders(res: NextResponse) {
   res.headers.set("X-Content-Type-Options", "nosniff");
   res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   res.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  return res;
+}
+
+// Prevent authenticated pages from being restored by the browser's back/forward
+// cache after sign-out (clicking "back" should re-hit middleware and redirect).
+function noStore(res: NextResponse) {
+  res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+  res.headers.set("Pragma", "no-cache");
+  res.headers.set("Expires", "0");
   return res;
 }
 

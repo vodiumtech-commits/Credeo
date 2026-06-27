@@ -14,7 +14,6 @@ type Branch = {
   status: string;
 };
 
-type Domain = { id: string; host: string; status: string };
 type Channel = {
   id: string;
   displayName: string;
@@ -43,7 +42,6 @@ export function OrgSettingsClient({
   subdomain,
   branding,
   branches,
-  domains,
   channels,
   members,
 }: {
@@ -51,7 +49,6 @@ export function OrgSettingsClient({
   subdomain: string;
   branding: Branding;
   branches: Branch[];
-  domains: Domain[];
   channels: Channel[];
   members: Member[];
 }) {
@@ -64,9 +61,9 @@ export function OrgSettingsClient({
       </div>
 
       <BrandingSection branding={branding} />
+      <StoreAddressSection subdomain={subdomain} />
       <BranchesSection branches={branches} />
       <StaffSection members={members} branches={branches} />
-      <DomainsSection domains={domains} subdomain={subdomain} />
       <ChannelsSection channels={channels} />
     </div>
   );
@@ -402,12 +399,9 @@ function BranchForm({ branch, onClose }: { branch?: Branch; onClose: () => void 
   );
 }
 
-/* ───────────────────────────── Domains ───────────────────────────── */
+/* ───────────────────────────── Store address ───────────────────────────── */
 
-function DomainsSection({ domains, subdomain }: { domains: Domain[]; subdomain: string }) {
-  const [host, setHost] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+function StoreAddressSection({ subdomain }: { subdomain: string }) {
   const [copied, setCopied] = useState(false);
 
   async function copySubdomain() {
@@ -417,67 +411,17 @@ function DomainsSection({ domains, subdomain }: { domains: Domain[]; subdomain: 
     setTimeout(() => setCopied(false), 1500);
   }
 
-  async function addDomain() {
-    setError(null);
-    if (!host.trim()) return setError("Enter a domain.");
-    setSaving(true);
-    const res = await fetch("/api/tenant/domains", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ host: host.trim() }),
-    });
-    const data = await res.json().catch(() => ({}));
-    setSaving(false);
-    if (!res.ok) return setError(data.error ?? "Could not add the domain.");
-    window.location.reload();
-  }
-
-  async function setStatus(id: string, status: string) {
-    const res = await fetch(`/api/tenant/domains/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-    if (res.ok) window.location.reload();
-  }
-
   return (
-    <Section icon={<Globe2 size={16} className="text-vodium-gold" />} title="White-label domains">
-      {/* Ready-to-use subdomain — works immediately, no DNS needed */}
-      <div className="rounded-lg border border-vodium-gold/20 bg-vodium-gold/[0.04] p-3 flex items-center justify-between gap-3">
+    <Section icon={<Globe2 size={16} className="text-vodium-gold" />} title="Your store address">
+      <div className="rounded-lg border border-vodium-gold/20 bg-vodium-gold/[0.04] p-4 flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] uppercase tracking-wider text-vodium-cream/35">Your ready-to-use address</p>
+          <p className="text-[11px] uppercase tracking-wider text-vodium-cream/35">Your branded address</p>
           <p className="text-sm text-vodium-cream truncate mt-0.5">{subdomain}</p>
-          <p className="text-[11px] text-vodium-cream/35 mt-0.5">Live now — no DNS setup required.</p>
+          <p className="text-[11px] text-vodium-cream/35 mt-0.5">Live now — share this link with your customers. No setup required.</p>
         </div>
         <button onClick={copySubdomain} className="px-3 py-1.5 rounded-lg border border-white/10 text-xs text-vodium-cream/70 hover:text-vodium-gold shrink-0 inline-flex items-center gap-1.5">
           {copied ? <Check size={13} /> : <Copy size={13} />} {copied ? "Copied" : "Copy"}
         </button>
-      </div>
-
-      <p className="text-xs text-vodium-cream/40 pt-1">Or connect your own domain:</p>
-      <div className="flex gap-2">
-        <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="credit.yoursupermarket.com" className={inputClass} />
-        <button disabled={saving} onClick={addDomain} className="px-3 py-2 rounded-lg bg-vodium-gold text-vodium-black text-xs font-bold disabled:opacity-50 inline-flex items-center gap-2 shrink-0">
-          {saving && <Loader2 size={12} className="animate-spin" />} Add
-        </button>
-      </div>
-      <p className="text-xs text-vodium-cream/35">Add a CNAME record for your domain → <span className="text-vodium-cream/55">cname.vercel-dns.com</span>, then click Verify (we check DNS before activating).</p>
-      {error && <p className="text-sm text-rose-300">{error}</p>}
-      <div className="space-y-2">
-        {domains.length === 0 ? (
-          <p className="text-sm text-vodium-cream/35">No domains connected yet.</p>
-        ) : domains.map((domain) => (
-          <div key={domain.id} className="flex items-center justify-between gap-3 rounded-lg bg-black/20 border border-white/[0.05] p-3">
-            <p className="text-sm text-vodium-cream truncate">{domain.host}</p>
-            <div className="flex items-center gap-2 shrink-0">
-              <StatusPill status={domain.status} />
-              {domain.status !== "VERIFIED" && <button onClick={() => setStatus(domain.id, "VERIFIED")} className="text-xs text-emerald-300 hover:underline">Verify</button>}
-              {domain.status !== "DISABLED" && <button onClick={() => setStatus(domain.id, "DISABLED")} className="text-xs text-rose-300 hover:underline">Disable</button>}
-              {domain.status === "DISABLED" && <button onClick={() => setStatus(domain.id, "PENDING")} className="text-xs text-vodium-gold hover:underline">Re-enable</button>}
-            </div>
-          </div>
-        ))}
       </div>
     </Section>
   );
@@ -508,27 +452,84 @@ function ChannelsSection({ channels }: { channels: Channel[] }) {
       }
     >
       {showForm && <ChannelForm onClose={() => setShowForm(false)} />}
-      <p className="text-xs text-vodium-cream/35">Store a reference name for the access token (e.g. an env var key), never the raw long-lived token.</p>
-      <div className="space-y-2">
+      <p className="text-xs text-vodium-cream/35">Connect your store&apos;s own WhatsApp number. Paste the access token (stored encrypted) and we&apos;ll auto-connect the webhook — no manual webhook setup.</p>
+      <div className="space-y-3">
         {channels.length === 0 ? (
           <p className="text-sm text-vodium-cream/35">No WhatsApp channel connected yet.</p>
         ) : channels.map((channel) => (
-          <div key={channel.id} className="flex items-center justify-between gap-3 rounded-lg bg-black/20 border border-white/[0.05] p-3">
-            <div className="min-w-0">
-              <p className="text-sm text-vodium-cream truncate">{channel.displayName}</p>
-              <p className="text-xs text-vodium-cream/35 truncate">
-                {channel.phoneNumber ?? "No number"}{channel.phoneNumberId ? ` · id ${channel.phoneNumberId}` : ""}
-              </p>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <StatusPill status={channel.status} />
-              {channel.status !== "ACTIVE" && <button onClick={() => setStatus(channel.id, "ACTIVE")} className="text-xs text-emerald-300 hover:underline">Activate</button>}
-              {channel.status !== "DISABLED" && <button onClick={() => setStatus(channel.id, "DISABLED")} className="text-xs text-rose-300 hover:underline">Disable</button>}
-            </div>
-          </div>
+          <ChannelRow key={channel.id} channel={channel} onStatus={setStatus} />
         ))}
       </div>
     </Section>
+  );
+}
+
+function ChannelRow({ channel, onStatus }: { channel: Channel; onStatus: (id: string, status: string) => void }) {
+  const [testTo, setTestTo] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [testMsg, setTestMsg] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const digits = (channel.phoneNumber ?? "").replace(/[^0-9]/g, "");
+  const waLink = digits ? `https://wa.me/${digits}` : null;
+  const qrSrc = waLink ? `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(waLink)}` : null;
+
+  async function copy() {
+    if (!waLink) return;
+    try { await navigator.clipboard.writeText(waLink); } catch { window.prompt("Copy:", waLink); }
+    setCopied(true); setTimeout(() => setCopied(false), 1500);
+  }
+
+  async function sendTest() {
+    setTestMsg(null);
+    if (!testTo.trim()) return setTestMsg("Enter a phone number to test.");
+    setTesting(true);
+    const res = await fetch(`/api/whatsapp/channels/${channel.id}/test`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ toPhone: testTo.trim() }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setTesting(false);
+    setTestMsg(res.ok ? "✓ Test message sent." : (data.error ?? "Test failed."));
+  }
+
+  return (
+    <div className="rounded-lg bg-black/20 border border-white/[0.05] p-3 space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm text-vodium-cream truncate">{channel.displayName}</p>
+          <p className="text-xs text-vodium-cream/35 truncate">{channel.phoneNumber ?? "No number"}{channel.phoneNumberId ? ` · id ${channel.phoneNumberId}` : ""}</p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <StatusPill status={channel.status} />
+          {channel.status !== "ACTIVE" && <button onClick={() => onStatus(channel.id, "ACTIVE")} className="text-xs text-emerald-300 hover:underline">Activate</button>}
+          {channel.status !== "DISABLED" && <button onClick={() => onStatus(channel.id, "DISABLED")} className="text-xs text-rose-300 hover:underline">Disable</button>}
+        </div>
+      </div>
+
+      {waLink && (
+        <div className="flex flex-col sm:flex-row gap-3 border-t border-white/[0.05] pt-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {qrSrc && <img src={qrSrc} alt="WhatsApp QR" className="w-24 h-24 rounded-lg bg-white p-1 shrink-0" />}
+          <div className="min-w-0 flex-1 space-y-2">
+            <p className="text-[11px] uppercase tracking-wider text-vodium-cream/35">Customer chat link & QR</p>
+            <div className="flex gap-2">
+              <input readOnly value={waLink} className={`${inputClass} text-xs`} />
+              <button onClick={copy} className="px-3 py-1.5 rounded-lg border border-white/10 text-xs text-vodium-cream/70 hover:text-vodium-gold shrink-0 inline-flex items-center gap-1.5">
+                {copied ? <Check size={12} /> : <Copy size={12} />}{copied ? "Copied" : "Copy"}
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <input value={testTo} onChange={(e) => setTestTo(e.target.value)} placeholder="Your phone — send a test" className={`${inputClass} text-xs`} />
+              <button onClick={sendTest} disabled={testing} className="px-3 py-1.5 rounded-lg bg-vodium-gold text-vodium-black text-xs font-bold disabled:opacity-50 shrink-0 inline-flex items-center gap-1.5">
+                {testing && <Loader2 size={12} className="animate-spin" />} Test
+              </button>
+            </div>
+            {testMsg && <p className={`text-xs ${testMsg.startsWith("✓") ? "text-emerald-300" : "text-rose-300"}`}>{testMsg}</p>}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

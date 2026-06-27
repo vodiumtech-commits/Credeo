@@ -14,14 +14,10 @@ export default async function OrgSettingsPage() {
     redirect("/dashboard/supermarket");
   }
 
-  const [branches, domains, channels, members] = await Promise.all([
+  const [branches, channels, members] = await Promise.all([
     prisma.branch.findMany({
       where: { organizationId: ctx.organizationId },
       orderBy: { createdAt: "asc" },
-    }),
-    prisma.tenantDomain.findMany({
-      where: { organizationId: ctx.organizationId },
-      orderBy: { createdAt: "desc" },
     }),
     prisma.whatsAppChannel.findMany({
       where: { organizationId: ctx.organizationId },
@@ -57,7 +53,6 @@ export default async function OrgSettingsPage() {
           state: b.state,
           status: b.status,
         }))}
-        domains={domains.map((d) => ({ id: d.id, host: d.host, status: d.status }))}
         channels={channels.map((c) => ({
           id: c.id,
           displayName: c.displayName,

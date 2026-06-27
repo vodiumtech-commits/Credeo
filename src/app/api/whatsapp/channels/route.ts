@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { hasOrgAdminAccess, requireTenantContext } from "@/lib/tenant-context";
 import { ipFromRequest, writeAudit } from "@/lib/audit";
 import { encryptSecret } from "@/lib/crypto/secrets";
+import { subscribeAppToWaba } from "@/lib/whatsapp/provisioning";
 
 // Never expose token material (ciphertext or env ref values) to clients.
 const PUBLIC_CHANNEL_FIELDS = {
@@ -79,6 +80,17 @@ export async function POST(req: NextRequest) {
       select: PUBLIC_CHANNEL_FIELDS,
     });
 
+    // Auto-subscribe our app to the store's WhatsApp Business Account so inbound
+    // messages reach the webhook without manual webhook configuration.
+    const subscribeToken = parsed.data.accessToken
+      ?? (parsed.data.accessTokenRef ? process.env[parsed.data.accessTokenRef] : undefined);
+    let webhookConnected = false;
+    if (subscribeToken && parsed.data.businessAccountId) {
+      const result = await subscribeAppToWaba(parsed.data.businessAccountId, subscribeToken);
+      webhookConnected = result.ok;
+      if (!result.ok) console.warn("[whatsapp/channels] subscribe failed:", result.error);
+    }
+
     await writeAudit({
       actorType: "vendor",
       actorId: ctx.vendor.id,
@@ -94,7 +106,7 @@ export async function POST(req: NextRequest) {
       ipAddress: ipFromRequest(req),
     });
 
-    return NextResponse.json({ ok: true, channel }, { status: 201 });
+    return NextResponse.json({ ok: true, channel, webhookConnected }, { status: 201 });
   } catch (err: unknown) {
     const message = err instanceof Error && err.message.includes("Unique")
       ? "This WhatsApp phone number ID is already connected."

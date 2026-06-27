@@ -59,6 +59,7 @@ model Organization {
   domains     TenantDomain[]
   whatsAppChannels WhatsAppChannel[]
   whatsAppSessions WhatsAppSession[]
+  products    Product[]
 
   @@index([type])
   @@index([status])
@@ -107,6 +108,7 @@ model Branch {
   bnplOrders     BnplOrder[]
   couponCampaigns CouponCampaign[]
   ledgerEntries  WalletLedgerEntry[]
+  products       Product[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -410,6 +412,27 @@ model BnplOrderItem {
   createdAt   DateTime  @default(now())
 
   @@index([orderId])
+}
+
+model Product {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  branchId       String?
+  branch         Branch?      @relation(fields: [branchId], references: [id])
+  name           String
+  description    String?
+  sku            String?
+  price          Decimal      @db.Decimal(12, 2)
+  imageUrl       String?
+  active         Boolean      @default(true)
+  bnplEligible   Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId])
+  @@index([branchId])
+  @@index([active])
 }
 
 model RepaymentSchedule {
