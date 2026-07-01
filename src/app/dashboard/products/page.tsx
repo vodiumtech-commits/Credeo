@@ -27,6 +27,7 @@ export default async function ProductsPage() {
     sku: p.sku,
     price: Number(p.price),
     imageUrl: p.imageUrl,
+    imageUrls: p.imageUrls,
     active: p.active,
     bnplEligible: p.bnplEligible,
     branchId: p.branchId,

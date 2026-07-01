@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, CheckCircle2, Loader2, Minus, Plus, ShieldCheck } from "lucide-react";
 
-type Product = { id: string; name: string; description: string | null; price: number; imageUrl: string | null };
+type Product = { id: string; name: string; description: string | null; price: number; imageUrl: string | null; imageUrls?: string[] };
 type Org = { id: string; name: string; brandColor: string | null; logoUrl: string | null };
 
 function naira(n: number) {
@@ -44,6 +44,11 @@ function CheckoutInner() {
 
   const brand = org?.brandColor || "#C9A961";
   const total = useMemo(() => (product ? product.price * qty : 0), [product, qty]);
+  const gallery = useMemo(
+    () => (product?.imageUrls?.length ? product.imageUrls : product?.imageUrl ? [product.imageUrl] : []),
+    [product]
+  );
+  const [activeImg, setActiveImg] = useState<string | null>(null);
 
   async function sendCode(e: React.FormEvent) {
     e.preventDefault();
@@ -103,6 +108,29 @@ function CheckoutInner() {
     <Shell brand={brand} org={org}>
       <Link href="/" className="inline-flex items-center gap-2 text-xs text-vodium-cream/45 hover:text-vodium-cream mb-5"><ArrowLeft size={14} /> Back to store</Link>
 
+      {/* Gallery */}
+      {gallery.length > 0 && (
+        <div className="mb-4">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={activeImg ?? gallery[0]} alt={product.name} className="w-full h-56 object-cover rounded-xl border border-white/[0.06]" />
+          {gallery.length > 1 && (
+            <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
+              {gallery.map((src) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={src}
+                  src={src}
+                  alt=""
+                  onClick={() => setActiveImg(src)}
+                  className={`w-14 h-14 rounded-lg object-cover cursor-pointer shrink-0 border ${(activeImg ?? gallery[0]) === src ? "border-2" : "border-white/[0.08]"}`}
+                  style={(activeImg ?? gallery[0]) === src ? { borderColor: brand } : undefined}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Item summary */}
       <div className="rounded-xl border border-white/[0.06] bg-black/20 p-4 flex items-center gap-3 mb-5">
         {product.imageUrl ? (
@@ -132,7 +160,7 @@ function CheckoutInner() {
           <button type="submit" disabled={busy} className="w-full py-2.5 rounded-lg text-sm font-bold text-vodium-black inline-flex items-center justify-center gap-2 disabled:opacity-50" style={{ backgroundColor: brand }}>
             {busy && <Loader2 size={15} className="animate-spin" />} Send confirmation code
           </button>
-          <p className="text-[11px] text-vodium-cream/35 text-center">We&apos;ll send a 6-digit code to your WhatsApp to confirm your number.</p>
+          <p className="text-[11px] text-vodium-cream/35 text-center">We&apos;ll send a 6-digit code to your WhatsApp (or SMS) to confirm your number.</p>
         </form>
       ) : (
         <form onSubmit={submit} className="space-y-3">

@@ -5,8 +5,7 @@ import { resolveTenantByHost } from "@/lib/tenant-domain";
 import { normalisePhone } from "@/lib/utils";
 import { rateLimit } from "@/lib/redis";
 import { setOtpCookie } from "@/lib/otp-cookie";
-import { sendWhatsAppMessage } from "@/lib/whatsapp/outbound";
-import { getOrgChannelCredentials } from "@/lib/whatsapp/channel-token";
+import { sendOtpCode } from "@/lib/otp-delivery";
 
 const schema = z.object({ phone: z.string().min(7).max(20) });
 
@@ -30,17 +29,9 @@ export async function POST(req: NextRequest) {
   const otp = String(crypto.randomInt(100000, 999999));
   setOtpCookie("storefront", phone, otp);
 
-  const creds = await getOrgChannelCredentials(org.id);
-  try {
-    await sendWhatsAppMessage(
-      phone,
-      `Your ${org.name} order code is ${otp}. It expires in 10 minutes.`,
-      creds ?? undefined
-    );
-  } catch (err) {
-    console.error("[storefront/otp] WhatsApp send failed:", err);
-    // The code is still set in the cookie; in dev it is also logged to the server.
-  }
+  // Delivered via the platform's own WhatsApp OTP template / SMS — the store does
+  // not need any Meta setup for this to work.
+  const { channel } = await sendOtpCode({ phone, code: otp, storeName: org.name });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, channel });
 }

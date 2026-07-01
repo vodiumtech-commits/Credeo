@@ -10,6 +10,7 @@ const updateSchema = z.object({
   sku: z.string().max(80).nullish(),
   price: z.number().positive().optional(),
   imageUrl: z.string().url().max(600).nullish(),
+  imageUrls: z.array(z.string().url().max(600)).max(6).optional(),
   active: z.boolean().optional(),
   bnplEligible: z.boolean().optional(),
 });
@@ -40,7 +41,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       ...(d.description !== undefined ? { description: d.description?.trim() || null } : {}),
       ...(d.sku !== undefined ? { sku: d.sku?.trim() || null } : {}),
       ...(d.price !== undefined ? { price: d.price } : {}),
-      ...(d.imageUrl !== undefined ? { imageUrl: d.imageUrl?.trim() || null } : {}),
+      ...(d.imageUrls !== undefined ? { imageUrls: d.imageUrls, imageUrl: d.imageUrls[0] ?? null } : {}),
+      ...(d.imageUrl !== undefined && d.imageUrls === undefined ? { imageUrl: d.imageUrl?.trim() || null } : {}),
       ...(d.active !== undefined ? { active: d.active } : {}),
       ...(d.bnplEligible !== undefined ? { bnplEligible: d.bnplEligible } : {}),
     },

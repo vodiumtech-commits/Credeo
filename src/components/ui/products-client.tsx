@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ExternalLink, Loader2, Package, Plus, Trash2, X } from "lucide-react";
 import { formatNaira } from "@/lib/utils";
-import { ImageUpload } from "@/components/ui/image-upload";
+import { MultiImageUpload } from "@/components/ui/multi-image-upload";
 
 export type ProductBranch = { id: string; name: string; code: string };
 export type ProductRow = {
@@ -13,6 +13,7 @@ export type ProductRow = {
   sku: string | null;
   price: number;
   imageUrl: string | null;
+  imageUrls: string[];
   active: boolean;
   bnplEligible: boolean;
   branchId: string | null;
@@ -133,7 +134,9 @@ function ProductForm({
   const [price, setPrice] = useState(product?.price ?? 0);
   const [description, setDescription] = useState(product?.description ?? "");
   const [sku, setSku] = useState(product?.sku ?? "");
-  const [imageUrl, setImageUrl] = useState(product?.imageUrl ?? "");
+  const [images, setImages] = useState<string[]>(
+    product?.imageUrls?.length ? product.imageUrls : product?.imageUrl ? [product.imageUrl] : []
+  );
   const [branchId, setBranchId] = useState(product?.branchId ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -148,7 +151,7 @@ function ProductForm({
       price,
       description: description.trim() || undefined,
       sku: sku.trim() || undefined,
-      imageUrl: imageUrl.trim() || undefined,
+      imageUrls: images,
       branchId: branchId || undefined,
     };
     const res = await fetch(isEdit ? `/api/products/${product!.id}` : "/api/products", {
@@ -174,7 +177,7 @@ function ProductForm({
         <input type="number" min={0} value={price} onChange={(e) => setPrice(Number(e.target.value))} placeholder="Price (₦)" className={inputClass} />
       </div>
       <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description (optional)" rows={2} className={inputClass} />
-      <ImageUpload value={imageUrl || null} onChange={(url) => setImageUrl(url ?? "")} label="Product image" shape="wide" />
+      <MultiImageUpload value={images} onChange={setImages} label="Product images" max={6} />
       <input value={sku} onChange={(e) => setSku(e.target.value)} placeholder="SKU (optional)" className={`md:w-64 ${inputClass}`} />
       {canSeeAllBranches && branches.length > 0 && (
         <select value={branchId} onChange={(e) => setBranchId(e.target.value)} className={`${inputClass} md:w-64`}>

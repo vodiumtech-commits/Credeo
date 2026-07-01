@@ -424,7 +424,8 @@ model Product {
   description    String?
   sku            String?
   price          Decimal      @db.Decimal(12, 2)
-  imageUrl       String?
+  imageUrl       String?      // primary image (kept in sync with imageUrls[0])
+  imageUrls      String[]     @default([])
   active         Boolean      @default(true)
   bnplEligible   Boolean      @default(true)
   createdAt      DateTime     @default(now())

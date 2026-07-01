@@ -1,0 +1,3 @@
+-- Multiple images per product.
+
+ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "imageUrls" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];
