@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ExternalLink, Loader2, Package, Plus, Trash2, X } from "lucide-react";
 import { formatNaira } from "@/lib/utils";
+import { ImageUpload } from "@/components/ui/image-upload";
 
 export type ProductBranch = { id: string; name: string; code: string };
 export type ProductRow = {
@@ -173,10 +174,8 @@ function ProductForm({
         <input type="number" min={0} value={price} onChange={(e) => setPrice(Number(e.target.value))} placeholder="Price (₦)" className={inputClass} />
       </div>
       <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description (optional)" rows={2} className={inputClass} />
-      <div className="grid md:grid-cols-3 gap-2">
-        <input value={sku} onChange={(e) => setSku(e.target.value)} placeholder="SKU (optional)" className={inputClass} />
-        <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="Image URL (optional)" className={`md:col-span-2 ${inputClass}`} />
-      </div>
+      <ImageUpload value={imageUrl || null} onChange={(url) => setImageUrl(url ?? "")} label="Product image" shape="wide" />
+      <input value={sku} onChange={(e) => setSku(e.target.value)} placeholder="SKU (optional)" className={`md:w-64 ${inputClass}`} />
       {canSeeAllBranches && branches.length > 0 && (
         <select value={branchId} onChange={(e) => setBranchId(e.target.value)} className={`${inputClass} md:w-64`}>
           <option value="">All branches</option>

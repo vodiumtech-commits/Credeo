@@ -39,6 +39,7 @@ const VENDOR_API_PREFIXES = [
   "/api/tenant/members",
   "/api/tenant/organization",
   "/api/products",
+  "/api/upload",
   "/api/user",
 ];
 

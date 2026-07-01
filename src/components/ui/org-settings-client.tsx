@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Building2, Check, Copy, Globe2, Loader2, MessageCircle, Palette, Plus, Trash2, Users, X } from "lucide-react";
+import { ImageUpload } from "@/components/ui/image-upload";
 
 type Branch = {
   id: string;
@@ -115,10 +116,8 @@ function BrandingSection({ branding }: { branding: Branding }) {
               <input value={brandColor} onChange={(e) => setBrandColor(e.target.value)} className={`${inputClass} uppercase`} />
             </div>
           </label>
-          <label className="space-y-1 block">
-            <span className="text-xs text-vodium-cream/40">Logo URL (https)</span>
-            <input value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://…/logo.png" className={inputClass} />
-          </label>
+          <ImageUpload value={logoUrl || null} onChange={(url) => setLogoUrl(url ?? "")} label="Logo" />
+
         </div>
 
         {/* Live preview */}
