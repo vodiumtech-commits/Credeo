@@ -29,9 +29,19 @@ export async function POST(req: NextRequest) {
   const otp = String(crypto.randomInt(100000, 999999));
   setOtpCookie("storefront", phone, otp);
 
-  // Delivered via the platform's own WhatsApp OTP template / SMS — the store does
-  // not need any Meta setup for this to work.
+  // Sent from the Vodium Ledger bot number — the store needs no Meta setup for OTP.
   const { channel } = await sendOtpCode({ phone, code: otp, storeName: org.name });
 
-  return NextResponse.json({ ok: true, channel });
+  // Always log the code + delivery result so it can be read from Vercel logs
+  // while WhatsApp delivery is being set up. Remove for production hygiene later.
+  console.log(`[storefront/otp] ${org.name} → ${phone} code=${otp} delivery=${channel}`);
+
+  // Testing aid: when OTP_DEBUG_RETURN=true, return the code so it auto-fills in
+  // checkout. Otherwise the code is still readable from the server logs above.
+  const debugCode = process.env.OTP_DEBUG_RETURN === "true" ? otp : undefined;
+
+  // Always let the customer proceed to the code-entry step — the code is set in
+  // the cookie and logged, so it can be verified even while WhatsApp delivery is
+  // still being configured.
+  return NextResponse.json({ ok: true, channel, ...(debugCode ? { debugCode } : {}) });
 }

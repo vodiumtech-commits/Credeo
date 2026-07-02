@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Building2, Check, Copy, Globe2, Loader2, MessageCircle, Palette, Plus, Trash2, Users, X } from "lucide-react";
 import { ImageUpload } from "@/components/ui/image-upload";
+import { WhatsAppSetupGuide } from "@/components/ui/whatsapp-setup-guide";
 
 type Branch = {
   id: string;
@@ -451,7 +452,8 @@ function ChannelsSection({ channels }: { channels: Channel[] }) {
       }
     >
       {showForm && <ChannelForm onClose={() => setShowForm(false)} />}
-      <p className="text-xs text-vodium-cream/35">Connect your store&apos;s own WhatsApp number. Paste the access token (stored encrypted) and we&apos;ll auto-connect the webhook — no manual webhook setup.</p>
+      <WhatsAppSetupGuide defaultOpen={channels.length === 0} />
+      <p className="text-xs text-vodium-cream/35">Optional: connect your store&apos;s own WhatsApp number for branded chat &amp; reminders. Customer OTP is always sent by the Vodium bot.</p>
       <div className="space-y-3">
         {channels.length === 0 ? (
           <p className="text-sm text-vodium-cream/35">No WhatsApp channel connected yet.</p>

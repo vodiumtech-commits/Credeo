@@ -49,6 +49,7 @@ function CheckoutInner() {
     [product]
   );
   const [activeImg, setActiveImg] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   async function sendCode(e: React.FormEvent) {
     e.preventDefault();
@@ -62,6 +63,12 @@ function CheckoutInner() {
     const data = await res.json().catch(() => ({}));
     setBusy(false);
     if (!res.ok) return setError(data.error ?? "Could not send a code.");
+    if (data.debugCode) {
+      setOtp(String(data.debugCode));
+      setNotice(`Testing mode — your code is ${data.debugCode}`);
+    } else {
+      setNotice("We sent a 6-digit code to your WhatsApp. It may take a moment.");
+    }
     setStep("otp");
   }
 
@@ -160,10 +167,11 @@ function CheckoutInner() {
           <button type="submit" disabled={busy} className="w-full py-2.5 rounded-lg text-sm font-bold text-vodium-black inline-flex items-center justify-center gap-2 disabled:opacity-50" style={{ backgroundColor: brand }}>
             {busy && <Loader2 size={15} className="animate-spin" />} Send confirmation code
           </button>
-          <p className="text-[11px] text-vodium-cream/35 text-center">We&apos;ll send a 6-digit code to your WhatsApp (or SMS) to confirm your number.</p>
+          <p className="text-[11px] text-vodium-cream/35 text-center">We&apos;ll send a 6-digit code to your WhatsApp to confirm your number.</p>
         </form>
       ) : (
         <form onSubmit={submit} className="space-y-3">
+          {notice && <p className="text-xs text-center rounded-lg bg-emerald-400/10 border border-emerald-400/20 text-emerald-200 py-2 px-3">{notice}</p>}
           <input inputMode="numeric" maxLength={6} value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} placeholder="Enter 6-digit code" className={`${inputClass} tracking-[0.4em] text-center`} />
           <label className="flex items-start gap-2.5 rounded-lg bg-black/20 border border-white/[0.06] p-3 cursor-pointer">
             <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 accent-vodium-gold" />
