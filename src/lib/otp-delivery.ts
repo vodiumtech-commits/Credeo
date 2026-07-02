@@ -1,23 +1,20 @@
 /**
- * Vodium Ledger — reliable customer OTP delivery.
+ * Vodium Ledger — customer OTP delivery via the Vodium Ledger WhatsApp bot.
  *
- * DESIGN: OTP is delivered through the PLATFORM's own channels, never the store's.
- * This removes all Meta setup from vendors — they don't need their own WhatsApp
- * number, token, or template for storefront OTP to work.
+ * DESIGN: OTP is always sent from the PLATFORM's own WhatsApp number, never the
+ * store's. Vendors need zero Meta setup for storefront OTP to work.
  *
  * Delivery order:
- *   1. WhatsApp OTP *template* from Vodium's number (if WHATSAPP_OTP_TEMPLATE_NAME set).
- *   2. SMS via Termii (if TERMII_API_KEY set).
+ *   1. WhatsApp OTP *template* from Vodium's number — the reliable path for
+ *      first-time customers (Meta requires a template for business-initiated
+ *      messages). Configure WHATSAPP_OTP_TEMPLATE_NAME once.
+ *   2. Free-text WhatsApp from Vodium's number (works within an open 24h session).
  *   3. Dev fallback: log to server console.
- *
- * A store's own connected number is still used for branded conversations and
- * reminders — just not for OTP, which must be maximally reliable.
  */
 
-import { sendWhatsAppTemplate } from "@/lib/whatsapp/outbound";
-import { sendSms } from "@/lib/sms/termii";
+import { sendWhatsAppMessage, sendWhatsAppTemplate } from "@/lib/whatsapp/outbound";
 
-export type OtpChannel = "whatsapp" | "sms" | "console";
+export type OtpChannel = "whatsapp" | "console";
 
 export async function sendOtpCode(input: {
   phone: string;
@@ -25,28 +22,32 @@ export async function sendOtpCode(input: {
   storeName: string;
 }): Promise<{ channel: OtpChannel }> {
   const { phone, code, storeName } = input;
+  const hasVodiumWa = process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID;
 
-  // 1) WhatsApp OTP template via the platform number.
-  const template = process.env.WHATSAPP_OTP_TEMPLATE_NAME;
-  if (template && process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID) {
+  if (hasVodiumWa) {
+    // 1) Approved OTP template (reliable for first-time numbers).
+    const template = process.env.WHATSAPP_OTP_TEMPLATE_NAME;
+    if (template) {
+      try {
+        await sendWhatsAppTemplate(phone, template, [code], {
+          languageCode: process.env.WHATSAPP_OTP_TEMPLATE_LANG ?? "en_US",
+          otpButton: process.env.WHATSAPP_OTP_TEMPLATE_BUTTON !== "false",
+        });
+        return { channel: "whatsapp" };
+      } catch (err) {
+        console.warn("[otp] WhatsApp template failed, trying free-text:", err);
+      }
+    }
+
+    // 2) Free-text from the Vodium bot number (delivers within an open session).
     try {
-      await sendWhatsAppTemplate(phone, template, [code], {
-        languageCode: process.env.WHATSAPP_OTP_TEMPLATE_LANG ?? "en_US",
-        otpButton: process.env.WHATSAPP_OTP_TEMPLATE_BUTTON !== "false",
-      });
+      await sendWhatsAppMessage(
+        phone,
+        `${code} is your verification code for your ${storeName} order on Vodium Ledger. It expires in 10 minutes. Do not share it.`
+      );
       return { channel: "whatsapp" };
     } catch (err) {
-      console.warn("[otp] WhatsApp template failed, falling back to SMS:", err);
-    }
-  }
-
-  // 2) SMS fallback.
-  if (process.env.TERMII_API_KEY) {
-    try {
-      await sendSms(phone, `${code} is your ${storeName} verification code. Do not share it.`);
-      return { channel: "sms" };
-    } catch (err) {
-      console.warn("[otp] SMS failed:", err);
+      console.warn("[otp] WhatsApp free-text failed:", err);
     }
   }
 
