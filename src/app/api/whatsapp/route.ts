@@ -99,8 +99,13 @@ export async function POST(req: NextRequest) {
       // Still return 200 so Meta doesn't suspend the webhook, but don't process
       return NextResponse.json({ ok: true });
     }
+  } else if (process.env.NODE_ENV === "production") {
+    // Fail closed: without the app secret we cannot verify Meta's signature, so
+    // refuse to process (prevents forged webhook events driving the bot).
+    console.error("[whatsapp] WHATSAPP_APP_SECRET not set in production — rejecting unverifiable webhook");
+    return NextResponse.json({ ok: true });
   } else {
-    console.warn("[whatsapp] WHATSAPP_APP_SECRET not set — skipping signature check. Set it in Vercel.");
+    console.warn("[whatsapp] WHATSAPP_APP_SECRET not set — skipping signature check (dev only).");
   }
 
   // ── Parse payload ───────────────────────────────────────────────────────────

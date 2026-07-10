@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
 
   const { token, password } = parsed.data;
 
-  const rl = await rateLimit(`rl:staff-accept:${token.slice(0, 16)}`, 5, 600);
+  const rl = await rateLimit(`rl:staff-accept:${token.slice(0, 16)}`, 5, 600, true);
   if (!rl.ok) {
     return NextResponse.json({ error: "Too many attempts. Please wait and try again." }, { status: 429 });
   }

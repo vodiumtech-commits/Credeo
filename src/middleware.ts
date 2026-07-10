@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ADMIN_COOKIE, ADMIN_COOKIE_AGE, ADMIN_ROUTE_ROLES, VENDOR_COOKIE } from "@/lib/session-cookies";
+import { ADMIN_COOKIE, ADMIN_COOKIE_AGE, ADMIN_ROUTE_ROLES, VENDOR_COOKIE, VENDOR_COOKIE_AGE } from "@/lib/session-cookies";
 
 type AdminTokenPayload = {
   id: string;
@@ -63,6 +63,8 @@ export async function middleware(req: NextRequest) {
       return withSecurityHeaders(NextResponse.next());
     }
 
+    if (isApi(pathname) && isCrossSiteMutation(req)) return jsonError("Cross-site request blocked", 403);
+
     const token = req.cookies.get(ADMIN_COOKIE)?.value;
     const admin = token ? await verifyAdminToken(token) : null;
     if (!admin) return unauthorized(req, "/admin/login");
@@ -86,6 +88,7 @@ export async function middleware(req: NextRequest) {
   }
 
   if (VENDOR_API_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
+    if (isCrossSiteMutation(req)) return jsonError("Cross-site request blocked", 403);
     const token = req.cookies.get(VENDOR_COOKIE)?.value;
     if (!token || !(await verifyVendorToken(token))) {
       return jsonError("Unauthorized", 401);
@@ -113,6 +116,20 @@ function unauthorized(req: NextRequest, loginPath: string) {
 
 function isApi(pathname: string) {
   return pathname.startsWith("/api/");
+}
+
+// Lightweight CSRF defense: block cookie-authenticated mutations whose Origin
+// header doesn't match the request host. (Webhooks/public APIs are handled
+// earlier and use signatures, not cookies.)
+function isCrossSiteMutation(req: NextRequest): boolean {
+  if (!["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) return false;
+  const origin = req.headers.get("origin");
+  if (!origin) return false; // no Origin header — rely on SameSite cookies
+  try {
+    return new URL(origin).host !== req.headers.get("host");
+  } catch {
+    return true;
+  }
 }
 
 function isPublicApi(pathname: string) {
@@ -146,10 +163,12 @@ async function verifyVendorToken(token: string): Promise<boolean> {
     if (dot === -1) return false;
     const payload = token.slice(0, dot);
     const incoming = token.slice(dot + 1);
-    const expected = await hmac(`v1:vendor:${payload}`);
+    const expected = await hmac(`v2:vendor:${payload}`);
     if (incoming !== expected) return false;
-    const phone = atobUrl(payload);
-    return /^\+\d{7,15}$/.test(phone);
+    const data = JSON.parse(atobUrl(payload)) as { phone?: string; iat?: number };
+    if (!data.phone || !data.iat) return false;
+    if (Date.now() - data.iat > VENDOR_COOKIE_AGE * 1000) return false; // expired
+    return /^\+\d{7,15}$/.test(data.phone);
   } catch {
     return false;
   }

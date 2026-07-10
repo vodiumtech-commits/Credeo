@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
   }
 
   // 5 verify attempts per phone per 10 minutes
-  const { ok } = await rateLimit(`otp:verify:${phone}`, 5, 600);
+  const { ok } = await rateLimit(`otp:verify:${phone}`, 5, 600, true);
   if (!ok) {
     return NextResponse.json(
       { error: "Too many attempts. Please wait before trying again." },

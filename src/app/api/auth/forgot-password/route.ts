@@ -34,7 +34,7 @@ async function handleRequest(json: unknown) {
   }
   const { email } = parsed.data;
 
-  const rl = await rateLimit(`rl:forgot:${email}`, 3, 900);
+  const rl = await rateLimit(`rl:forgot:${email}`, 3, 900, true);
   if (!rl.ok) {
     return NextResponse.json({ error: "Too many requests. Please wait 15 minutes." }, { status: 429 });
   }
@@ -58,7 +58,7 @@ async function handleVerify(json: unknown) {
   }
   const { email, otp, password } = parsed.data;
 
-  const rl = await rateLimit(`rl:forgot-verify:${email}`, 5, 600);
+  const rl = await rateLimit(`rl:forgot-verify:${email}`, 5, 600, true);
   if (!rl.ok) {
     return NextResponse.json({ error: "Too many attempts. Request a new code." }, { status: 429 });
   }

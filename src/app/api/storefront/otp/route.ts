@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   const phone = normalisePhone(parsed.data.phone);
   if (!phone) return NextResponse.json({ error: "Enter a valid phone number." }, { status: 400 });
 
-  const rl = await rateLimit(`rl:store-otp:${phone}`, 4, 600);
+  const rl = await rateLimit(`rl:store-otp:${phone}`, 4, 600, true);
   if (!rl.ok) return NextResponse.json({ error: "Too many requests. Please wait a few minutes." }, { status: 429 });
 
   const otp = String(crypto.randomInt(100000, 999999));
@@ -32,9 +32,12 @@ export async function POST(req: NextRequest) {
   // Sent from the Vodium Ledger bot number — the store needs no Meta setup for OTP.
   const { channel } = await sendOtpCode({ phone, code: otp, storeName: org.name });
 
-  // Always log the code + delivery result so it can be read from Vercel logs
-  // while WhatsApp delivery is being set up. Remove for production hygiene later.
-  console.log(`[storefront/otp] ${org.name} → ${phone} code=${otp} delivery=${channel}`);
+  // Only log the code when explicitly in debug mode — never in normal production.
+  if (process.env.OTP_DEBUG_RETURN === "true") {
+    console.log(`[storefront/otp] ${org.name} → ${phone} code=${otp} delivery=${channel}`);
+  } else {
+    console.log(`[storefront/otp] ${org.name} → ${phone.slice(0, 6)}… delivery=${channel}`);
+  }
 
   // Testing aid: when OTP_DEBUG_RETURN=true, return the code so it auto-fills in
   // checkout. Otherwise the code is still readable from the server logs above.

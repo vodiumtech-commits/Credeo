@@ -40,7 +40,7 @@ async function handleRequest(json: unknown) {
   const { email, password } = parsed.data;
 
   // Rate-limit: max 5 login attempts per 15 min per email (best-effort).
-  const rl = await rateLimit(`rl:login:${email}`, 5, 900);
+  const rl = await rateLimit(`rl:login:${email}`, 5, 900, true);
   if (!rl.ok) {
     return NextResponse.json(
       { error: "Too many attempts. Please wait 15 minutes and try again." },
@@ -79,7 +79,7 @@ async function handleVerify(json: unknown) {
   const { email, otp } = parsed.data;
 
   // Rate-limit OTP guesses (best-effort).
-  const rl = await rateLimit(`rl:otp-verify:${email}`, 5, 600);
+  const rl = await rateLimit(`rl:otp-verify:${email}`, 5, 600, true);
   if (!rl.ok) {
     return NextResponse.json(
       { error: "Too many attempts. Request a new code." },

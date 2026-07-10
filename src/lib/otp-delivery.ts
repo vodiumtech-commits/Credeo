@@ -25,17 +25,21 @@ export async function sendOtpCode(input: {
   const hasVodiumWa = process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID;
 
   if (hasVodiumWa) {
-    // 1) Approved OTP template (reliable for first-time numbers).
+    // 1) Approved OTP template (reliable for first-time numbers). Try the
+    // configured language first, then common fallbacks, since a mismatched
+    // language code is a frequent cause of "template does not exist" errors.
     const template = process.env.WHATSAPP_OTP_TEMPLATE_NAME;
     if (template) {
-      try {
-        await sendWhatsAppTemplate(phone, template, [code], {
-          languageCode: process.env.WHATSAPP_OTP_TEMPLATE_LANG ?? "en_US",
-          otpButton: process.env.WHATSAPP_OTP_TEMPLATE_BUTTON !== "false",
-        });
-        return { channel: "whatsapp" };
-      } catch (err) {
-        console.warn("[otp] WhatsApp template failed, trying free-text:", err);
+      const langs = [process.env.WHATSAPP_OTP_TEMPLATE_LANG, "en_US", "en"]
+        .filter((v, i, a): v is string => Boolean(v) && a.indexOf(v) === i);
+      const otpButton = process.env.WHATSAPP_OTP_TEMPLATE_BUTTON !== "false";
+      for (const languageCode of langs) {
+        try {
+          await sendWhatsAppTemplate(phone, template, [code], { languageCode, otpButton });
+          return { channel: "whatsapp" };
+        } catch (err) {
+          console.warn(`[otp] template '${template}' (${languageCode}) failed:`, err instanceof Error ? err.message : err);
+        }
       }
     }
 
@@ -51,7 +55,11 @@ export async function sendOtpCode(input: {
     }
   }
 
-  // 3) Dev fallback.
-  console.log(`\n[OTP → ${phone}] ${code} (${storeName})\n`);
+  // 3) Fallback: only print the code outside production (or when debug is on).
+  if (process.env.NODE_ENV !== "production" || process.env.OTP_DEBUG_RETURN === "true") {
+    console.log(`\n[OTP → ${phone}] ${code} (${storeName})\n`);
+  } else {
+    console.warn(`[otp] No WhatsApp delivery configured for ${storeName}; code not sent.`);
+  }
   return { channel: "console" };
 }

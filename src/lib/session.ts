@@ -66,8 +66,8 @@ function safeEqual(a: string, b: string): boolean {
 // ══ VENDOR SESSION ═══════════════════════════════════════════════════════════
 
 export function buildSessionToken(phone: string): string {
-  const payload = Buffer.from(phone, "utf8").toString("base64url");
-  const sig = hmac(getSecret(), `v1:vendor:${payload}`);
+  const payload = Buffer.from(JSON.stringify({ phone, iat: Date.now() }), "utf8").toString("base64url");
+  const sig = hmac(getSecret(), `v2:vendor:${payload}`);
   return `${payload}.${sig}`;
 }
 
@@ -77,11 +77,13 @@ export function verifySessionToken(token: string): string | null {
     if (dot === -1) return null;
     const payload  = token.slice(0, dot);
     const incoming = token.slice(dot + 1);
-    const expected = hmac(getSecret(), `v1:vendor:${payload}`);
+    const expected = hmac(getSecret(), `v2:vendor:${payload}`);
     if (!safeEqual(incoming, expected)) return null;
-    const phone = Buffer.from(payload, "base64url").toString("utf8");
-    if (!/^\+\d{7,15}$/.test(phone)) return null;
-    return phone;
+    const data = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as { phone?: string; iat?: number };
+    if (!data.phone || !data.iat) return null;
+    if (Date.now() - data.iat > VENDOR_COOKIE_AGE * 1000) return null; // expired
+    if (!/^\+\d{7,15}$/.test(data.phone)) return null;
+    return data.phone;
   } catch {
     return null;
   }

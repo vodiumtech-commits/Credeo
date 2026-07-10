@@ -82,7 +82,7 @@ async function handleRequest(json: unknown) {
   if (conflict) return duplicateResponse(conflict);
 
   // Rate-limit: max 3 OTP sends per email per 10 min (best-effort — no-ops if Redis is down).
-  const rl = await rateLimit(`rl:register-otp:${email}`, 3, 600);
+  const rl = await rateLimit(`rl:register-otp:${email}`, 3, 600, true);
   if (!rl.ok) {
     return NextResponse.json(
       { error: "Too many verification emails sent. Wait 10 minutes and try again." },
@@ -117,7 +117,7 @@ async function handleVerify(json: unknown) {
   } = parsed.data;
 
   // Rate-limit OTP guesses (best-effort — no-ops if Redis is down).
-  const rl = await rateLimit(`rl:register-verify:${email}`, 5, 600);
+  const rl = await rateLimit(`rl:register-verify:${email}`, 5, 600, true);
   if (!rl.ok) {
     return NextResponse.json(
       { error: "Too many attempts. Request a new code." },

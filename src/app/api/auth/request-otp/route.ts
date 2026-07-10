@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   }
 
   // 3 OTP requests per phone per 10 minutes
-  const { ok } = await rateLimit(`otp:req:${phone}`, 3, 600);
+  const { ok } = await rateLimit(`otp:req:${phone}`, 3, 600, true);
   if (!ok) {
     return NextResponse.json(
       { error: "Too many requests. Please wait 10 minutes before trying again." },
