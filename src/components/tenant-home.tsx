@@ -37,7 +37,7 @@ export function TenantHome({
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-vodium-cream">
       {/* Sticky header */}
-      <header className="sticky top-0 z-30 backdrop-blur-xl bg-[#0A0A0A]/85 border-b border-white/[0.06]">
+      <header className="sticky top-0 z-30 backdrop-blur-xl bg-[#0A0A0A]/85 border-b border-white/[0.06] pt-safe px-safe">
         <div className="max-w-6xl mx-auto px-5 md:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {logoUrl ? (

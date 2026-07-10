@@ -192,7 +192,7 @@ function CheckoutInner() {
 
 function Shell({ children, brand, org }: { children: React.ReactNode; brand: string; org?: Org }) {
   return (
-    <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center px-5 py-10">
+    <div className="min-h-dvh bg-[#0A0A0A] flex items-center justify-center px-5 py-10">
       <div className="w-full max-w-md">
         {org && (
           <div className="flex items-center gap-3 mb-6 justify-center">

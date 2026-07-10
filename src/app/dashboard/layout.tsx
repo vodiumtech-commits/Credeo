@@ -284,7 +284,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen bg-[#0D0D0D] flex">
       {/* Desktop sidebar */}
-      <aside className="hidden md:flex w-60 flex-col bg-[#080808] border-r border-white/[0.05] fixed inset-y-0 left-0 z-30">
+      <aside className="hidden md:flex w-60 flex-col bg-[#080808] border-r border-white/[0.05] fixed inset-y-0 left-0 z-30 pt-safe pb-safe pl-safe">
         <SidebarContent />
       </aside>
 
@@ -295,7 +295,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Mobile drawer */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-72 bg-[#080808] flex flex-col border-r border-white/[0.05] md:hidden transition-transform duration-200 ease-out ${
+        className={`fixed inset-y-0 left-0 z-50 w-72 bg-[#080808] flex flex-col border-r border-white/[0.05] md:hidden transition-transform duration-200 ease-out pt-safe pb-safe ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -331,7 +331,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Main */}
       <div className="flex-1 md:ml-60 flex flex-col min-h-screen">
         {/* Sticky header */}
-        <header className="sticky top-0 z-20 bg-[#0A0A0A]/95 backdrop-blur-xl border-b border-white/[0.05] px-5 h-14 flex items-center justify-between">
+        <header className="sticky top-0 z-20 bg-[#0A0A0A]/95 backdrop-blur-xl border-b border-white/[0.05] px-5 min-h-[3.5rem] pt-safe flex items-center justify-between">
           {/* Left: hamburger + breadcrumb */}
           <div className="flex items-center gap-3">
             <button
@@ -376,7 +376,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </header>
 
-        <main className="flex-1 overflow-auto">{children}</main>
+        <main className="flex-1 overflow-auto pb-safe">{children}</main>
       </div>
 
       <NpsWidget />

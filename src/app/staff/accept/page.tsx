@@ -35,7 +35,7 @@ function AcceptForm() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center px-5">
+    <div className="min-h-dvh bg-[#0A0A0A] flex items-center justify-center px-5 py-8">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="w-12 h-12 rounded-2xl bg-vodium-charcoal border border-vodium-gold/30 flex items-center justify-center mx-auto mb-4">
