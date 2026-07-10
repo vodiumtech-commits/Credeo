@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      # Dummy values so Prisma client + session module can load at build time.
+      # No real DB is contacted (dynamic pages don't query during build).
+      DATABASE_URL: postgresql://user:pass@localhost:5432/db
+      DIRECT_URL: postgresql://user:pass@localhost:5432/db
+      SESSION_SECRET: ci-session-secret-not-used-in-prod
+      SECRET_ENCRYPTION_KEY: dGVzdC10ZXN0LXRlc3QtdGVzdC10ZXN0LTMyIQ==
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Unit tests
+        run: npm test
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Lint
+        run: npx next lint
+      - name: Build
+        run: npx next build

@@ -10,6 +10,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test tests/*.test.ts",
     "db:generate": "node --env-file=.env.local node_modules/.bin/prisma generate",
     "db:push": "node --env-file=.env.local node_modules/.bin/prisma db push",
     "db:migrate": "node --env-file=.env.local node_modules/.bin/prisma migrate dev",
