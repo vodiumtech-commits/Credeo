@@ -14,7 +14,8 @@ jobs:
       DATABASE_URL: postgresql://user:pass@localhost:5432/db
       DIRECT_URL: postgresql://user:pass@localhost:5432/db
       SESSION_SECRET: ci-session-secret-not-used-in-prod
-      SECRET_ENCRYPTION_KEY: dGVzdC10ZXN0LXRlc3QtdGVzdC10ZXN0LTMyIQ==
+      # Valid 32-byte key (64 hex chars) so encryption is enabled in CI.
+      SECRET_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

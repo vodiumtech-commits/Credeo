@@ -2,9 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 // Env is read lazily inside the functions, so setting it here (before the tests
-// run) is sufficient even though the imports are hoisted.
-process.env.SESSION_SECRET ||= "test-session-secret";
-process.env.SECRET_ENCRYPTION_KEY ||= Buffer.alloc(32, 7).toString("base64");
+// run) is sufficient even though the imports are hoisted. Set unconditionally so
+// the test is hermetic regardless of any (possibly invalid) CI env value.
+process.env.SESSION_SECRET = "test-session-secret";
+process.env.SECRET_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64"); // valid 32-byte key
 
 import { normalisePhone, formatNaira } from "../src/lib/utils";
 import { encryptSecret, decryptSecret } from "../src/lib/crypto/secrets";
