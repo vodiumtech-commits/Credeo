@@ -38,6 +38,7 @@ export default async function BnplOrdersPage() {
       canRepay: Boolean(order.creditId) && outstanding > 0,
       consentAccepted: Boolean(order.termsAcceptedAt),
       consentPath: `/bnpl/${signOrderToken(order.id)}`,
+      customerScore: order.student.vodiumScore,
     };
   });
 

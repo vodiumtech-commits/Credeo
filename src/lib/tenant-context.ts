@@ -101,3 +101,11 @@ export function canAccessBranch(
 export function hasTenantWriteAccess(ctx: Awaited<ReturnType<typeof requireTenantContext>>) {
   return ctx.canWrite;
 }
+
+// Extending credit (approving a BNPL request) is a credit decision — limit it to
+// managers/finance/owners, not general branch staff.
+const CREDIT_APPROVER_ROLES: OrganizationRole[] = ["OWNER", "HQ_ADMIN", "BRANCH_MANAGER", "FINANCE"];
+
+export function canApproveCredit(ctx: Awaited<ReturnType<typeof requireTenantContext>>) {
+  return Boolean(ctx.organizationId) && ctx.role !== null && CREDIT_APPROVER_ROLES.includes(ctx.role);
+}

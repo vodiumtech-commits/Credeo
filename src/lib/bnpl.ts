@@ -14,8 +14,13 @@ export function nextOrderNumber(prefix = "BNPL") {
   return `${prefix}-${Date.now().toString(36).toUpperCase()}`;
 }
 
+/** Round to 2 decimal places (kobo) to avoid floating-point drift on money. */
+export function roundMoney(amount: number): number {
+  return Math.round((amount + Number.EPSILON) * 100) / 100;
+}
+
 export function calculateItemsTotal(items: OrderItemInput[]) {
-  return items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+  return roundMoney(items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0));
 }
 
 export function calculateCouponDiscount(coupon: CouponCampaign, subtotal: number) {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { hasTenantWriteAccess, requireTenantContext } from "@/lib/tenant-context";
+import { canApproveCredit, requireTenantContext } from "@/lib/tenant-context";
 import { ipFromRequest, writeAudit } from "@/lib/audit";
 import { getOrgChannelCredentials } from "@/lib/whatsapp/channel-token";
 import { sendWhatsAppMessage } from "@/lib/whatsapp/outbound";
@@ -8,12 +8,12 @@ import { sendWhatsAppMessage } from "@/lib/whatsapp/outbound";
 // POST /api/bnpl/orders/[id]/decline — reject a customer-submitted DRAFT order.
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const ctx = await requireTenantContext();
-  if (!hasTenantWriteAccess(ctx) || !ctx.organizationId) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!canApproveCredit(ctx)) {
+    return NextResponse.json({ error: "Only a manager, finance or owner can act on this." }, { status: 403 });
   }
 
   const order = await prisma.bnplOrder.findFirst({
-    where: { id: params.id, organizationId: ctx.organizationId },
+    where: { id: params.id, organizationId: ctx.organizationId! },
     include: { student: true },
   });
   if (!order) return NextResponse.json({ error: "Order not found." }, { status: 404 });

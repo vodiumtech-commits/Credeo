@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { canAccessBranch, hasTenantWriteAccess, requireTenantContext } from "@/lib/tenant-context";
+import { canAccessBranch, canApproveCredit, requireTenantContext } from "@/lib/tenant-context";
 import { ipFromRequest, writeAudit } from "@/lib/audit";
 import { signOrderToken } from "@/lib/bnpl-token";
 import { getOrgChannelCredentials } from "@/lib/whatsapp/channel-token";
@@ -17,12 +17,12 @@ const schema = z.object({
 // into an active BNPL credit with a repayment schedule.
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const ctx = await requireTenantContext();
-  if (!hasTenantWriteAccess(ctx) || !ctx.organizationId) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!canApproveCredit(ctx)) {
+    return NextResponse.json({ error: "Only a manager, finance or owner can approve credit." }, { status: 403 });
   }
 
   const order = await prisma.bnplOrder.findFirst({
-    where: { id: params.id, organizationId: ctx.organizationId },
+    where: { id: params.id, organizationId: ctx.organizationId! },
     include: { student: true, items: true },
   });
   if (!order) return NextResponse.json({ error: "Order not found." }, { status: 404 });

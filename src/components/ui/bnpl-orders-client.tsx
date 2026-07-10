@@ -18,6 +18,7 @@ export type BnplOrderRow = {
   canRepay: boolean;
   consentAccepted: boolean;
   consentPath: string;
+  customerScore?: number;
 };
 
 type ItemDraft = { name: string; quantity: number; unitPrice: number };
@@ -334,6 +335,12 @@ function NewOrderForm({
   );
 }
 
+function scoreTone(score: number): string {
+  if (score >= 600) return "bg-emerald-300/15 text-emerald-300";
+  if (score >= 450) return "bg-amber-300/15 text-amber-200";
+  return "bg-rose-300/15 text-rose-300";
+}
+
 function PendingRow({ order }: { order: BnplOrderRow }) {
   const [busy, setBusy] = useState<"approve" | "decline" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -356,7 +363,14 @@ function PendingRow({ order }: { order: BnplOrderRow }) {
   return (
     <div className="px-5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div className="min-w-0">
-        <p className="text-sm text-vodium-cream">{order.studentName} <span className="text-vodium-cream/35">· {order.orderNumber}</span></p>
+        <p className="text-sm text-vodium-cream">
+          {order.studentName} <span className="text-vodium-cream/35">· {order.orderNumber}</span>
+          {typeof order.customerScore === "number" && (
+            <span className={`ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded ${scoreTone(order.customerScore)}`}>
+              score {order.customerScore}
+            </span>
+          )}
+        </p>
         <p className="text-xs text-vodium-cream/40">{formatNaira(order.totalAmount)} · requested online</p>
         {error && <p className="text-xs text-rose-300 mt-1">{error}</p>}
       </div>

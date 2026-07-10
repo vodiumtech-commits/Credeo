@@ -5,8 +5,9 @@ import { resolveTenantByHost } from "@/lib/tenant-domain";
 import { normalisePhone } from "@/lib/utils";
 import { rateLimit } from "@/lib/redis";
 import { verifyOtpCookie, clearOtpCookie } from "@/lib/otp-cookie";
-import { nextOrderNumber } from "@/lib/bnpl";
+import { nextOrderNumber, roundMoney } from "@/lib/bnpl";
 import { getOrCreateStorefrontCustomer, getOrgOwnerVendorId } from "@/lib/storefront";
+import { assessBnplRisk } from "@/lib/bnpl-risk";
 import { ipFromRequest, writeAudit } from "@/lib/audit";
 
 const schema = z.object({
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
   const phone = normalisePhone(data.phone);
   if (!phone) return NextResponse.json({ error: "Enter a valid phone number." }, { status: 400 });
 
-  const rl = await rateLimit(`rl:store-order:${phone}`, 5, 600);
+  const rl = await rateLimit(`rl:store-order:${phone}`, 5, 600, true);
   if (!rl.ok) return NextResponse.json({ error: "Too many attempts. Please wait." }, { status: 429 });
 
   if (!verifyOtpCookie("storefront", phone, data.otp)) {
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
     const unitPrice = Number(p.price);
     return { name: p.name, sku: p.sku ?? null, quantity: i.quantity, unitPrice, totalPrice: unitPrice * i.quantity };
   });
-  const subtotal = lineItems.reduce((s, l) => s + l.totalPrice, 0);
+  const subtotal = roundMoney(lineItems.reduce((s, l) => s + l.totalPrice, 0));
   if (subtotal <= 0) return NextResponse.json({ error: "Your cart is empty." }, { status: 400 });
 
   const ownerVendorId = await getOrgOwnerVendorId(org.id);
@@ -75,6 +76,13 @@ export async function POST(req: NextRequest) {
       fullName: data.fullName,
       phone,
     });
+
+    // Credit-risk guardrail: block oversized/abusive/defaulted requests before
+    // they ever reach the store's approval queue.
+    const risk = await assessBnplRisk({ organizationId: org.id, studentId: customer.id, amount: subtotal });
+    if (!risk.allowed) {
+      return NextResponse.json({ error: risk.reason ?? "This request can't be approved online." }, { status: 403 });
+    }
 
     const dueDate = new Date(Date.now() + DEFAULT_TERM_DAYS * 86_400_000);
     const orderNumber = nextOrderNumber(org.slug.slice(0, 4).toUpperCase());
