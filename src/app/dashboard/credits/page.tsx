@@ -3,7 +3,6 @@ import { getVendorSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { markOverdueCredits } from "@/lib/credit-lifecycle";
 import { CreditsClient } from "@/components/ui/credits-client";
-import type { CreditStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
