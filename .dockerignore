@@ -1,0 +1,15 @@
+node_modules
+.next
+.git
+.github
+.env
+.env.local
+.env*.local
+.env*.bak
+*.bak
+npm-debug.log
+Dockerfile
+.dockerignore
+docs
+tests
+README.md
