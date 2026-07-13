@@ -290,7 +290,7 @@ export default function LandingPage() {
                 <div className="flex-1 mx-3 bg-[#1A1A1A] rounded-md h-6 flex items-center px-3 gap-2">
                   <span className="w-2.5 h-2.5 rounded-full border border-white/[0.12] flex-shrink-0" />
                   <span className="text-[11px] text-vodium-cream/20">
-                    app.vodium.co/dashboard
+                    vodiumledger.com/dashboard
                   </span>
                 </div>
               </div>
@@ -948,7 +948,7 @@ export default function LandingPage() {
           <div className="brand-divider mb-8" />
           <div className="flex flex-col md:flex-row justify-between gap-4 text-vodium-cream/30 text-xs">
             <p>© 2026 Vodium. Lagos, Nigeria. All rights reserved.</p>
-            {/* <p>hello@vodium.co</p> */}
+            {/* <p>hello@vodiumledger.com</p> */}
           </div>
         </div>
       </footer>

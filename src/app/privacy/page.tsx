@@ -9,7 +9,7 @@ export const metadata = {
 
 export default function PrivacyPage() {
   const EFFECTIVE = "1 June 2026";
-  const EMAIL = "privacy@vodium.co";
+  const EMAIL = "privacy@vodiumledger.com";
 
   const Section = ({
     title,
@@ -309,10 +309,10 @@ export default function PrivacyPage() {
             We conduct periodic security reviews. If you discover a
             vulnerability, please report it responsibly to{" "}
             <a
-              href="mailto:security@vodium.co"
+              href="mailto:security@vodiumledger.com"
               className="text-vodium-gold hover:underline"
             >
-              security@vodium.co
+              security@vodiumledger.com
             </a>
             .
           </p>
@@ -365,10 +365,10 @@ export default function PrivacyPage() {
             <br />
             Data Protection Officer:{" "}
             <a
-              href="mailto:dpo@vodium.co"
+              href="mailto:dpo@vodiumledger.com"
               className="text-vodium-gold hover:underline"
             >
-              dpo@vodium.co
+              dpo@vodiumledger.com
             </a>
           </p>
         </Section>

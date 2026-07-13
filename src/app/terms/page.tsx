@@ -8,7 +8,7 @@ export const metadata = {
 
 export default function TermsPage() {
   const EFFECTIVE = "1 June 2026";
-  const EMAIL = "legal@vodium.co";
+  const EMAIL = "legal@vodiumledger.com";
 
   const Section = ({
     title,
@@ -312,10 +312,10 @@ export default function TermsPage() {
             <br />
             Support:{" "}
             <a
-              href="mailto:hello@vodium.co"
+              href="mailto:hello@vodiumledger.com"
               className="text-vodium-gold hover:underline"
             >
-              hello@vodium.co
+              hello@vodiumledger.com
             </a>
             <br />
             Vodium Technology Limited, Lagos, Nigeria

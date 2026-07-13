@@ -170,7 +170,7 @@ export async function POST(req: NextRequest) {
       console.log(`[whatsapp] Rejected: unregistered user ${fromPhone}`);
       await sendWhatsAppMessage(
         fromPhone,
-        "You are not registered as a vendor on Vodium Ledger. Please sign up at vodium.ng or contact support.",
+        "You are not registered as a vendor on Vodium Ledger. Please sign up at vodiumledger.com or contact support.",
         creds
       );
       return NextResponse.json({ ok: true });

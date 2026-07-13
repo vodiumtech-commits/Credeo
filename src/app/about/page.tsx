@@ -347,11 +347,11 @@ export default function AboutPage() {
             what we&apos;re building?
           </p>
           <a
-            href="mailto:hello@vodium.co"
+            href="mailto:hello@vodiumledger.com"
             className="inline-flex items-center gap-2.5 btn-gold px-7 py-3.5 rounded-xl text-sm font-semibold hover:shadow-[0_0_28px_rgba(201,169,97,0.35)] transition-all"
           >
             <Mail size={15} />
-            hello@vodium.co
+            hello@vodiumledger.com
           </a>
         </section>
       </main>

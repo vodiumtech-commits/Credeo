@@ -35,7 +35,7 @@ const jobs: JobPost[] = [
     type: "Full-time",
     description:
       "Own the technical architecture of a platform that will process billions of naira in credit data. Next.js, TypeScript, PostgreSQL, Prisma. You'll build features used by thousands of campus vendors.",
-    mailto: "careers@vodium.co?subject=Application: Senior Full-Stack Engineer",
+    mailto: "careers@vodiumledger.com?subject=Application: Senior Full-Stack Engineer",
   },
   {
     title: "Growth & Partnerships Manager",
@@ -44,7 +44,7 @@ const jobs: JobPost[] = [
     description:
       "Sign Vodium's first 500 paying vendors. Build the playbook. Own the pipeline. Work directly with the CEO on market expansion across Nigerian universities.",
     mailto:
-      "careers@vodium.co?subject=Application: Growth %26 Partnerships Manager",
+      "careers@vodiumledger.com?subject=Application: Growth %26 Partnerships Manager",
   },
   {
     title: "Customer Success Lead",
@@ -52,7 +52,7 @@ const jobs: JobPost[] = [
     type: "Full-time",
     description:
       "Be the voice of Vodium to vendors and customers. Onboard new shops, gather feedback, drive retention. You'll know every pilot vendor by name.",
-    mailto: "careers@vodium.co?subject=Application: Customer Success Lead",
+    mailto: "careers@vodiumledger.com?subject=Application: Customer Success Lead",
   },
   {
     title: "UI/UX Designer",
@@ -60,7 +60,7 @@ const jobs: JobPost[] = [
     type: "Contract",
     description:
       "Raise the bar on what a Nigerian fintech product looks like. Own every pixel from WhatsApp message templates to the web dashboard.",
-    mailto: "careers@vodium.co?subject=Application: UI/UX Designer",
+    mailto: "careers@vodiumledger.com?subject=Application: UI/UX Designer",
   },
 ];
 
@@ -223,10 +223,10 @@ export default function CareersPage() {
               Questions? Reach us at
             </p>
             <a
-              href="mailto:careers@vodium.co"
+              href="mailto:careers@vodiumledger.com"
               className="text-vodium-gold hover:text-vodium-gold/80 transition-colors font-medium"
             >
-              careers@vodium.co
+              careers@vodiumledger.com
             </a>
           </div>
         </section>

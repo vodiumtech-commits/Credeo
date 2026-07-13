@@ -316,7 +316,7 @@ export default function LoginPage() {
                     <input
                       type="email"
                       autoComplete="email"
-                      placeholder="jeff@vodiumledger.com"
+                      placeholder="you@example.com"
                       value={email}
                       onChange={(e) => {
                         setEmail(e.target.value);
