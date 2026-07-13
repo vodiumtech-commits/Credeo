@@ -39,6 +39,13 @@ export type AuditAction =
   | "product.created"
   | "product.updated"
   | "product.deleted"
+  // reminders
+  | "reminders.settings_updated"
+  // invoices
+  | "invoice.created"
+  | "invoice.sent"
+  | "invoice.payment_recorded"
+  | "invoice.cancelled"
   | "bnpl.consent_accepted"
   // coupons
   | "coupon.created"

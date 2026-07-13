@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, CreditCard, Settings, LogOut,
   MessageCircle, Menu, X, Plus, ChevronRight, Zap,
-  Building2, ReceiptText, TicketPercent, WalletCards, SlidersHorizontal, Package,
+  Building2, ReceiptText, TicketPercent, WalletCards, SlidersHorizontal, Package, FileText,
 } from "lucide-react";
 import { NpsWidget } from "@/components/ui/nps-widget";
 import { NavProgress } from "@/components/ui/nav-progress";
@@ -29,6 +29,7 @@ type VendorInfo = {
 const NAV_ITEMS = [
   { href: "/dashboard",           icon: LayoutDashboard, label: "Overview",  emoji: "◈" },
   { href: "/dashboard/credits",   icon: CreditCard,      label: "Credits",   emoji: "◉" },
+  { href: "/dashboard/invoices",  icon: FileText,        label: "Invoices",  emoji: "◈" },
   { href: "/dashboard/customers", icon: Users,           label: "Customers", emoji: "◎" },
   { href: "/dashboard/settings",  icon: Settings,        label: "Settings",  emoji: "◌" },
 ];
@@ -45,6 +46,7 @@ const ENTERPRISE_NAV_ITEMS = [
 const PAGE_TITLES: Record<string, string> = {
   "/dashboard":            "Overview",
   "/dashboard/credits":    "Credits",
+  "/dashboard/invoices":   "Invoices",
   "/dashboard/customers":  "Customers",
   "/dashboard/settings":   "Settings",
   "/dashboard/credit/new": "New Credit",

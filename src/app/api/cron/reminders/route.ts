@@ -14,6 +14,7 @@ import { sendWhatsAppMessage } from "@/lib/whatsapp/outbound";
 import { messages } from "@/lib/whatsapp/messages";
 import { reminderLeadMinutesForDue } from "@/lib/whatsapp/state-machine";
 import { applyDailyDefaultDecay, markOverdueCredits, sendOverdueReminders } from "@/lib/credit-lifecycle";
+import { createReminderPrefResolver } from "@/lib/reminder-prefs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -63,9 +64,19 @@ export async function GET(req: NextRequest) {
   let failed = 0;
   const vendorSentCount: Record<string, number> = {};
 
+  // Merchants can turn off customer reminders — respect that (cached per org).
+  const remindersAllowed = createReminderPrefResolver();
+  let skipped = 0;
+
   for (const credit of credits) {
     const student  = credit.student;
     const vendor   = credit.vendor;
+
+    if (!(await remindersAllowed(vendor.organizationId, "preDue"))) {
+      skipped++;
+      continue;
+    }
+
     const diffMs   = credit.dueDate.getTime() - now.getTime();
     const diffMins = Math.ceil(diffMs / 60_000);
     const originalDueMins = Math.max(
@@ -142,6 +153,7 @@ export async function GET(req: NextRequest) {
     sent: totalSent,
     failed: totalFailed,
     total: credits.length + overdueReminders.total,
+    skipped: { preDue: skipped, overdue: overdueReminders.skipped },
     overdue: overdueLifecycle,
     defaultDecay,
     overdueReminders: {

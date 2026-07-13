@@ -48,3 +48,23 @@ export function verifyOrderToken(token: string): string | null {
     return null;
   }
 }
+
+/** Signed public link for a digital invoice (same scheme, separate namespace). */
+export function signInvoiceToken(invoiceId: string): string {
+  const payload = Buffer.from(invoiceId, "utf8").toString("base64url");
+  return `${payload}.${hmac(`v1:invoice:${payload}`)}`;
+}
+
+export function verifyInvoiceToken(token: string): string | null {
+  try {
+    const dot = token.lastIndexOf(".");
+    if (dot === -1) return null;
+    const payload = token.slice(0, dot);
+    const incoming = token.slice(dot + 1);
+    if (!safeEqual(incoming, hmac(`v1:invoice:${payload}`))) return null;
+    const invoiceId = Buffer.from(payload, "base64url").toString("utf8");
+    return invoiceId.length >= 10 ? invoiceId : null;
+  } catch {
+    return null;
+  }
+}

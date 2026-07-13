@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { ReminderSettings } from "@/components/ui/reminder-settings";
 import {
   CheckCircle,
   Store,
@@ -480,6 +481,9 @@ export default function SettingsPage() {
                 />
               </div>
             </div>
+
+            {/* Customer reminder preferences */}
+            <ReminderSettings />
 
             {/* Vodium tip */}
             <div className="glass-gold rounded-2xl p-5">

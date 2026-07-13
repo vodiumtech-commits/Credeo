@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppMessage } from "@/lib/whatsapp/outbound";
 import { getOrgChannelCredentials, type ChannelCredentials } from "@/lib/whatsapp/channel-token";
+import { createReminderPrefResolver } from "@/lib/reminder-prefs";
 import { messages } from "@/lib/whatsapp/messages";
 
 const DEFAULT_SCORE_DELTA = -80;
@@ -211,7 +212,17 @@ export async function sendOverdueReminders(scope: LifecycleScope & { force?: boo
     return credsCache.get(key) ?? null;
   }
 
+  // Merchants can turn AUTOMATED customer reminders off — respect that. A manual
+  // "remind now" (scope.force) is an explicit merchant action and still sends.
+  const remindersAllowed = createReminderPrefResolver();
+  let skipped = 0;
+
   for (const item of grouped.values()) {
+    if (!scope.force && !(await remindersAllowed(item.vendor.organizationId, "overdue"))) {
+      skipped++;
+      continue;
+    }
+
     const daysOverdue = Math.max(
       1,
       Math.ceil((now.getTime() - item.oldestDueDate.getTime()) / 86_400_000)
@@ -244,5 +255,5 @@ export async function sendOverdueReminders(scope: LifecycleScope & { force?: boo
     }
   }
 
-  return { sent, failed, total: grouped.size, vendorSentCount };
+  return { sent, failed, skipped, total: grouped.size, vendorSentCount };
 }
