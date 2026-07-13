@@ -19,7 +19,19 @@ export type InvoiceRow = {
   publicPath: string;
 };
 
-type ItemDraft = { name: string; quantity: number; unitPrice: number };
+type ItemDraft = { name: string; quantity: string; unitPrice: string };
+
+// Plain text inputs (no spinner counters) — sanitize as the vendor types.
+const digitsOnly = (v: string) => v.replace(/\D/g, "");
+function decimalOnly(v: string) {
+  const cleaned = v.replace(/[^0-9.]/g, "");
+  const [head, ...rest] = cleaned.split(".");
+  return rest.length ? `${head}.${rest.join("")}` : head;
+}
+function toNumber(v: string) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
 
 const OPEN = ["DRAFT", "SENT", "PARTIALLY_PAID", "OVERDUE"];
 
@@ -152,19 +164,20 @@ function SendButton({ invoice }: { invoice: InvoiceRow }) {
 }
 
 function PayForm({ invoice, onClose }: { invoice: InvoiceRow; onClose: () => void }) {
-  const [amount, setAmount] = useState(invoice.outstanding);
+  const [amount, setAmount] = useState(String(invoice.outstanding));
   const [method, setMethod] = useState("CASH");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function submit() {
     setError(null);
-    if (amount <= 0) return setError("Enter an amount greater than zero.");
+    const value = toNumber(amount);
+    if (value <= 0) return setError("Enter an amount greater than zero.");
     setBusy(true);
     const res = await fetch(`/api/invoices/${invoice.id}/payments`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount, method }),
+      body: JSON.stringify({ amount: value, method }),
     });
     const data = await res.json().catch(() => ({}));
     setBusy(false);
@@ -176,7 +189,7 @@ function PayForm({ invoice, onClose }: { invoice: InvoiceRow; onClose: () => voi
   return (
     <div className="flex flex-col sm:flex-row sm:items-end gap-3">
       <Field label={`Amount (balance ${formatNaira(invoice.outstanding)})`}>
-        <input type="number" min={0} value={amount} onChange={(e) => setAmount(Number(e.target.value))} className={inputClass} />
+        <input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(decimalOnly(e.target.value))} className={inputClass} />
       </Field>
       <Field label="Method">
         <select value={method} onChange={(e) => setMethod(e.target.value)} className={inputClass}>
@@ -205,14 +218,15 @@ function NewInvoiceForm({
   const [customerPhone, setCustomerPhone] = useState("");
   const [branchId, setBranchId] = useState(defaultBranchId ?? branches[0]?.id ?? "");
   const [dueDate, setDueDate] = useState(defaultDue());
-  const [discount, setDiscount] = useState(0);
+  const [discount, setDiscount] = useState("");
   const [notes, setNotes] = useState("");
-  const [items, setItems] = useState<ItemDraft[]>([{ name: "", quantity: 1, unitPrice: 0 }]);
+  const [items, setItems] = useState<ItemDraft[]>([{ name: "", quantity: "1", unitPrice: "" }]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const subtotal = useMemo(() => items.reduce((s, i) => s + i.quantity * i.unitPrice, 0), [items]);
-  const total = Math.max(0, subtotal - discount);
+  const subtotal = useMemo(() => items.reduce((s, i) => s + toNumber(i.quantity) * toNumber(i.unitPrice), 0), [items]);
+  const discountValue = toNumber(discount);
+  const total = Math.max(0, subtotal - discountValue);
 
   function update(i: number, patch: Partial<ItemDraft>) {
     setItems((cur) => cur.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
@@ -220,7 +234,13 @@ function NewInvoiceForm({
 
   async function submit() {
     setError(null);
-    const clean = items.filter((i) => i.name.trim() && i.unitPrice > 0);
+    const clean = items
+      .map((i) => ({
+        name: i.name.trim(),
+        quantity: Math.max(1, Math.round(toNumber(i.quantity)) || 1),
+        unitPrice: toNumber(i.unitPrice),
+      }))
+      .filter((i) => i.name && i.unitPrice > 0);
     if (clean.length === 0) return setError("Add at least one item with a price.");
     if (!customerName.trim() || !customerPhone.trim()) return setError("Enter the customer's name and phone.");
     if (total <= 0) return setError("Invoice total must be greater than zero.");
@@ -234,9 +254,9 @@ function NewInvoiceForm({
         customerPhone: customerPhone.trim(),
         branchId: branchId || undefined,
         dueDate: new Date(dueDate).toISOString(),
-        discountAmount: discount,
+        discountAmount: discountValue,
         notes: notes.trim() || undefined,
-        items: clean.map((i) => ({ name: i.name.trim(), quantity: i.quantity, unitPrice: i.unitPrice })),
+        items: clean,
       }),
     });
     const data = await res.json().catch(() => ({}));
@@ -264,7 +284,7 @@ function NewInvoiceForm({
           </Field>
         )}
         <Field label="Due date"><input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={inputClass} /></Field>
-        <Field label="Discount (₦)"><input type="number" min={0} value={discount} onChange={(e) => setDiscount(Number(e.target.value))} className={inputClass} /></Field>
+        <Field label="Discount (₦)"><input type="text" inputMode="decimal" value={discount} onChange={(e) => setDiscount(decimalOnly(e.target.value))} placeholder="0" className={inputClass} /></Field>
       </div>
 
       <div className="space-y-2">
@@ -272,15 +292,15 @@ function NewInvoiceForm({
         {items.map((item, i) => (
           <div key={i} className="grid grid-cols-12 gap-2">
             <input value={item.name} onChange={(e) => update(i, { name: e.target.value })} placeholder="Item or service" className={`col-span-6 ${inputClass}`} />
-            <input type="number" min={1} value={item.quantity} onChange={(e) => update(i, { quantity: Math.max(1, Number(e.target.value)) })} placeholder="Qty" className={`col-span-2 ${inputClass}`} />
-            <input type="number" min={0} value={item.unitPrice} onChange={(e) => update(i, { unitPrice: Number(e.target.value) })} placeholder="Unit ₦" className={`col-span-3 ${inputClass}`} />
+            <input type="text" inputMode="numeric" value={item.quantity} onChange={(e) => update(i, { quantity: digitsOnly(e.target.value).slice(0, 3) })} placeholder="Qty" className={`col-span-2 ${inputClass}`} />
+            <input type="text" inputMode="decimal" value={item.unitPrice} onChange={(e) => update(i, { unitPrice: decimalOnly(e.target.value) })} placeholder="Unit ₦" className={`col-span-3 ${inputClass}`} />
             <button onClick={() => setItems((c) => c.filter((_, idx) => idx !== i))} disabled={items.length === 1}
                     className="col-span-1 flex items-center justify-center text-vodium-cream/40 hover:text-rose-300 disabled:opacity-30">
               <Trash2 size={14} />
             </button>
           </div>
         ))}
-        <button onClick={() => setItems((c) => [...c, { name: "", quantity: 1, unitPrice: 0 }])} className="text-xs text-vodium-gold hover:underline inline-flex items-center gap-1">
+        <button onClick={() => setItems((c) => [...c, { name: "", quantity: "1", unitPrice: "" }])} className="text-xs text-vodium-gold hover:underline inline-flex items-center gap-1">
           <Plus size={12} /> Add item
         </button>
       </div>
@@ -291,7 +311,7 @@ function NewInvoiceForm({
 
       <div className="space-y-1 text-sm">
         <div className="flex justify-between text-vodium-cream/45"><span>Subtotal</span><span>{formatNaira(subtotal)}</span></div>
-        {discount > 0 && <div className="flex justify-between text-vodium-cream/45"><span>Discount</span><span>− {formatNaira(discount)}</span></div>}
+        {discountValue > 0 && <div className="flex justify-between text-vodium-cream/45"><span>Discount</span><span>− {formatNaira(discountValue)}</span></div>}
         <div className="flex justify-between font-semibold"><span className="text-vodium-cream">Total</span><span className="text-vodium-gold">{formatNaira(total)}</span></div>
       </div>
 
