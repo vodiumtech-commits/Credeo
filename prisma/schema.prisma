@@ -468,6 +468,7 @@ model Invoice {
   notes          String?
   sentAt         DateTime?
   paidAt         DateTime?
+  overdueReminderSentAt DateTime?  // throttles automated overdue reminders
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 

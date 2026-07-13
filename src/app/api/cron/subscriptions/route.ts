@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { applyDailyDefaultDecay, markOverdueCredits } from "@/lib/credit-lifecycle";
+import { markOverdueInvoices, sendOverdueInvoiceReminders } from "@/lib/invoice-lifecycle";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,6 +22,8 @@ export async function GET(req: NextRequest) {
   // reminders cron already ran it today.
   const overdue = await markOverdueCredits({ now });
   const defaultDecay = await applyDailyDefaultDecay({ now });
+  const overdueInvoices = await markOverdueInvoices({ now });
+  const invoiceReminders = await sendOverdueInvoiceReminders({ now });
 
   // 1. Expire trials that have passed their end date
   const expiredTrials = await prisma.vendorSubscription.updateMany({
@@ -84,5 +87,6 @@ export async function GET(req: NextRequest) {
     notificationsSent: expiredSubs.length,
     overdue,
     defaultDecay,
+    invoices: { marked: overdueInvoices.marked, reminders: invoiceReminders },
   });
 }

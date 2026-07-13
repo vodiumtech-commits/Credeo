@@ -15,6 +15,7 @@ import { messages } from "@/lib/whatsapp/messages";
 import { reminderLeadMinutesForDue } from "@/lib/whatsapp/state-machine";
 import { applyDailyDefaultDecay, markOverdueCredits, sendOverdueReminders } from "@/lib/credit-lifecycle";
 import { createReminderPrefResolver } from "@/lib/reminder-prefs";
+import { markOverdueInvoices, sendOverdueInvoiceReminders } from "@/lib/invoice-lifecycle";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,6 +41,10 @@ export async function GET(req: NextRequest) {
   const overdueLifecycle = await markOverdueCredits({ now });
   const defaultDecay = await applyDailyDefaultDecay({ now });
   const overdueReminders = await sendOverdueReminders({ now });
+
+  // Invoices follow the same stream: mark overdue, then remind.
+  const overdueInvoices = await markOverdueInvoices({ now });
+  const invoiceReminders = await sendOverdueInvoiceReminders({ now });
 
   // Find possible reminder candidates. Each credit is filtered below using
   // its own adaptive reminder lead time, so hour-based debts are not told
@@ -153,8 +158,9 @@ export async function GET(req: NextRequest) {
     sent: totalSent,
     failed: totalFailed,
     total: credits.length + overdueReminders.total,
-    skipped: { preDue: skipped, overdue: overdueReminders.skipped },
+    skipped: { preDue: skipped, overdue: overdueReminders.skipped, invoices: invoiceReminders.skipped },
     overdue: overdueLifecycle,
+    invoices: { marked: overdueInvoices.marked, reminders: invoiceReminders },
     defaultDecay,
     overdueReminders: {
       sent: overdueReminders.sent,
