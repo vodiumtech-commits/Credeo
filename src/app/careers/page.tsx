@@ -1,8 +1,6 @@
 import Link from "next/link";
 import {
   ArrowLeft,
-  MapPin,
-  Briefcase,
   ArrowRight,
   Heart,
   Wifi,
@@ -19,50 +17,6 @@ export const metadata = {
   title: "Careers : Vodium Ledger",
   description: "Join us in building Africa's credit infrastructure.",
 };
-
-interface JobPost {
-  title: string;
-  location: string;
-  type: string;
-  description: string;
-  mailto: string;
-}
-
-const jobs: JobPost[] = [
-  {
-    title: "Senior Full-Stack Engineer",
-    location: "Lagos, Nigeria",
-    type: "Full-time",
-    description:
-      "Own the technical architecture of a platform that will process billions of naira in credit data. Next.js, TypeScript, PostgreSQL, Prisma. You'll build features used by thousands of campus vendors.",
-    mailto: "careers@vodiumledger.com?subject=Application: Senior Full-Stack Engineer",
-  },
-  {
-    title: "Growth & Partnerships Manager",
-    location: "Lagos, Nigeria",
-    type: "Full-time",
-    description:
-      "Sign Vodium's first 500 paying vendors. Build the playbook. Own the pipeline. Work directly with the CEO on market expansion across Nigerian universities.",
-    mailto:
-      "careers@vodiumledger.com?subject=Application: Growth %26 Partnerships Manager",
-  },
-  {
-    title: "Customer Success Lead",
-    location: "Lagos / Remote",
-    type: "Full-time",
-    description:
-      "Be the voice of Vodium to vendors and customers. Onboard new shops, gather feedback, drive retention. You'll know every pilot vendor by name.",
-    mailto: "careers@vodiumledger.com?subject=Application: Customer Success Lead",
-  },
-  {
-    title: "UI/UX Designer",
-    location: "Lagos / Remote",
-    type: "Contract",
-    description:
-      "Raise the bar on what a Nigerian fintech product looks like. Own every pixel from WhatsApp message templates to the web dashboard.",
-    mailto: "careers@vodiumledger.com?subject=Application: UI/UX Designer",
-  },
-];
 
 const benefits = [
   { icon: Zap, label: "Competitive salary in NGN + ESOP" },
@@ -134,49 +88,29 @@ export default function CareersPage() {
               Open roles
             </span>
             <h2 className="font-serif text-3xl md:text-4xl text-vodium-cream">
-              {jobs.length} open positions.
+              No open positions right now.
             </h2>
           </div>
 
-          <div className="space-y-4">
-            {jobs.map((job) => (
-              <AnimatedBorder key={job.title}>
-                <div className="group p-6 md:p-8 flex flex-col md:flex-row md:items-center gap-6">
-                  <div className="flex-1">
-                    <div className="flex flex-wrap items-center gap-3 mb-3">
-                      <h3 className="font-serif text-xl text-vodium-cream group-hover:text-vodium-gold transition-colors duration-200">
-                        {job.title}
-                      </h3>
-                      <span className="text-[10px] font-semibold tracking-[0.15em] px-2.5 py-1 rounded-full bg-vodium-charcoal border border-white/[0.08] text-vodium-cream/50">
-                        {job.type}
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-4 mb-4 text-xs text-vodium-cream/40">
-                      <span className="flex items-center gap-1.5">
-                        <MapPin size={11} />
-                        {job.location}
-                      </span>
-                      <span className="flex items-center gap-1.5">
-                        <Briefcase size={11} />
-                        {job.type}
-                      </span>
-                    </div>
-                    <p className="text-vodium-cream/55 text-sm leading-relaxed max-w-2xl">
-                      {job.description}
-                    </p>
-                  </div>
-                  <div className="flex-shrink-0">
-                    <a
-                      href={`mailto:${job.mailto}`}
-                      className="inline-flex items-center gap-2 btn-gold px-6 py-3 rounded-xl text-sm font-semibold group-hover:gap-3 hover:shadow-[0_0_20px_rgba(201,169,97,0.3)] transition-all duration-200"
-                    >
-                      Apply now <ArrowRight size={14} />
-                    </a>
-                  </div>
-                </div>
-              </AnimatedBorder>
-            ))}
-          </div>
+          <AnimatedBorder>
+            <div className="p-6 md:p-8 max-w-2xl">
+              <p className="text-vodium-cream/55 text-sm md:text-base leading-relaxed">
+                We&apos;re not hiring at the moment. The team is heads-down
+                building Vodium Ledger with our pilot vendors. When a role
+                opens, it will be posted here first.
+              </p>
+              <p className="text-vodium-cream/55 text-sm md:text-base leading-relaxed mt-4">
+                Think you&apos;d be a great fit anyway? Introduce yourself —
+                we read every email and keep good people in mind.
+              </p>
+              <a
+                href="mailto:careers@vodiumledger.com?subject=Future roles at Vodium"
+                className="mt-6 inline-flex items-center gap-2 btn-gold px-6 py-3 rounded-xl text-sm font-semibold hover:gap-3 hover:shadow-[0_0_20px_rgba(201,169,97,0.3)] transition-all duration-200"
+              >
+                careers@vodiumledger.com <ArrowRight size={14} />
+              </a>
+            </div>
+          </AnimatedBorder>
         </section>
 
         {/* Benefits */}
