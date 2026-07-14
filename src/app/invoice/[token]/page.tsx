@@ -39,12 +39,23 @@ export default async function PublicInvoicePage({ params }: { params: { token: s
 
   const invoice = await prisma.invoice.findUnique({
     where: { id: invoiceId },
-    include: { items: true, student: true, organization: true, branch: true },
+    include: {
+      items: true,
+      student: true,
+      branch: true,
+      organization: {
+        include: {
+          branches: { where: { status: "ACTIVE" }, orderBy: { createdAt: "asc" }, take: 1 },
+        },
+      },
+    },
   });
   if (!invoice) notFound();
 
   const brand = invoice.organization.brandColor || "#C9A961";
   const storeName = invoice.organization.name;
+  // The store's address: the invoicing branch first, else the org's main (oldest) branch.
+  const storeAddress = branchAddress(invoice.branch) ?? branchAddress(invoice.organization.branches[0]);
   const total = Number(invoice.total);
   const paid = Number(invoice.amountPaid);
   const outstanding = Math.max(0, total - paid);
@@ -54,31 +65,24 @@ export default async function PublicInvoicePage({ params }: { params: { token: s
     <div id="invoice-root" className="min-h-dvh bg-[#0A0A0A] text-vodium-cream px-5 py-10 flex justify-center">
       <style dangerouslySetInnerHTML={{ __html: PRINT_CSS }} />
       <div className="w-full max-w-lg">
-        {/* Store header */}
-        <div className="flex items-center gap-3 justify-center mb-6 no-print">
-          {invoice.organization.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={invoice.organization.logoUrl} alt={storeName} className="w-10 h-10 rounded-xl object-cover" />
-          ) : (
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center font-serif text-lg"
-                 style={{ backgroundColor: `${brand}1a`, color: brand }}>
-              {storeName.charAt(0).toUpperCase()}
-            </div>
-          )}
-          <span className="font-serif tracking-[0.14em] text-sm" style={{ color: brand }}>{storeName.toUpperCase()}</span>
-        </div>
-
         <div id="invoice-sheet" className="rounded-2xl border border-white/[0.06] bg-vodium-charcoal overflow-hidden">
-          {/* Head */}
+          {/* Head — store identity prints on the PDF too */}
           <div className="sheet-head p-6 border-b border-white/[0.06]" style={{ background: `linear-gradient(140deg, ${brand}14, transparent)` }}>
             <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="print-accent text-xs uppercase tracking-[0.2em] inline-flex items-center gap-1.5" style={{ color: brand }}>
-                  <FileText size={13} /> Invoice
-                </p>
-                <p className="text-sm font-semibold mt-2">{storeName}</p>
-                <h1 className="print-accent font-serif text-2xl mt-1" style={{ color: brand }}>{formatNaira(total)}</h1>
-                <p className="muted text-xs text-vodium-cream/40 mt-1">{invoice.invoiceNumber}</p>
+              <div className="flex items-center gap-3 min-w-0">
+                {invoice.organization.logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={invoice.organization.logoUrl} alt={storeName} className="w-12 h-12 rounded-xl object-cover shrink-0" />
+                ) : (
+                  <div className="print-accent w-12 h-12 rounded-xl flex items-center justify-center font-serif text-xl shrink-0"
+                       style={{ backgroundColor: `${brand}1a`, color: brand }}>
+                    {storeName.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="print-accent font-serif text-lg leading-tight" style={{ color: brand }}>{storeName}</p>
+                  {storeAddress && <p className="muted text-xs text-vodium-cream/40 mt-0.5">{storeAddress}</p>}
+                </div>
               </div>
               <span
                 className="print-accent text-[11px] font-bold px-2.5 py-1 rounded-md shrink-0"
@@ -90,6 +94,14 @@ export default async function PublicInvoicePage({ params }: { params: { token: s
               >
                 {STATUS_LABEL[invoice.status] ?? invoice.status}
               </span>
+            </div>
+
+            <div className="mt-5">
+              <p className="print-accent text-xs uppercase tracking-[0.2em] inline-flex items-center gap-1.5" style={{ color: brand }}>
+                <FileText size={13} /> Invoice
+              </p>
+              <h1 className="print-accent font-serif text-2xl mt-1" style={{ color: brand }}>{formatNaira(total)}</h1>
+              <p className="muted text-xs text-vodium-cream/40 mt-1">{invoice.invoiceNumber}</p>
             </div>
             <p className="text-sm text-vodium-cream/55 mt-4">
               Billed to <strong className="text-vodium-cream">{invoice.student.fullName}</strong>
@@ -164,6 +176,13 @@ export default async function PublicInvoicePage({ params }: { params: { token: s
       </div>
     </div>
   );
+}
+
+function branchAddress(
+  b: { address: string | null; city: string | null; state: string | null } | null | undefined
+): string | null {
+  if (!b) return null;
+  return [b.address, b.city, b.state].filter(Boolean).join(", ") || null;
 }
 
 function Line({ label, value }: { label: string; value: string }) {
