@@ -16,7 +16,9 @@ import crypto from "crypto";
 import { prisma } from "../../../lib/prisma";
 import { computeScore } from "../../../lib/credit-score/score";
 import { nextVendorCustomerId } from "../../../lib/customer-id";
-import { normalisePhone } from "../../../lib/utils";
+import { formatNaira, normalisePhone } from "../../../lib/utils";
+import { getOrCreateCustomerForVendor, roundMoney } from "../../../lib/bnpl";
+import { signInvoiceToken } from "../../../lib/bnpl-token";
 import { messages } from "../../../lib/whatsapp/messages";
 import { sendWhatsAppMessage } from "../../../lib/whatsapp/outbound";
 import { getOrgChannelCredentials } from "../../../lib/whatsapp/channel-token";
@@ -361,6 +363,105 @@ async function runSideEffect(
       });
 
       return {};
+    }
+
+    case "CREATE_INVOICE": {
+      if (!vendorId) return { replyOverride: messages.noVendorAccount() };
+      const { customerName, customerPhone, items, dueInMinutes } = effect.data;
+
+      let vendor = await prisma.vendor.findUnique({
+        where: { id: vendorId },
+        include: { organization: true },
+      });
+      if (!vendor) return {};
+
+      // Invoices are organization-scoped; older bot vendors may predate solo orgs.
+      if (!vendor.organizationId) {
+        await createSoloOrganizationForVendor(vendor);
+        vendor = await prisma.vendor.findUnique({ where: { id: vendorId }, include: { organization: true } });
+      }
+      if (!vendor?.organizationId || !vendor.organization) {
+        return { replyOverride: "I couldn't set up invoicing for your shop. Please try again or reply *SUPPORT*." };
+      }
+      const organization = vendor.organization;
+
+      let customer;
+      try {
+        customer = await getOrCreateCustomerForVendor({
+          vendorId,
+          vendorBusinessName: vendor.businessName,
+          communityId: vendor.communityId,
+          organizationId: vendor.organizationId,
+          fullName: customerName,
+          phone: customerPhone,
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "I couldn't save that customer.";
+        return { replyOverride: `❌ ${message}\n\nReply *INVOICE* to try again.` };
+      }
+
+      const subtotal = roundMoney(items.reduce((s, i) => s + i.quantity * i.unitPrice, 0));
+      if (subtotal <= 0) {
+        return { replyOverride: "The invoice total must be greater than zero. Reply *INVOICE* to try again." };
+      }
+
+      const dueDate = new Date(Date.now() + dueInMinutes * 60_000);
+      const invoice = await prisma.invoice.create({
+        data: {
+          organizationId: vendor.organizationId,
+          branchId: vendor.branchId,
+          vendorId,
+          studentId: customer.id,
+          invoiceNumber: `INV-${(organization.slug ?? "VDM").slice(0, 4).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`,
+          status: "DRAFT",
+          subtotal,
+          discountAmount: 0,
+          total: subtotal,
+          dueDate,
+          items: {
+            create: items.map((i) => ({
+              name: i.name.trim(),
+              quantity: i.quantity,
+              unitPrice: i.unitPrice,
+              totalPrice: roundMoney(i.quantity * i.unitPrice),
+            })),
+          },
+        },
+      });
+
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://vodiumledger.com";
+      const link = `${appUrl}/invoice/${signInvoiceToken(invoice.id)}`;
+      const storeName = organization.name ?? vendor.businessName;
+      const dueText = dueDate.toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" });
+
+      const customerMessage =
+        `Hi *${customer.fullName}* 👋\n\n` +
+        `${storeName} has sent you an invoice.\n\n` +
+        `*Invoice:* ${invoice.invoiceNumber}\n` +
+        `*Amount:* ${formatNaira(subtotal)}\n` +
+        `*Due:* ${dueText}\n\n` +
+        `View it here:\n${link}\n\n` +
+        `Thank you! 🙏`;
+
+      const orgCreds = await getOrgChannelCredentials(vendor.organizationId);
+      try {
+        await sendWhatsAppMessage(customer.phone, customerMessage, orgCreds ?? undefined);
+      } catch (err) {
+        console.error("[whatsapp] Invoice delivery failed:", err);
+        return { replyOverride: messages.invoiceSendFailed(invoice.invoiceNumber, link) };
+      }
+
+      await prisma.invoice.update({ where: { id: invoice.id }, data: { status: "SENT", sentAt: new Date() } });
+      await prisma.notification.create({
+        data: {
+          vendorId,
+          title: "Invoice Sent",
+          message: `Invoice ${invoice.invoiceNumber} (${formatNaira(subtotal)}) sent to ${customer.fullName} via WhatsApp.`,
+          type: "SUCCESS",
+        },
+      });
+
+      return { replyOverride: messages.invoiceSent(customer.fullName, invoice.invoiceNumber, subtotal) };
     }
 
     case "FETCH_LIST": {

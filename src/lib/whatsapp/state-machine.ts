@@ -5,7 +5,7 @@
  * The route handler owns all side-effect execution.
  */
 
-import { messages } from "./messages";
+import { messages, type InvoiceItemEntry } from "./messages";
 import type { WhatsAppState } from "@prisma/client";
 
 // ─── public types ─────────────────────────────────────────────────────────────
@@ -13,6 +13,7 @@ import type { WhatsAppState } from "@prisma/client";
 export type Intent =
   | "START"
   | "ADD"
+  | "INVOICE"
   | "PAID"
   | "LIST"
   | "SCORE"
@@ -42,6 +43,7 @@ export interface StepResult {
 export type SideEffect =
   | { type: "CREATE_VENDOR";  data: { name: string; businessName: string; communityName: string; phone: string } }
   | { type: "CREATE_CREDIT";  data: { vendorId: string; customerName: string; customerPhone: string; amount: number; dueInMinutes: number } }
+  | { type: "CREATE_INVOICE"; data: { vendorId: string; customerName: string; customerPhone: string; items: InvoiceItemEntry[]; dueInMinutes: number } }
   | { type: "MARK_PAID";      data: { vendorId: string; customerName: string } }
   | { type: "FETCH_LIST";     data: { vendorId: string } }
   | { type: "FETCH_SCORE";    data: { customerQuery: string; fromPhone: string } };
@@ -52,6 +54,7 @@ export function detectIntent(body: string): Intent {
   const t = body.trim().toUpperCase();
   if (t === "START" || t === "BEGIN" || t === "HI" || t === "HELLO") return "START";
   if (t === "ADD" || t === "NEW" || t === "CREDIT")                   return "ADD";
+  if (t === "INVOICE" || t === "BILL")                                 return "INVOICE";
   if (t.startsWith("PAID"))                                            return "PAID";
   if (t === "LIST" || t === "OWE" || t === "OWING" || t === "WHO")   return "LIST";
   if (t.startsWith("SCORE"))                                           return "SCORE";
@@ -156,17 +159,7 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
       const customerPhone = String(session.context.creditCustomerPhone ?? "");
       const amount = Number(session.context.creditAmount ?? 0);
 
-      // Friendly text for the reply
-      let dueText = "";
-      if (dueInMinutes < 60) {
-        dueText = `in ${dueInMinutes} minute${dueInMinutes === 1 ? "" : "s"}`;
-      } else if (dueInMinutes < 1440) {
-        const hours = Math.round(dueInMinutes / 60);
-        dueText = `in ${hours} hour${hours === 1 ? "" : "s"}`;
-      } else {
-        const days = Math.round(dueInMinutes / 1440);
-        dueText = `in ${days} day${days === 1 ? "" : "s"}`;
-      }
+      const dueText = friendlyDueText(dueInMinutes);
 
       return {
         reply: messages.addCreditConfirmed(
@@ -205,6 +198,11 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
       };
   }
 
+  // ── invoice flow (tracked in session context, not a dedicated DB state) ──
+
+  const invoiceResult = stepInvoiceFlow(session, body, upperBody);
+  if (invoiceResult) return invoiceResult;
+
   // ── IDLE / fresh intent dispatch ─────────────────────────────────────────
 
   switch (intent) {
@@ -218,6 +216,14 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
     case "ADD":
       if (!session.vendorId) return { reply: messages.noVendorAccount(), nextState: "IDLE" };
       return { reply: messages.addCreditAskCustomer(), nextState: "ADDING_CREDIT_STUDENT" };
+
+    case "INVOICE":
+      if (!session.vendorId) return { reply: messages.noVendorAccount(), nextState: "IDLE" };
+      return {
+        reply: messages.invoiceAskCustomer(),
+        nextState: "IDLE",
+        contextPatch: { ...clearFlowContext(), invStep: "customer" },
+      };
 
     case "PAID": {
       if (!session.vendorId) return { reply: messages.noVendorAccount(), nextState: "IDLE" };
@@ -275,7 +281,143 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
   }
 }
 
+// ─── invoice flow ─────────────────────────────────────────────────────────────
+
+function stepInvoiceFlow(session: SessionContext, body: string, upperBody: string): StepResult | null {
+  const invStep = typeof session.context.invStep === "string" ? session.context.invStep : null;
+  if (!invStep) return null;
+
+  const customerName = String(session.context.invCustomerName ?? "the customer");
+
+  switch (invStep) {
+    case "customer":
+      return {
+        reply: messages.invoiceAskPhone(body),
+        nextState: "IDLE",
+        contextPatch: { invCustomerName: body, invStep: "phone" },
+      };
+
+    case "phone": {
+      const phoneDigits = body.replace(/\D/g, "");
+      if (phoneDigits.length < 7) {
+        return { reply: messages.invalidPhone(), nextState: "IDLE" };
+      }
+      return {
+        reply: messages.invoiceAskItems(customerName),
+        nextState: "IDLE",
+        contextPatch: { invCustomerPhone: body, invStep: "items", invItems: [] },
+      };
+    }
+
+    case "items": {
+      const items = invoiceItemsFromContext(session.context);
+      if (upperBody === "DONE" || upperBody === "FINISH" || upperBody === "FINISHED") {
+        if (!items.length) return { reply: messages.invoiceNeedItem(), nextState: "IDLE" };
+        return {
+          reply: messages.invoiceAskDue(customerName),
+          nextState: "IDLE",
+          contextPatch: { invStep: "due" },
+        };
+      }
+      const item = parseInvoiceItem(body);
+      if (!item) return { reply: messages.invoiceInvalidItem(), nextState: "IDLE" };
+      const updated = [...items, item];
+      return {
+        reply: messages.invoiceItemAdded(updated),
+        nextState: "IDLE",
+        contextPatch: { invItems: updated },
+      };
+    }
+
+    case "due": {
+      const dueInMinutes = parseDueDuration(body);
+      if (!dueInMinutes) return { reply: messages.invalidDueDate(), nextState: "IDLE" };
+      const items = invoiceItemsFromContext(session.context);
+      const total = items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
+      return {
+        reply: messages.invoiceConfirm(customerName, items, total, friendlyDueText(dueInMinutes)),
+        nextState: "IDLE",
+        contextPatch: { invDueMinutes: dueInMinutes, invStep: "confirm" },
+      };
+    }
+
+    case "confirm": {
+      if (upperBody === "SEND" || upperBody === "YES" || upperBody === "CONFIRM" || upperBody === "OK") {
+        return {
+          reply: "Creating your invoice…",
+          nextState: "IDLE",
+          contextPatch: clearFlowContext(),
+          sideEffects: [
+            {
+              type: "CREATE_INVOICE",
+              data: {
+                vendorId: session.vendorId!,
+                customerName: String(session.context.invCustomerName ?? ""),
+                customerPhone: String(session.context.invCustomerPhone ?? ""),
+                items: invoiceItemsFromContext(session.context),
+                dueInMinutes: Number(session.context.invDueMinutes ?? 0),
+              },
+            },
+          ],
+        };
+      }
+      return { reply: messages.invoiceConfirmHint(), nextState: "IDLE" };
+    }
+
+    default:
+      return null;
+  }
+}
+
+/**
+ * Parses "Rice, 2, 1500" (item, qty, unit price) or "Delivery, 500" (qty 1).
+ */
+export function parseInvoiceItem(input: string): InvoiceItemEntry | null {
+  // "₦1,200" → "₦1200" so thousands separators don't break the comma split.
+  const withoutThousands = input.replace(/(\d),(?=\d{3}\b)/g, "$1");
+  const parts = withoutThousands.split(",").map((p) => p.trim()).filter(Boolean);
+  if (parts.length < 2 || parts.length > 3) return null;
+
+  const name = parts[0];
+  if (!name || /^[\d₦,.\s]+$/.test(name)) return null;
+
+  if (parts.length === 2) {
+    const unitPrice = parseAmount(parts[1]);
+    return unitPrice ? { name, quantity: 1, unitPrice } : null;
+  }
+
+  const quantity = parseInt(parts[1].replace(/\D/g, ""), 10);
+  const unitPrice = parseAmount(parts[2]);
+  if (!quantity || quantity < 1 || quantity > 999 || !unitPrice) return null;
+  return { name, quantity, unitPrice };
+}
+
+function invoiceItemsFromContext(context: Record<string, unknown>): InvoiceItemEntry[] {
+  const raw = context.invItems;
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (i): i is InvoiceItemEntry =>
+      !!i &&
+      typeof i === "object" &&
+      typeof (i as InvoiceItemEntry).name === "string" &&
+      typeof (i as InvoiceItemEntry).quantity === "number" &&
+      typeof (i as InvoiceItemEntry).unitPrice === "number"
+  );
+}
+
 // ─── helpers ──────────────────────────────────────────────────────────────────
+
+export function friendlyDueText(dueInMinutes: number): string {
+  if (dueInMinutes < 60) {
+    return `in ${dueInMinutes} minute${dueInMinutes === 1 ? "" : "s"}`;
+  }
+  if (dueInMinutes < 1440) {
+    const hours = Math.round(dueInMinutes / 60);
+    return `in ${hours} hour${hours === 1 ? "" : "s"}`;
+  }
+  const days = Math.round(dueInMinutes / 1440);
+  return `in ${days} day${days === 1 ? "" : "s"}`;
+}
 
 export function parseAmount(input: string): number | null {
   const cleaned = input.replace(/[₦,\s]/g, "");
@@ -354,5 +496,10 @@ function clearFlowContext(): Record<string, null> {
     creditCustomerName: null,
     creditCustomerPhone: null,
     creditAmount: null,
+    invStep: null,
+    invCustomerName: null,
+    invCustomerPhone: null,
+    invItems: null,
+    invDueMinutes: null,
   };
 }

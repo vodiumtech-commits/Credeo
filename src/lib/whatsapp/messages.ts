@@ -11,6 +11,18 @@ export type CreditEntry = {
   daysUntilDue: number; // negative = overdue
 };
 
+export type InvoiceItemEntry = {
+  name: string;
+  quantity: number;
+  unitPrice: number;
+};
+
+function invoiceItemLines(items: InvoiceItemEntry[]): string {
+  return items
+    .map((i, idx) => `${idx + 1}. *${i.name}* ×${i.quantity} : ${formatNaira(i.quantity * i.unitPrice)}`)
+    .join("\n");
+}
+
 export const messages = {
   // ── Welcome & onboarding ───────────────────────────────────────────────
   welcome: () =>
@@ -83,6 +95,64 @@ export const messages = {
 
   noVendorAccount: () =>
     `You don't have a shop set up yet. Reply *START* to get started.`,
+
+  // ── INVOICE flow ───────────────────────────────────────────────────────
+  invoiceAskCustomer: () =>
+    `Let's create an invoice. 🧾 Who is it for? Send the customer's full name.\n\n` +
+    `Example: *Chidi Okeke*`,
+
+  invoiceAskPhone: (customerName: string) =>
+    `What is *${customerName}'s* WhatsApp number?\n\n` +
+    `The invoice will be sent to them there.\n\n` +
+    `Example: *08012345678*`,
+
+  invoiceAskItems: (customerName: string) =>
+    `Now add the items for *${customerName}*, one per message:\n\n` +
+    `• *Rice, 2, 1500* : item, quantity, unit price\n` +
+    `• *Delivery, 500* : item, price (quantity 1)\n\n` +
+    `Send *DONE* when you've added everything.`,
+
+  invoiceItemAdded: (items: InvoiceItemEntry[]) => {
+    const total = items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
+    return (
+      `✓ Added.\n\n` +
+      `${invoiceItemLines(items)}\n` +
+      `*Total so far: ${formatNaira(total)}*\n\n` +
+      `Add another item, or send *DONE* to continue.`
+    );
+  },
+
+  invoiceInvalidItem: () =>
+    `I couldn't read that item. Send it like:\n\n` +
+    `*Rice, 2, 1500* : item, quantity, unit price\n\n` +
+    `Or send *DONE* if you've finished.`,
+
+  invoiceNeedItem: () =>
+    `Add at least one item first.\n\nExample: *Rice, 2, 1500*`,
+
+  invoiceAskDue: (customerName: string) =>
+    `When should *${customerName}* pay? Reply with:\n` +
+    `• *7* : in 7 days\n` +
+    `• *END* : end of month\n` +
+    `• *15-06-2026* : a specific date`,
+
+  invoiceConfirm: (customerName: string, items: InvoiceItemEntry[], total: number, dueText: string) =>
+    `🧾 *Invoice for ${customerName}*\n\n` +
+    `${invoiceItemLines(items)}\n\n` +
+    `*Total: ${formatNaira(total)}*\n` +
+    `Due ${dueText}.\n\n` +
+    `Send *SEND* to create it and deliver it to *${customerName}* on WhatsApp, or *CANCEL* to discard.`,
+
+  invoiceConfirmHint: () =>
+    `Reply *SEND* to send the invoice, or *CANCEL* to discard it.`,
+
+  invoiceSent: (customerName: string, invoiceNumber: string, total: number) =>
+    `✅ Invoice *${invoiceNumber}* for *${formatNaira(total)}* is on its way to *${customerName}* on WhatsApp.\n\n` +
+    `If it's not paid by the due date, I'll send them a polite reminder. You can track it under *Invoices* on your dashboard.`,
+
+  invoiceSendFailed: (invoiceNumber: string, link: string) =>
+    `⚠️ I created invoice *${invoiceNumber}* but couldn't deliver it on WhatsApp.\n\n` +
+    `Share this link with the customer instead:\n${link}`,
 
   // ── LIST ───────────────────────────────────────────────────────────────
   listEmpty: () => `🎉 No outstanding credits, you're all settled up!`,
@@ -179,6 +249,7 @@ export const messages = {
   help: () =>
     `*Vodium Ledger commands:*\n\n` +
     `• *ADD* : record a new credit\n` +
+    `• *INVOICE* : create & send an invoice\n` +
     `• *PAID [name]* : mark a credit paid\n` +
     `• *LIST* : see who owes you\n` +
     `• *SCORE [name]* : check a customer's reliability\n` +
