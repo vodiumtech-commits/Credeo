@@ -53,7 +53,7 @@ export interface StepResult {
 
 export type SideEffect =
   | { type: "CREATE_VENDOR";  data: { name: string; businessName: string; communityName: string; phone: string } }
-  | { type: "CREATE_CREDIT";  data: { vendorId: string; customerName: string; customerPhone: string; amount: number; dueInMinutes: number } }
+  | { type: "CREATE_CREDIT";  data: { vendorId: string; customerName: string; customerPhone: string; amount: number; dueInMinutes: number; remindersEnabled: boolean } }
   | { type: "CREATE_INVOICE"; data: { vendorId: string; customerName: string; customerPhone: string; items: InvoiceItemEntry[]; dueInMinutes: number } }
   | { type: "MARK_PAID";      data: { vendorId: string; customerName: string } }
   | { type: "CONFIRM_PAID";   data: { vendorId: string; creditId: string } }
@@ -91,6 +91,11 @@ const DUE_BUTTONS: BotButton[] = [
   { id: "7",      title: "In 7 days" },
   { id: "END",    title: "End of month" },
   { id: "CANCEL", title: "Cancel" },
+];
+
+const REMINDER_BUTTONS: BotButton[] = [
+  { id: "REMIND",   title: "Yes, remind them" },
+  { id: "NOREMIND", title: "No reminders" },
 ];
 
 /** Full command menu — WhatsApp caps reply buttons at 3, so HELP uses a list. */
@@ -222,10 +227,38 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
       if (!dueInMinutes) {
         return { reply: messages.invalidDueDate(), nextState: "ADDING_CREDIT_DUE", buttons: DUE_BUTTONS };
       }
+      return {
+        reply: messages.addCreditAskReminders(String(session.context.creditCustomerName ?? "Customer")),
+        nextState: "ADDING_CREDIT_REMINDER",
+        contextPatch: { creditDueMinutes: dueInMinutes },
+        buttons: REMINDER_BUTTONS,
+      };
+    }
+
+    case "ADDING_CREDIT_REMINDER": {
+      const remindersEnabled =
+        upperBody === "REMIND" || upperBody === "YES" || upperBody === "Y"
+          ? true
+          : upperBody === "NOREMIND" || upperBody === "NO" || upperBody === "N"
+            ? false
+            : null;
+      if (remindersEnabled === null) {
+        return {
+          reply: messages.addCreditAskReminders(String(session.context.creditCustomerName ?? "Customer")),
+          nextState: "ADDING_CREDIT_REMINDER",
+          buttons: REMINDER_BUTTONS,
+        };
+      }
+
+      const dueInMinutes = Number(session.context.creditDueMinutes ?? 0);
+      if (!dueInMinutes) {
+        // Context lost mid-flow (e.g. stale session) — re-ask the due date.
+        return { reply: messages.invalidDueDate(), nextState: "ADDING_CREDIT_DUE", buttons: DUE_BUTTONS };
+      }
+
       const customerName = String(session.context.creditCustomerName ?? "Customer");
       const customerPhone = String(session.context.creditCustomerPhone ?? "");
       const amount = Number(session.context.creditAmount ?? 0);
-
       const dueText = friendlyDueText(dueInMinutes);
 
       return {
@@ -233,10 +266,10 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
           customerName,
           amount,
           dueText,
-          reminderPromiseForDue(dueInMinutes),
+          remindersEnabled ? reminderPromiseForDue(dueInMinutes) : messages.noReminderPromise(),
         ),
         nextState: "IDLE",
-        contextPatch: { creditCustomerName: null, creditCustomerPhone: null, creditAmount: null },
+        contextPatch: { creditCustomerName: null, creditCustomerPhone: null, creditAmount: null, creditDueMinutes: null },
         buttons: [
           { id: "ADD",  title: "Add another" },
           { id: "LIST", title: "Who's owing" },
@@ -244,7 +277,7 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
         sideEffects: [
           {
             type: "CREATE_CREDIT",
-            data: { vendorId: session.vendorId!, customerName, customerPhone, amount, dueInMinutes },
+            data: { vendorId: session.vendorId!, customerName, customerPhone, amount, dueInMinutes, remindersEnabled },
           },
         ],
       };
@@ -590,6 +623,7 @@ function clearFlowContext(): Record<string, null> {
     creditCustomerName: null,
     creditCustomerPhone: null,
     creditAmount: null,
+    creditDueMinutes: null,
     invStep: null,
     invCustomerName: null,
     invCustomerPhone: null,

@@ -311,6 +311,7 @@ model Credit {
   amountRepaid    Decimal  @default(0) @db.Decimal(12, 2)
   closedAt        DateTime?
   notes           String?
+  remindersEnabled      Boolean  @default(true)  // vendor's per-credit choice: message the customer or not
   reminderSentAt        DateTime?      // set when a pre-due reminder is dispatched
   overdueReminderSentAt DateTime?      // set when the latest overdue reminder is dispatched
   createdAt       DateTime @default(now())
@@ -761,6 +762,7 @@ enum WhatsAppState {
   ADDING_CREDIT_PHONE
   ADDING_CREDIT_AMOUNT
   ADDING_CREDIT_DUE
+  ADDING_CREDIT_REMINDER
   MARKING_PAID
   LOOKING_UP_SCORE
 }

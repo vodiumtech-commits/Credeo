@@ -73,6 +73,14 @@ export const messages = {
     `• *END* : end of month\n` +
     `• *15-06-2026* : a specific date`,
 
+  addCreditAskReminders: (customerName: string) =>
+    `Last thing — should I send *${customerName}* polite reminders about this credit?\n\n` +
+    `• *Yes* : I'll remind them respectfully before it's due\n` +
+    `• *No* : I stay silent and you follow up yourself`,
+
+  noReminderPromise: () =>
+    `I won't message them about this one — you'll follow up yourself. It still counts in *LIST* and their Vodium score.`,
+
   addCreditConfirmed: (
     customerName: string,
     amount: number,

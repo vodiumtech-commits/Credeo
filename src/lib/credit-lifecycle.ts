@@ -166,6 +166,7 @@ export async function sendOverdueReminders(scope: LifecycleScope & { force?: boo
       ...(scope.force
         ? {}
         : { OR: [{ overdueReminderSentAt: null }, { overdueReminderSentAt: { lte: cutoff } }] }),
+      remindersEnabled: true, // vendor opted out of messaging this customer otherwise
       student: { NOT: { phone: { startsWith: "pending:" } } },
     },
     include: { student: true, vendor: true },

@@ -411,7 +411,7 @@ async function runSideEffect(
 
     case "CREATE_CREDIT": {
       if (!vendorId) return {};
-      const { customerName, customerPhone, amount, dueInMinutes } = effect.data;
+      const { customerName, customerPhone, amount, dueInMinutes, remindersEnabled } = effect.data;
       const normalCustomerPhone = normalisePhone(customerPhone);
       if (!normalCustomerPhone) {
         return {
@@ -475,6 +475,7 @@ async function runSideEffect(
           amount,
           dueDate,
           status: "OUTSTANDING",
+          remindersEnabled,
         },
       });
       await prisma.creditScoreEvent.create({ data: { studentId: customer.id, vendorId, eventType: "CREDIT_EXTENDED", amount, scoreDelta: 0 } });

@@ -103,6 +103,40 @@ test("WhatsApp invoice flow walks to a CREATE_INVOICE side effect", () => {
   assert.equal(ctx.invStep, null); // flow context cleared
 });
 
+test("ADD flow asks whether to remind the customer and stores the choice", () => {
+  const send = (state: string, context: Record<string, unknown>, body: string) =>
+    step(
+      { state, context, vendorId: "vendor_1" } as SessionContext,
+      { body, fromPhone: "+2348030000000" },
+    );
+
+  // Due date answered → bot asks the reminder question with tappables.
+  const askReminder = send("ADDING_CREDIT_DUE", { creditCustomerName: "Ada", creditCustomerPhone: "0801", creditAmount: 2500 }, "7");
+  assert.equal(askReminder.nextState, "ADDING_CREDIT_REMINDER");
+  assert.deepEqual(askReminder.buttons?.map((b) => b.id), ["REMIND", "NOREMIND"]);
+  assert.equal(askReminder.contextPatch?.creditDueMinutes, 7 * 1440);
+
+  const ctx = { creditCustomerName: "Ada", creditCustomerPhone: "0801", creditAmount: 2500, creditDueMinutes: 7 * 1440 };
+
+  // Opting out saves the credit with reminders disabled.
+  const optOut = send("ADDING_CREDIT_REMINDER", ctx, "NOREMIND");
+  const offEffect = optOut.sideEffects?.[0];
+  assert.ok(offEffect && offEffect.type === "CREATE_CREDIT");
+  if (offEffect?.type === "CREATE_CREDIT") assert.equal(offEffect.data.remindersEnabled, false);
+  assert.match(optOut.reply, /won't message them/i);
+
+  // Opting in (tap or typed YES) keeps reminders on.
+  const optIn = send("ADDING_CREDIT_REMINDER", ctx, "yes");
+  const onEffect = optIn.sideEffects?.[0];
+  if (onEffect?.type === "CREATE_CREDIT") assert.equal(onEffect.data.remindersEnabled, true);
+  assert.match(optIn.reply, /reminder/i);
+
+  // Anything else re-asks instead of guessing.
+  const retry = send("ADDING_CREDIT_REMINDER", ctx, "maybe");
+  assert.equal(retry.nextState, "ADDING_CREDIT_REMINDER");
+  assert.equal(retry.sideEffects, undefined);
+});
+
 test("payment-claim buttons route to confirm/dispute side effects", () => {
   const confirm = step(
     { state: "IDLE", context: {}, vendorId: "vendor_1" } as SessionContext,

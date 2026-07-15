@@ -54,6 +54,7 @@ export async function GET(req: NextRequest) {
       status:        { in: ["OUTSTANDING", "DUE_SOON"] },
       dueDate:       { gte: now, lte: maxLookahead },
       reminderSentAt: null,
+      remindersEnabled: true, // vendor opted out of messaging this customer otherwise
       student: {
         // Only send to students with a real phone number (not a pending: placeholder)
         NOT: { phone: { startsWith: "pending:" } },
