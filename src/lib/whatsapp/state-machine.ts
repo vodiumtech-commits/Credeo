@@ -33,11 +33,16 @@ export interface SessionContext {
   vendorId?: string;
 }
 
+/** Tappable reply button (rendered via Meta interactive messages). */
+export type BotButton = { id: string; title: string };
+
 export interface StepResult {
   reply: string;
   nextState: WhatsAppState;
   contextPatch?: Record<string, unknown>;
   sideEffects?: SideEffect[];
+  /** Optional tappable buttons attached to the reply. Max 3, titles ≤ 20 chars. */
+  buttons?: BotButton[];
 }
 
 export type SideEffect =
@@ -45,6 +50,8 @@ export type SideEffect =
   | { type: "CREATE_CREDIT";  data: { vendorId: string; customerName: string; customerPhone: string; amount: number; dueInMinutes: number } }
   | { type: "CREATE_INVOICE"; data: { vendorId: string; customerName: string; customerPhone: string; items: InvoiceItemEntry[]; dueInMinutes: number } }
   | { type: "MARK_PAID";      data: { vendorId: string; customerName: string } }
+  | { type: "CONFIRM_PAID";   data: { vendorId: string; creditId: string } }
+  | { type: "DISPUTE_PAID";   data: { vendorId: string; creditId: string } }
   | { type: "FETCH_LIST";     data: { vendorId: string } }
   | { type: "FETCH_SCORE";    data: { customerQuery: string; fromPhone: string } };
 
@@ -66,17 +73,45 @@ export function detectIntent(body: string): Intent {
 
 // ─── main step function ───────────────────────────────────────────────────────
 
+const MAIN_BUTTONS: BotButton[] = [
+  { id: "ADD",     title: "Add credit" },
+  { id: "INVOICE", title: "New invoice" },
+  { id: "LIST",    title: "Who's owing" },
+];
+
 export function step(session: SessionContext, msg: IncomingMessage): StepResult {
   const body = msg.body.trim();
   const intent = detectIntent(body);
   const upperBody = body.toUpperCase();
 
   if (intent === "HELP") {
-    return { reply: messages.help(), nextState: "IDLE", contextPatch: clearFlowContext() };
+    return { reply: messages.help(), nextState: "IDLE", contextPatch: clearFlowContext(), buttons: MAIN_BUTTONS };
   }
 
   if (upperBody === "CANCEL" || upperBody === "STOP") {
-    return { reply: messages.cancelled(), nextState: "IDLE", contextPatch: clearFlowContext() };
+    return { reply: messages.cancelled(), nextState: "IDLE", contextPatch: clearFlowContext(), buttons: MAIN_BUTTONS };
+  }
+
+  // ── payment-claim buttons (tapped by the vendor; always win, even mid-flow) ──
+
+  const confirmPaid = body.match(/^CONFIRM_PAID_([\w-]+)$/i);
+  if (confirmPaid) {
+    if (!session.vendorId) return { reply: messages.noVendorAccount(), nextState: "IDLE" };
+    return {
+      reply: "Confirming…",
+      nextState: session.state,
+      sideEffects: [{ type: "CONFIRM_PAID", data: { vendorId: session.vendorId, creditId: confirmPaid[1] } }],
+    };
+  }
+
+  const notPaid = body.match(/^NOT_PAID_([\w-]+)$/i);
+  if (notPaid) {
+    if (!session.vendorId) return { reply: messages.noVendorAccount(), nextState: "IDLE" };
+    return {
+      reply: "Noted.",
+      nextState: session.state,
+      sideEffects: [{ type: "DISPUTE_PAID", data: { vendorId: session.vendorId, creditId: notPaid[1] } }],
+    };
   }
 
   // ── mid-flow states (sticky — always take priority over intent) ──────────
@@ -104,6 +139,7 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
         reply: messages.onboardingDone(businessName),
         nextState: "IDLE",
         contextPatch: { communityName: body },
+        buttons: MAIN_BUTTONS,
         sideEffects: [
           {
             type: "CREATE_VENDOR",
@@ -170,6 +206,10 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
         ),
         nextState: "IDLE",
         contextPatch: { creditCustomerName: null, creditCustomerPhone: null, creditAmount: null },
+        buttons: [
+          { id: "ADD",  title: "Add another" },
+          { id: "LIST", title: "Who's owing" },
+        ],
         sideEffects: [
           {
             type: "CREATE_CREDIT",
@@ -209,7 +249,7 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
     case "START":
       if (session.vendorId) {
         const businessName = String(session.context.businessName ?? "your shop");
-        return { reply: messages.alreadyRegistered(businessName), nextState: "IDLE" };
+        return { reply: messages.alreadyRegistered(businessName), nextState: "IDLE", buttons: MAIN_BUTTONS };
       }
       return { reply: messages.onboardingAskName(), nextState: "ONBOARDING_NAME" };
 
@@ -275,9 +315,16 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
     default:
       // First touch from an unknown number
       if (session.state === "IDLE" && !session.vendorId) {
-        return { reply: messages.welcome(), nextState: "IDLE" };
+        return {
+          reply: messages.welcome(),
+          nextState: "IDLE",
+          buttons: [
+            { id: "START", title: "Set up my shop" },
+            { id: "HELP",  title: "Help" },
+          ],
+        };
       }
-      return { reply: messages.unknown(), nextState: "IDLE" };
+      return { reply: messages.unknown(), nextState: "IDLE", buttons: MAIN_BUTTONS };
   }
 }
 
@@ -326,6 +373,7 @@ function stepInvoiceFlow(session: SessionContext, body: string, upperBody: strin
         reply: messages.invoiceItemAdded(updated),
         nextState: "IDLE",
         contextPatch: { invItems: updated },
+        buttons: [{ id: "DONE", title: "Done ✓" }],
       };
     }
 
@@ -338,6 +386,7 @@ function stepInvoiceFlow(session: SessionContext, body: string, upperBody: strin
         reply: messages.invoiceConfirm(customerName, items, total, friendlyDueText(dueInMinutes)),
         nextState: "IDLE",
         contextPatch: { invDueMinutes: dueInMinutes, invStep: "confirm" },
+        buttons: INVOICE_CONFIRM_BUTTONS,
       };
     }
 
@@ -361,13 +410,18 @@ function stepInvoiceFlow(session: SessionContext, body: string, upperBody: strin
           ],
         };
       }
-      return { reply: messages.invoiceConfirmHint(), nextState: "IDLE" };
+      return { reply: messages.invoiceConfirmHint(), nextState: "IDLE", buttons: INVOICE_CONFIRM_BUTTONS };
     }
 
     default:
       return null;
   }
 }
+
+const INVOICE_CONFIRM_BUTTONS: BotButton[] = [
+  { id: "SEND",   title: "Send it ✓" },
+  { id: "CANCEL", title: "Cancel" },
+];
 
 /**
  * Parses "Rice, 2, 1500" (item, qty, unit price) or "Delivery, 500" (qty 1).

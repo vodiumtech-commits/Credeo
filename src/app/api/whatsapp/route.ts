@@ -20,7 +20,7 @@ import { formatNaira, normalisePhone } from "../../../lib/utils";
 import { getOrCreateCustomerForVendor, roundMoney } from "../../../lib/bnpl";
 import { signInvoiceToken } from "../../../lib/bnpl-token";
 import { messages } from "../../../lib/whatsapp/messages";
-import { sendWhatsAppMessage } from "../../../lib/whatsapp/outbound";
+import { sendWhatsAppButtons, sendWhatsAppMessage, type WhatsAppButton } from "../../../lib/whatsapp/outbound";
 import { getOrgChannelCredentials } from "../../../lib/whatsapp/channel-token";
 import { parseCommunity } from "../../../lib/community";
 import { createSoloOrganizationForVendor, trialEndsAt } from "../../../lib/tenant";
@@ -38,8 +38,13 @@ interface MetaTextMessage {
   from:      string;   // E.164 without "+"
   id:        string;
   timestamp: string;
-  type:      "text" | string;
+  type:      "text" | "interactive" | string;
   text?:     { body: string };
+  interactive?: {
+    type: string;
+    button_reply?: { id: string; title: string };
+    list_reply?:   { id: string; title: string };
+  };
 }
 
 interface MetaWebhook {
@@ -125,13 +130,22 @@ export async function POST(req: NextRequest) {
   const message = value?.messages?.[0];
   const phoneNumberId = value?.metadata?.phone_number_id;
 
-  // Silently ack status updates, delivery receipts, etc.
-  if (!message || message.type !== "text" || !message.text?.body) {
+  // Text messages carry a body; button taps arrive as "interactive" replies whose
+  // id we treat exactly like typed text (e.g. tapping [Add credit] sends "ADD").
+  const rawText =
+    message?.type === "text"
+      ? message.text?.body
+      : message?.type === "interactive"
+        ? message.interactive?.button_reply?.id ?? message.interactive?.list_reply?.id
+        : undefined;
+
+  // Silently ack status updates, delivery receipts, unsupported media, etc.
+  if (!message || !rawText?.trim()) {
     return NextResponse.json({ ok: true });
   }
 
   const fromPhone   = `+${message.from}`;   // Meta sends without "+", normalise to E.164
-  const messageText = message.text.body.trim();
+  const messageText = rawText.trim();
 
   console.log(`[whatsapp] ← ${fromPhone}: "${messageText}"`);
 
@@ -169,6 +183,11 @@ export async function POST(req: NextRequest) {
       : await prisma.vendor.findUnique({ where: { phone: fromPhone } });
 
     if (!vendor) {
+      // Customers replying "PAID" to a reminder raise a claim — the vendor must
+      // confirm before the credit is actually marked paid.
+      const claimHandled = await handleCustomerPaidClaim(fromPhone, messageText, creds);
+      if (claimHandled) return NextResponse.json({ ok: true });
+
       console.log(`[whatsapp] Rejected: unregistered user ${fromPhone}`);
       await sendWhatsAppMessage(
         fromPhone,
@@ -201,12 +220,16 @@ export async function POST(req: NextRequest) {
 
     // Side effects
     let finalReply     = result.reply;
+    let finalButtons   = result.buttons;
     let linkedVendorId = vendor?.id;
 
     if (result.sideEffects?.length) {
       for (const effect of result.sideEffects) {
-        const { replyOverride, newVendorId } = await runSideEffect(effect, fromPhone, vendor?.id);
-        if (replyOverride !== undefined) finalReply    = replyOverride;
+        const { replyOverride, buttonsOverride, newVendorId } = await runSideEffect(effect, fromPhone, vendor?.id);
+        if (replyOverride !== undefined) {
+          finalReply   = replyOverride;
+          finalButtons = buttonsOverride;
+        }
         if (newVendorId)                 linkedVendorId = newVendorId;
       }
       if (linkedVendorId && linkedVendorId !== vendor?.id) {
@@ -219,8 +242,12 @@ export async function POST(req: NextRequest) {
 
     console.log(`[whatsapp] → ${fromPhone}: "${finalReply.slice(0, 80)}..."`);
 
-    // Send reply
-    await sendWhatsAppMessage(fromPhone, finalReply, creds);
+    // Send reply (with tappable buttons when the step provides them)
+    if (finalButtons?.length) {
+      await sendWhatsAppButtons(fromPhone, finalReply, finalButtons, creds);
+    } else {
+      await sendWhatsAppMessage(fromPhone, finalReply, creds);
+    }
 
   } catch (err) {
     console.error("[whatsapp] Error processing message from", fromPhone, ":", err);
@@ -243,7 +270,103 @@ export async function POST(req: NextRequest) {
 
 interface SideEffectResult {
   replyOverride?: string;
+  /** Buttons attached to the overriding reply (ignored without replyOverride). */
+  buttonsOverride?: WhatsAppButton[];
   newVendorId?:   string;
+}
+
+const OPEN_CREDIT_STATUSES = ["OUTSTANDING", "DUE_SOON", "OVERDUE", "PARTIALLY_PAID"] as const;
+
+/** Marks a credit fully paid: repayment, score event, score update, vendor notification. */
+async function settleCredit(
+  credit: { id: string; amount: unknown; dueDate: Date; student: { id: string; fullName: string; vodiumScore: number | null } },
+  vendorId: string
+): Promise<{ customerName: string; amount: number }> {
+  const amount   = Number(credit.amount);
+  const customer = credit.student;
+  const now      = new Date();
+  const paidOnTime = now <= credit.dueDate;
+  const scoreDelta = paidOnTime ? 25 : -15;
+  const eventType  = paidOnTime ? "PAID_ON_TIME" : ("PAID_LATE" as const);
+
+  await prisma.credit.update({ where: { id: credit.id }, data: { status: "PAID", amountRepaid: amount, closedAt: now } });
+  await prisma.repayment.create({ data: { creditId: credit.id, amount, method: "CASH", receivedAt: now, recordedBy: vendorId } });
+  await prisma.creditScoreEvent.create({ data: { studentId: customer.id, vendorId, creditId: credit.id, eventType, amount, scoreDelta } });
+  const newScore = Math.min(1000, Math.max(0, (customer.vodiumScore ?? 500) + scoreDelta));
+  await prisma.student.update({ where: { id: customer.id }, data: { vodiumScore: newScore, scoreUpdatedAt: now } });
+
+  await prisma.notification.create({
+    data: {
+      vendorId,
+      title: "Credit Paid",
+      message: `${customer.fullName} paid ₦${amount.toLocaleString()} via WhatsApp.`,
+      type: "SUCCESS",
+    },
+  });
+
+  return { customerName: customer.fullName, amount };
+}
+
+/**
+ * A customer (not a vendor) replied "PAID" — raise a claim with every vendor
+ * holding an open credit for them. Nothing is marked paid here: each vendor
+ * gets a tappable Confirm/Not-received prompt and the ledger only changes
+ * when they confirm. Returns false when the sender isn't a known customer.
+ */
+async function handleCustomerPaidClaim(
+  fromPhone: string,
+  text: string,
+  creds?: { token: string; phoneId: string }
+): Promise<boolean> {
+  const upper = text.trim().toUpperCase();
+  if (upper !== "PAID" && !upper.startsWith("PAID ")) return false;
+
+  const student = await prisma.student.findUnique({ where: { phone: fromPhone } });
+  if (!student) return false;
+
+  const credits = await prisma.credit.findMany({
+    where: { studentId: student.id, status: { in: [...OPEN_CREDIT_STATUSES] } },
+    include: { vendor: { select: { id: true, businessName: true, phone: true, organizationId: true } } },
+    orderBy: { dueDate: "asc" },
+  });
+
+  if (!credits.length) {
+    await sendWhatsAppMessage(fromPhone, messages.claimNoCredit(), creds);
+    return true;
+  }
+
+  const vendorNames: string[] = [];
+  for (const credit of credits) {
+    const amount = Number(credit.amount);
+    if (!vendorNames.includes(credit.vendor.businessName)) vendorNames.push(credit.vendor.businessName);
+
+    await prisma.notification.create({
+      data: {
+        vendorId: credit.vendor.id,
+        title: "Payment Claim",
+        message: `${student.fullName} says they've paid ₦${amount.toLocaleString()}. Confirm on WhatsApp once you receive it.`,
+        type: "INFO",
+      },
+    });
+
+    const vendorCreds = (await getOrgChannelCredentials(credit.vendor.organizationId)) ?? undefined;
+    try {
+      await sendWhatsAppButtons(
+        credit.vendor.phone,
+        messages.claimToVendor(student.fullName, amount),
+        [
+          { id: `CONFIRM_PAID_${credit.id}`, title: "Confirm received ✓" },
+          { id: `NOT_PAID_${credit.id}`,     title: "Not received" },
+        ],
+        vendorCreds
+      );
+    } catch (err) {
+      console.error("[whatsapp] Failed to notify vendor of payment claim:", err);
+    }
+  }
+
+  await sendWhatsAppMessage(fromPhone, messages.claimAckToCustomer(vendorNames), creds);
+  return true;
 }
 
 async function runSideEffect(
@@ -461,7 +584,13 @@ async function runSideEffect(
         },
       });
 
-      return { replyOverride: messages.invoiceSent(customer.fullName, invoice.invoiceNumber, subtotal) };
+      return {
+        replyOverride: messages.invoiceSent(customer.fullName, invoice.invoiceNumber, subtotal),
+        buttonsOverride: [
+          { id: "INVOICE", title: "New invoice" },
+          { id: "LIST",    title: "Who's owing" },
+        ],
+      };
     }
 
     case "FETCH_LIST": {
@@ -480,34 +609,66 @@ async function runSideEffect(
       const { customerName } = effect.data;
       const words   = customerName.split(/\s+/).filter(Boolean);
       const credits = await prisma.credit.findMany({
-        where: { vendorId, status: { in: ["OUTSTANDING", "DUE_SOON", "OVERDUE", "PARTIALLY_PAID"] }, student: { OR: words.map((w) => ({ fullName: { contains: w, mode: "insensitive" as const } })) } },
+        where: { vendorId, status: { in: [...OPEN_CREDIT_STATUSES] }, student: { OR: words.map((w) => ({ fullName: { contains: w, mode: "insensitive" as const } })) } },
         include: { student: true }, orderBy: { dueDate: "asc" }, take: 1,
       });
       if (!credits.length) return { replyOverride: messages.paidNotFound(customerName) };
-      const credit  = credits[0];
-      const amount  = Number(credit.amount);
-      const customer = credit.student;
-      const now     = new Date();
-      const paidOnTime = now <= credit.dueDate;
-      const scoreDelta = paidOnTime ? 25 : -15;
-      const eventType  = paidOnTime ? "PAID_ON_TIME" : "PAID_LATE" as const;
-      await prisma.credit.update({ where: { id: credit.id }, data: { status: "PAID", amountRepaid: amount, closedAt: now } });
-      await prisma.repayment.create({ data: { creditId: credit.id, amount, method: "CASH", receivedAt: now, recordedBy: vendorId } });
-      await prisma.creditScoreEvent.create({ data: { studentId: customer.id, vendorId, creditId: credit.id, eventType, amount, scoreDelta } });
-      const newScore = Math.min(1000, Math.max(0, (customer.vodiumScore ?? 500) + scoreDelta));
-      await prisma.student.update({ where: { id: customer.id }, data: { vodiumScore: newScore, scoreUpdatedAt: now } });
+      const settled = await settleCredit(credits[0], vendorId);
+      return { replyOverride: messages.paidConfirmed(settled.customerName, settled.amount) };
+    }
 
-      // Notify vendor on web dashboard
-      await prisma.notification.create({
-        data: {
-          vendorId,
-          title: "Credit Paid",
-          message: `${customer.fullName} paid ₦${amount.toLocaleString()} via WhatsApp.`,
-          type: "SUCCESS",
-        },
+    case "CONFIRM_PAID": {
+      const { creditId } = effect.data;
+      const credit = await prisma.credit.findFirst({
+        where: { id: creditId, vendorId: effect.data.vendorId, status: { in: [...OPEN_CREDIT_STATUSES] } },
+        include: { student: true },
       });
+      if (!credit) return { replyOverride: messages.confirmNotFound() };
 
-      return { replyOverride: messages.paidConfirmed(customer.fullName, amount) };
+      const settled = await settleCredit(credit, effect.data.vendorId);
+
+      // Close the loop with the customer.
+      const confirmingVendor = await prisma.vendor.findUnique({
+        where: { id: effect.data.vendorId },
+        select: { businessName: true, organizationId: true },
+      });
+      const customerCreds = (await getOrgChannelCredentials(confirmingVendor?.organizationId)) ?? undefined;
+      try {
+        await sendWhatsAppMessage(
+          credit.student.phone,
+          messages.claimConfirmedToCustomer(confirmingVendor?.businessName ?? "The vendor", settled.amount),
+          customerCreds
+        );
+      } catch (err) {
+        console.error("[whatsapp] Failed to notify customer of confirmed payment:", err);
+      }
+
+      return {
+        replyOverride: messages.paidConfirmed(settled.customerName, settled.amount),
+        buttonsOverride: [{ id: "LIST", title: "Who's owing" }],
+      };
+    }
+
+    case "DISPUTE_PAID": {
+      const { creditId } = effect.data;
+      const credit = await prisma.credit.findFirst({
+        where: { id: creditId, vendorId: effect.data.vendorId, status: { in: [...OPEN_CREDIT_STATUSES] } },
+        include: { student: true, vendor: { select: { businessName: true, organizationId: true } } },
+      });
+      if (!credit) return { replyOverride: messages.confirmNotFound() };
+
+      const customerCreds = (await getOrgChannelCredentials(credit.vendor.organizationId)) ?? undefined;
+      try {
+        await sendWhatsAppMessage(
+          credit.student.phone,
+          messages.claimDisputedToCustomer(credit.vendor.businessName, Number(credit.amount)),
+          customerCreds
+        );
+      } catch (err) {
+        console.error("[whatsapp] Failed to notify customer of disputed claim:", err);
+      }
+
+      return { replyOverride: messages.claimDisputeNoted(credit.student.fullName) };
     }
 
     case "FETCH_SCORE": {

@@ -233,6 +233,42 @@ export const messages = {
     `🔵 New : no credit history yet.\n\n` +
     `This customer has no recorded credits on Vodium.`,
 
+  // ── Customer payment claims (vendor must confirm before anything changes) ──
+  claimNoCredit: () =>
+    `You have no outstanding credit recorded on Vodium. 🎉\n\n` +
+    `If you think this is a mistake, please contact your vendor directly.`,
+
+  claimAckToCustomer: (vendorNames: string[]) => {
+    const who =
+      vendorNames.length === 1
+        ? `*${vendorNames[0]}*`
+        : vendorNames.map((v) => `*${v}*`).join(", ");
+    return (
+      `Thanks for letting me know! 🙏\n\n` +
+      `I've told ${who} that you've paid. They'll confirm once they receive it — ` +
+      `your Vodium score improves the moment they do.`
+    );
+  },
+
+  claimToVendor: (customerName: string, amount: number) =>
+    `💰 *${customerName}* says they've paid you *${formatNaira(amount)}*.\n\n` +
+    `Tap *Confirm received* once you have the money — their credit is marked paid ` +
+    `and their score updates only after you confirm.`,
+
+  claimConfirmedToCustomer: (vendorBusinessName: string, amount: number) =>
+    `✅ *${vendorBusinessName}* confirmed your payment of *${formatNaira(amount)}*.\n\n` +
+    `Your Vodium score just improved. Thank you for paying on time! 🎉`,
+
+  claimDisputedToCustomer: (vendorBusinessName: string, amount: number) =>
+    `*${vendorBusinessName}* hasn't received your payment of *${formatNaira(amount)}* yet.\n\n` +
+    `If you've already paid, please reach out to them directly so they can confirm.`,
+
+  claimDisputeNoted: (customerName: string) =>
+    `Noted. I've let *${customerName}* know you haven't received it. The credit stays open.`,
+
+  confirmNotFound: () =>
+    `That credit is already settled or no longer open. Reply *LIST* to see what's outstanding.`,
+
   // ── Proactive reminders (sent to customers) ─────────────────────────────
   reminderToCustomer: (
     customerName: string,

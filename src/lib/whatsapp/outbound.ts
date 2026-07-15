@@ -52,6 +52,66 @@ export async function sendWhatsAppMessage(
   }
 }
 
+export type WhatsAppButton = { id: string; title: string };
+
+/**
+ * Send a message with tappable reply buttons (Meta "interactive" message).
+ * WhatsApp allows at most 3 buttons, titles of 20 chars, and 1024 chars of body —
+ * anything over those limits falls back to a plain text message.
+ */
+export async function sendWhatsAppButtons(
+  to: string,
+  body: string,
+  buttons: WhatsAppButton[],
+  creds?: { token: string; phoneId: string }
+): Promise<void> {
+  if (!buttons.length || body.length > 1024) {
+    return sendWhatsAppMessage(to, body, creds);
+  }
+
+  const token   = creds?.token  ?? process.env.WHATSAPP_ACCESS_TOKEN;
+  const phoneId = creds?.phoneId ?? process.env.WHATSAPP_PHONE_NUMBER_ID;
+
+  if (!token || !phoneId) {
+    console.log(`\n[WhatsApp → ${to}]\n${body}\n[buttons: ${buttons.map((b) => b.title).join(" | ")}]\n`);
+    return;
+  }
+
+  const recipient = to.replace(/^\+/, "").replace(/^whatsapp:/, "");
+
+  const res = await fetch(
+    `https://graph.facebook.com/${META_API_VERSION}/${phoneId}/messages`,
+    {
+      method:  "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type":  "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to:   recipient,
+        type: "interactive",
+        interactive: {
+          type: "button",
+          body: { text: body },
+          action: {
+            buttons: buttons.slice(0, 3).map((b) => ({
+              type:  "reply",
+              reply: { id: b.id.slice(0, 256), title: b.title.slice(0, 20) },
+            })),
+          },
+        },
+      }),
+    }
+  );
+
+  if (!res.ok) {
+    const err = await res.text();
+    console.error(`[WhatsApp buttons] Meta API error ${res.status}: ${err}`);
+    throw new Error(`WhatsApp interactive send failed: ${res.status}`);
+  }
+}
+
 /**
  * Send an approved WhatsApp *template* message. Required for business-initiated
  * messages to numbers outside a 24-hour session (e.g. OTP codes to new customers).

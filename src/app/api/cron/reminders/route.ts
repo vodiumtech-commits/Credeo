@@ -10,7 +10,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { sendWhatsAppMessage } from "@/lib/whatsapp/outbound";
+import { sendWhatsAppButtons } from "@/lib/whatsapp/outbound";
 import { messages } from "@/lib/whatsapp/messages";
 import { reminderLeadMinutesForDue } from "@/lib/whatsapp/state-machine";
 import { applyDailyDefaultDecay, markOverdueCredits, sendOverdueReminders } from "@/lib/credit-lifecycle";
@@ -115,7 +115,9 @@ export async function GET(req: NextRequest) {
     );
 
     try {
-      await sendWhatsAppMessage(student.phone, body);
+      // "I've paid" raises a claim the vendor must confirm — it never marks the
+      // credit paid on its own.
+      await sendWhatsAppButtons(student.phone, body, [{ id: "PAID", title: "I've paid ✓" }]);
 
       // Stamp the credit so we don't remind again.
       await prisma.credit.update({

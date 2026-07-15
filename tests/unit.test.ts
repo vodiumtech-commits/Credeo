@@ -103,6 +103,51 @@ test("WhatsApp invoice flow walks to a CREATE_INVOICE side effect", () => {
   assert.equal(ctx.invStep, null); // flow context cleared
 });
 
+test("payment-claim buttons route to confirm/dispute side effects", () => {
+  const confirm = step(
+    { state: "IDLE", context: {}, vendorId: "vendor_1" } as SessionContext,
+    { body: "CONFIRM_PAID_clx123abc", fromPhone: "+2348030000000" },
+  );
+  assert.deepEqual(confirm.sideEffects?.[0], {
+    type: "CONFIRM_PAID",
+    data: { vendorId: "vendor_1", creditId: "clx123abc" },
+  });
+
+  const dispute = step(
+    { state: "IDLE", context: {}, vendorId: "vendor_1" } as SessionContext,
+    { body: "NOT_PAID_clx123abc", fromPhone: "+2348030000000" },
+  );
+  assert.deepEqual(dispute.sideEffects?.[0], {
+    type: "DISPUTE_PAID",
+    data: { vendorId: "vendor_1", creditId: "clx123abc" },
+  });
+
+  // A non-vendor can never trigger a confirm — the claim stays unverified.
+  const stranger = step(
+    { state: "IDLE", context: {} } as SessionContext,
+    { body: "CONFIRM_PAID_clx123abc", fromPhone: "+2348039999999" },
+  );
+  assert.equal(stranger.sideEffects, undefined);
+});
+
+test("key replies carry tappable buttons", () => {
+  const help = step(
+    { state: "IDLE", context: {}, vendorId: "vendor_1" } as SessionContext,
+    { body: "HELP", fromPhone: "+2348030000000" },
+  );
+  assert.ok(help.buttons && help.buttons.length >= 2);
+
+  const confirmStep = step(
+    {
+      state: "IDLE",
+      context: { invStep: "due", invItems: [{ name: "Rice", quantity: 1, unitPrice: 500 }], invCustomerName: "Ada" },
+      vendorId: "vendor_1",
+    } as SessionContext,
+    { body: "7", fromPhone: "+2348030000000" },
+  );
+  assert.deepEqual(confirmStep.buttons?.map((b) => b.id), ["SEND", "CANCEL"]);
+});
+
 test("CANCEL exits the invoice flow", () => {
   const r = step(
     { state: "IDLE", context: { invStep: "items", invItems: [] }, vendorId: "vendor_1" } as SessionContext,
