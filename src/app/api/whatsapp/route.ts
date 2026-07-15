@@ -20,7 +20,7 @@ import { formatNaira, normalisePhone } from "../../../lib/utils";
 import { getOrCreateCustomerForVendor, roundMoney } from "../../../lib/bnpl";
 import { signInvoiceToken } from "../../../lib/bnpl-token";
 import { messages } from "../../../lib/whatsapp/messages";
-import { sendWhatsAppButtons, sendWhatsAppMessage, type WhatsAppButton } from "../../../lib/whatsapp/outbound";
+import { sendWhatsAppButtons, sendWhatsAppList, sendWhatsAppMessage, type WhatsAppButton } from "../../../lib/whatsapp/outbound";
 import { getOrgChannelCredentials } from "../../../lib/whatsapp/channel-token";
 import { parseCommunity } from "../../../lib/community";
 import { createSoloOrganizationForVendor, trialEndsAt } from "../../../lib/tenant";
@@ -221,6 +221,7 @@ export async function POST(req: NextRequest) {
     // Side effects
     let finalReply     = result.reply;
     let finalButtons   = result.buttons;
+    let finalList      = result.list;
     let linkedVendorId = vendor?.id;
 
     if (result.sideEffects?.length) {
@@ -229,6 +230,7 @@ export async function POST(req: NextRequest) {
         if (replyOverride !== undefined) {
           finalReply   = replyOverride;
           finalButtons = buttonsOverride;
+          finalList    = undefined;
         }
         if (newVendorId)                 linkedVendorId = newVendorId;
       }
@@ -242,8 +244,10 @@ export async function POST(req: NextRequest) {
 
     console.log(`[whatsapp] → ${fromPhone}: "${finalReply.slice(0, 80)}..."`);
 
-    // Send reply (with tappable buttons when the step provides them)
-    if (finalButtons?.length) {
+    // Send reply (with a tappable list or buttons when the step provides them)
+    if (finalList) {
+      await sendWhatsAppList(fromPhone, finalReply, finalList.buttonText, finalList.rows, creds);
+    } else if (finalButtons?.length) {
       await sendWhatsAppButtons(fromPhone, finalReply, finalButtons, creds);
     } else {
       await sendWhatsAppMessage(fromPhone, finalReply, creds);
@@ -411,7 +415,7 @@ async function runSideEffect(
       const normalCustomerPhone = normalisePhone(customerPhone);
       if (!normalCustomerPhone) {
         return {
-          replyOverride: "That customer phone number is not valid. Please restart with ADD and enter a valid WhatsApp number.",
+          replyOverride: "That customer phone number is not valid. Please restart with ADD and enter a valid WhatsApp number.", buttonsOverride: [{ id: "ADD", title: "Try again" }] as WhatsAppButton[],
         };
       }
       const vendor = await prisma.vendor.findUnique({
@@ -425,7 +429,7 @@ async function runSideEffect(
       });
       if (existingVendor) {
         return {
-          replyOverride: "That phone number belongs to a vendor account. Please use the customer's WhatsApp number and try ADD again.",
+          replyOverride: "That phone number belongs to a vendor account. Please use the customer's WhatsApp number and try ADD again.", buttonsOverride: [{ id: "ADD", title: "Try again" }] as WhatsAppButton[],
         };
       }
 
@@ -438,7 +442,7 @@ async function runSideEffect(
       if (existingCustomer) {
         if (existingCustomer.fullName.trim().toLowerCase() !== customerName.trim().toLowerCase()) {
           return {
-            replyOverride: `That phone number is already saved for ${existingCustomer.fullName}. Use that customer name or restart with a different phone number.`,
+            replyOverride: `That phone number is already saved for ${existingCustomer.fullName}. Use that customer name or restart with a different phone number.`, buttonsOverride: [{ id: "ADD", title: "Try again" }] as WhatsAppButton[],
           };
         }
 
@@ -504,7 +508,7 @@ async function runSideEffect(
         vendor = await prisma.vendor.findUnique({ where: { id: vendorId }, include: { organization: true } });
       }
       if (!vendor?.organizationId || !vendor.organization) {
-        return { replyOverride: "I couldn't set up invoicing for your shop. Please try again or reply *SUPPORT*." };
+        return { replyOverride: "I couldn't set up invoicing for your shop. Please try again or reply *SUPPORT*.", buttonsOverride: [{ id: "INVOICE", title: "Try again" }] as WhatsAppButton[] };
       }
       const organization = vendor.organization;
 
@@ -520,12 +524,12 @@ async function runSideEffect(
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : "I couldn't save that customer.";
-        return { replyOverride: `❌ ${message}\n\nReply *INVOICE* to try again.` };
+        return { replyOverride: `❌ ${message}\n\nReply *INVOICE* to try again.`, buttonsOverride: [{ id: "INVOICE", title: "Try again" }] as WhatsAppButton[] };
       }
 
       const subtotal = roundMoney(items.reduce((s, i) => s + i.quantity * i.unitPrice, 0));
       if (subtotal <= 0) {
-        return { replyOverride: "The invoice total must be greater than zero. Reply *INVOICE* to try again." };
+        return { replyOverride: "The invoice total must be greater than zero. Reply *INVOICE* to try again.", buttonsOverride: [{ id: "INVOICE", title: "Try again" }] as WhatsAppButton[] };
       }
 
       const dueDate = new Date(Date.now() + dueInMinutes * 60_000);
@@ -571,7 +575,7 @@ async function runSideEffect(
         await sendWhatsAppMessage(customer.phone, customerMessage, orgCreds ?? undefined);
       } catch (err) {
         console.error("[whatsapp] Invoice delivery failed:", err);
-        return { replyOverride: messages.invoiceSendFailed(invoice.invoiceNumber, link) };
+        return { replyOverride: messages.invoiceSendFailed(invoice.invoiceNumber, link), buttonsOverride: [{ id: "INVOICE", title: "New invoice" }, { id: "LIST", title: "Who's owing" }] as WhatsAppButton[] };
       }
 
       await prisma.invoice.update({ where: { id: invoice.id }, data: { status: "SENT", sentAt: new Date() } });
@@ -599,9 +603,24 @@ async function runSideEffect(
         include: { student: true },
         orderBy: { dueDate: "asc" },
       });
-      if (!credits.length) return { replyOverride: messages.listEmpty() };
+      if (!credits.length) {
+        return {
+          replyOverride: messages.listEmpty(),
+          buttonsOverride: [
+            { id: "ADD",     title: "Add credit" },
+            { id: "INVOICE", title: "New invoice" },
+          ],
+        };
+      }
       const now = Date.now();
-      return { replyOverride: messages.listFull(credits.map((c) => ({ customerName: c.student.fullName, amount: Number(c.amount), daysUntilDue: Math.ceil((c.dueDate.getTime() - now) / 86_400_000) }))) };
+      return {
+        replyOverride: messages.listFull(credits.map((c) => ({ customerName: c.student.fullName, amount: Number(c.amount), daysUntilDue: Math.ceil((c.dueDate.getTime() - now) / 86_400_000) }))),
+        buttonsOverride: [
+          { id: "PAID",  title: "Mark one paid" },
+          { id: "ADD",   title: "Add credit" },
+          { id: "SCORE", title: "Check a score" },
+        ],
+      };
     }
 
     case "MARK_PAID": {
@@ -612,9 +631,17 @@ async function runSideEffect(
         where: { vendorId, status: { in: [...OPEN_CREDIT_STATUSES] }, student: { OR: words.map((w) => ({ fullName: { contains: w, mode: "insensitive" as const } })) } },
         include: { student: true }, orderBy: { dueDate: "asc" }, take: 1,
       });
-      if (!credits.length) return { replyOverride: messages.paidNotFound(customerName) };
+      if (!credits.length) {
+        return { replyOverride: messages.paidNotFound(customerName), buttonsOverride: [{ id: "LIST", title: "Who's owing" }] };
+      }
       const settled = await settleCredit(credits[0], vendorId);
-      return { replyOverride: messages.paidConfirmed(settled.customerName, settled.amount) };
+      return {
+        replyOverride: messages.paidConfirmed(settled.customerName, settled.amount),
+        buttonsOverride: [
+          { id: "LIST", title: "Who's owing" },
+          { id: "ADD",  title: "Add credit" },
+        ],
+      };
     }
 
     case "CONFIRM_PAID": {
@@ -668,7 +695,7 @@ async function runSideEffect(
         console.error("[whatsapp] Failed to notify customer of disputed claim:", err);
       }
 
-      return { replyOverride: messages.claimDisputeNoted(credit.student.fullName) };
+      return { replyOverride: messages.claimDisputeNoted(credit.student.fullName), buttonsOverride: [{ id: "LIST", title: "Who's owing" }] as WhatsAppButton[] };
     }
 
     case "FETCH_SCORE": {
@@ -681,11 +708,15 @@ async function runSideEffect(
       
       const customer = byPhone ?? await prisma.student.findFirst({ where: { OR: words.map((w) => ({ fullName: { contains: w, mode: "insensitive" as const } })), NOT: { phone: { startsWith: "pending:" } } }, include: { scoreEvents: { orderBy: { occurredAt: "asc" } } }, orderBy: { createdAt: "desc" } });
       
-      if (!customer)                    return { replyOverride: messages.scoreNotFound(customerQuery) };
-      if (!customer.scoreEvents.length) return { replyOverride: messages.scoreNoHistory(customer.fullName) };
+      const scoreButtons: WhatsAppButton[] = [
+        { id: "LIST", title: "Who's owing" },
+        { id: "ADD",  title: "Add credit" },
+      ];
+      if (!customer)                    return { replyOverride: messages.scoreNotFound(customerQuery), buttonsOverride: scoreButtons };
+      if (!customer.scoreEvents.length) return { replyOverride: messages.scoreNoHistory(customer.fullName), buttonsOverride: scoreButtons };
 
       const { score, summary } = computeScore(customer.scoreEvents);
-      return { replyOverride: messages.scoreReply(customer.fullName, score, summary) };
+      return { replyOverride: messages.scoreReply(customer.fullName, score, summary), buttonsOverride: scoreButtons };
     }
 
 

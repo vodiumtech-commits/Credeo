@@ -36,6 +36,10 @@ export interface SessionContext {
 /** Tappable reply button (rendered via Meta interactive messages). */
 export type BotButton = { id: string; title: string };
 
+/** Tappable list menu (up to 10 rows) for choices that don't fit in 3 buttons. */
+export type BotListRow = { id: string; title: string; description?: string };
+export type BotList = { buttonText: string; rows: BotListRow[] };
+
 export interface StepResult {
   reply: string;
   nextState: WhatsAppState;
@@ -43,6 +47,8 @@ export interface StepResult {
   sideEffects?: SideEffect[];
   /** Optional tappable buttons attached to the reply. Max 3, titles ≤ 20 chars. */
   buttons?: BotButton[];
+  /** Optional tappable list menu — takes priority over `buttons` when set. */
+  list?: BotList;
 }
 
 export type SideEffect =
@@ -79,13 +85,35 @@ const MAIN_BUTTONS: BotButton[] = [
   { id: "LIST",    title: "Who's owing" },
 ];
 
+const CANCEL_BUTTON: BotButton[] = [{ id: "CANCEL", title: "Cancel" }];
+
+const DUE_BUTTONS: BotButton[] = [
+  { id: "7",      title: "In 7 days" },
+  { id: "END",    title: "End of month" },
+  { id: "CANCEL", title: "Cancel" },
+];
+
+/** Full command menu — WhatsApp caps reply buttons at 3, so HELP uses a list. */
+const MENU_LIST: BotList = {
+  buttonText: "Open menu",
+  rows: [
+    { id: "ADD",       title: "Add credit",      description: "Record a new credit in 15 seconds" },
+    { id: "INVOICE",   title: "New invoice",     description: "Create & send an invoice on WhatsApp" },
+    { id: "PAID",      title: "Mark paid",       description: "Record a customer's repayment" },
+    { id: "LIST",      title: "Who's owing",     description: "See all outstanding credits" },
+    { id: "SCORE",     title: "Check a score",   description: "A customer's reliability score" },
+    { id: "DASHBOARD", title: "Dashboard link",  description: "Open your full web dashboard" },
+    { id: "SUPPORT",   title: "Talk to a human", description: "Get help within 24 hours" },
+  ],
+};
+
 export function step(session: SessionContext, msg: IncomingMessage): StepResult {
   const body = msg.body.trim();
   const intent = detectIntent(body);
   const upperBody = body.toUpperCase();
 
   if (intent === "HELP") {
-    return { reply: messages.help(), nextState: "IDLE", contextPatch: clearFlowContext(), buttons: MAIN_BUTTONS };
+    return { reply: messages.help(), nextState: "IDLE", contextPatch: clearFlowContext(), list: MENU_LIST };
   }
 
   if (upperBody === "CANCEL" || upperBody === "STOP") {
@@ -159,37 +187,40 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
         reply: messages.addCreditAskPhone(body),
         nextState: "ADDING_CREDIT_PHONE",
         contextPatch: { creditCustomerName: body },
+        buttons: CANCEL_BUTTON,
       };
 
     case "ADDING_CREDIT_PHONE": {
       // Very basic phone validation: at least 7 digits
       const phoneDigits = body.replace(/\D/g, "");
       if (phoneDigits.length < 7) {
-        return { reply: messages.invalidPhone(), nextState: "ADDING_CREDIT_PHONE" };
+        return { reply: messages.invalidPhone(), nextState: "ADDING_CREDIT_PHONE", buttons: CANCEL_BUTTON };
       }
       return {
         reply: messages.addCreditAskAmount(String(session.context.creditCustomerName ?? "Customer")),
         nextState: "ADDING_CREDIT_AMOUNT",
         contextPatch: { creditCustomerPhone: body },
+        buttons: CANCEL_BUTTON,
       };
     }
 
     case "ADDING_CREDIT_AMOUNT": {
       const amount = parseAmount(body);
       if (!amount) {
-        return { reply: messages.invalidAmount(), nextState: "ADDING_CREDIT_AMOUNT" };
+        return { reply: messages.invalidAmount(), nextState: "ADDING_CREDIT_AMOUNT", buttons: CANCEL_BUTTON };
       }
       return {
         reply: messages.addCreditAskDue(String(session.context.creditCustomerName ?? "Customer"), amount),
         nextState: "ADDING_CREDIT_DUE",
         contextPatch: { creditAmount: amount },
+        buttons: DUE_BUTTONS,
       };
     }
 
     case "ADDING_CREDIT_DUE": {
       const dueInMinutes = parseDueDuration(body);
       if (!dueInMinutes) {
-        return { reply: messages.invalidDueDate(), nextState: "ADDING_CREDIT_DUE" };
+        return { reply: messages.invalidDueDate(), nextState: "ADDING_CREDIT_DUE", buttons: DUE_BUTTONS };
       }
       const customerName = String(session.context.creditCustomerName ?? "Customer");
       const customerPhone = String(session.context.creditCustomerPhone ?? "");
@@ -255,7 +286,7 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
 
     case "ADD":
       if (!session.vendorId) return { reply: messages.noVendorAccount(), nextState: "IDLE" };
-      return { reply: messages.addCreditAskCustomer(), nextState: "ADDING_CREDIT_STUDENT" };
+      return { reply: messages.addCreditAskCustomer(), nextState: "ADDING_CREDIT_STUDENT", buttons: CANCEL_BUTTON };
 
     case "INVOICE":
       if (!session.vendorId) return { reply: messages.noVendorAccount(), nextState: "IDLE" };
@@ -263,6 +294,7 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
         reply: messages.invoiceAskCustomer(),
         nextState: "IDLE",
         contextPatch: { ...clearFlowContext(), invStep: "customer" },
+        buttons: CANCEL_BUTTON,
       };
 
     case "PAID": {
@@ -277,7 +309,7 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
           ],
         };
       }
-      return { reply: messages.paidAsk(), nextState: "MARKING_PAID" };
+      return { reply: messages.paidAsk(), nextState: "MARKING_PAID", buttons: CANCEL_BUTTON };
     }
 
     case "LIST":
@@ -297,19 +329,21 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
           sideEffects: [{ type: "FETCH_SCORE", data: { customerQuery: queryAfterScore, fromPhone: msg.fromPhone } }],
         };
       }
-      return { reply: messages.scoreLookupAsk(), nextState: "LOOKING_UP_SCORE" };
+      return { reply: messages.scoreLookupAsk(), nextState: "LOOKING_UP_SCORE", buttons: CANCEL_BUTTON };
     }
 
     case "DASHBOARD":
       return {
         reply: `Open your dashboard here:\n${process.env.NEXT_PUBLIC_APP_URL ?? "https://vodiumledger.com"}/dashboard`,
         nextState: "IDLE",
+        buttons: MAIN_BUTTONS,
       };
 
     case "SUPPORT":
       return {
         reply: `For support, send an email to *support@vodiumledger.com* or reply here and a human will be in touch within 24 hours.`,
         nextState: "IDLE",
+        buttons: MAIN_BUTTONS,
       };
 
     default:
@@ -342,44 +376,50 @@ function stepInvoiceFlow(session: SessionContext, body: string, upperBody: strin
         reply: messages.invoiceAskPhone(body),
         nextState: "IDLE",
         contextPatch: { invCustomerName: body, invStep: "phone" },
+        buttons: CANCEL_BUTTON,
       };
 
     case "phone": {
       const phoneDigits = body.replace(/\D/g, "");
       if (phoneDigits.length < 7) {
-        return { reply: messages.invalidPhone(), nextState: "IDLE" };
+        return { reply: messages.invalidPhone(), nextState: "IDLE", buttons: CANCEL_BUTTON };
       }
       return {
         reply: messages.invoiceAskItems(customerName),
         nextState: "IDLE",
         contextPatch: { invCustomerPhone: body, invStep: "items", invItems: [] },
+        buttons: CANCEL_BUTTON,
       };
     }
 
     case "items": {
       const items = invoiceItemsFromContext(session.context);
+      const itemButtons: BotButton[] = items.length
+        ? [{ id: "DONE", title: "Done ✓" }, ...CANCEL_BUTTON]
+        : CANCEL_BUTTON;
       if (upperBody === "DONE" || upperBody === "FINISH" || upperBody === "FINISHED") {
-        if (!items.length) return { reply: messages.invoiceNeedItem(), nextState: "IDLE" };
+        if (!items.length) return { reply: messages.invoiceNeedItem(), nextState: "IDLE", buttons: CANCEL_BUTTON };
         return {
           reply: messages.invoiceAskDue(customerName),
           nextState: "IDLE",
           contextPatch: { invStep: "due" },
+          buttons: DUE_BUTTONS,
         };
       }
       const item = parseInvoiceItem(body);
-      if (!item) return { reply: messages.invoiceInvalidItem(), nextState: "IDLE" };
+      if (!item) return { reply: messages.invoiceInvalidItem(), nextState: "IDLE", buttons: itemButtons };
       const updated = [...items, item];
       return {
         reply: messages.invoiceItemAdded(updated),
         nextState: "IDLE",
         contextPatch: { invItems: updated },
-        buttons: [{ id: "DONE", title: "Done ✓" }],
+        buttons: [{ id: "DONE", title: "Done ✓" }, ...CANCEL_BUTTON],
       };
     }
 
     case "due": {
       const dueInMinutes = parseDueDuration(body);
-      if (!dueInMinutes) return { reply: messages.invalidDueDate(), nextState: "IDLE" };
+      if (!dueInMinutes) return { reply: messages.invalidDueDate(), nextState: "IDLE", buttons: DUE_BUTTONS };
       const items = invoiceItemsFromContext(session.context);
       const total = items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
       return {

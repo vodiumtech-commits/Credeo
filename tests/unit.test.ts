@@ -130,12 +130,13 @@ test("payment-claim buttons route to confirm/dispute side effects", () => {
   assert.equal(stranger.sideEffects, undefined);
 });
 
-test("key replies carry tappable buttons", () => {
+test("key replies carry tappable buttons and menus", () => {
   const help = step(
     { state: "IDLE", context: {}, vendorId: "vendor_1" } as SessionContext,
     { body: "HELP", fromPhone: "+2348030000000" },
   );
-  assert.ok(help.buttons && help.buttons.length >= 2);
+  assert.ok(help.list && help.list.rows.length >= 6, "HELP should carry the full menu list");
+  assert.ok(help.list!.rows.every((r) => r.title.length <= 24 && (r.description ?? "").length <= 72));
 
   const confirmStep = step(
     {
@@ -146,6 +147,25 @@ test("key replies carry tappable buttons", () => {
     { body: "7", fromPhone: "+2348030000000" },
   );
   assert.deepEqual(confirmStep.buttons?.map((b) => b.id), ["SEND", "CANCEL"]);
+
+  // Due-date prompt offers tappable durations.
+  const dueStep = step(
+    { state: "ADDING_CREDIT_AMOUNT", context: { creditCustomerName: "Ada" }, vendorId: "vendor_1" } as SessionContext,
+    { body: "2500", fromPhone: "+2348030000000" },
+  );
+  assert.deepEqual(dueStep.buttons?.map((b) => b.id), ["7", "END", "CANCEL"]);
+
+  // Every prompt in the ADD flow carries at least a Cancel tappable.
+  const askName = step(
+    { state: "IDLE", context: {}, vendorId: "vendor_1" } as SessionContext,
+    { body: "ADD", fromPhone: "+2348030000000" },
+  );
+  assert.equal(askName.buttons?.[0]?.id, "CANCEL");
+
+  // Button titles never exceed WhatsApp's 20-char cap.
+  for (const r of [help, confirmStep, dueStep, askName]) {
+    for (const b of r.buttons ?? []) assert.ok(b.title.length <= 20, `button title too long: ${b.title}`);
+  }
 });
 
 test("CANCEL exits the invoice flow", () => {
