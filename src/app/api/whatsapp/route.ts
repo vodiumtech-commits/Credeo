@@ -26,9 +26,19 @@ import { parseCommunity } from "../../../lib/community";
 import { createSoloOrganizationForVendor, trialEndsAt } from "../../../lib/tenant";
 import {
   step,
+  friendlyDueText,
+  reminderPromiseForDue,
   type SessionContext,
   type SideEffect,
 } from "../../../lib/whatsapp/state-machine";
+import {
+  getCustomerScorePreview,
+  sendCustomerVerification,
+  vendorKnowsCustomer,
+  verifyVerification,
+  maskPhone,
+} from "../../../lib/customer-verify";
+import type { WhatsAppState } from "@prisma/client";
 
 export const runtime = "nodejs";
 
@@ -207,12 +217,13 @@ export async function POST(req: NextRequest) {
     const result = step(sessionCtx, { body: messageText, fromPhone });
 
     // Persist updated session
+    const mergedContext = { ...sessionCtx.context, ...(result.contextPatch ?? {}) };
     await prisma.whatsAppSession.update({
       where: { phone: fromPhone },
       data: {
         state:   result.nextState,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        context: { ...sessionCtx.context, ...(result.contextPatch ?? {}) } as any,
+        context: mergedContext as any,
         vendorId: vendor?.id,
         ...(channel ? { channelId: channel.id, organizationId: channel.organizationId } : {}),
       },
@@ -223,21 +234,36 @@ export async function POST(req: NextRequest) {
     let finalButtons   = result.buttons;
     let finalList      = result.list;
     let linkedVendorId = vendor?.id;
+    let stateOverride: WhatsAppState | undefined;
+    let contextOverride: Record<string, unknown> | undefined;
 
     if (result.sideEffects?.length) {
       for (const effect of result.sideEffects) {
-        const { replyOverride, buttonsOverride, newVendorId } = await runSideEffect(effect, fromPhone, vendor?.id);
-        if (replyOverride !== undefined) {
-          finalReply   = replyOverride;
-          finalButtons = buttonsOverride;
+        const r = await runSideEffect(effect, fromPhone, vendor?.id, mergedContext);
+        if (r.replyOverride !== undefined) {
+          finalReply   = r.replyOverride;
+          finalButtons = r.buttonsOverride;
           finalList    = undefined;
         }
-        if (newVendorId)                 linkedVendorId = newVendorId;
+        if (r.newVendorId)        linkedVendorId  = r.newVendorId;
+        if (r.stateOverride)      stateOverride   = r.stateOverride;
+        if (r.contextPatchOverride) contextOverride = { ...(contextOverride ?? {}), ...r.contextPatchOverride };
       }
       if (linkedVendorId && linkedVendorId !== vendor?.id) {
         await prisma.whatsAppSession.update({
           where: { phone: fromPhone },
           data:  { vendorId: linkedVendorId },
+        });
+      }
+      // A side effect can redirect the conversation (e.g. into verification).
+      if (stateOverride || contextOverride) {
+        await prisma.whatsAppSession.update({
+          where: { phone: fromPhone },
+          data: {
+            ...(stateOverride ? { state: stateOverride } : {}),
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            context: { ...mergedContext, ...(contextOverride ?? {}) } as any,
+          },
         });
       }
     }
@@ -277,9 +303,61 @@ interface SideEffectResult {
   /** Buttons attached to the overriding reply (ignored without replyOverride). */
   buttonsOverride?: WhatsAppButton[];
   newVendorId?:   string;
+  /** Redirect the conversation to a new state (e.g. into customer verification). */
+  stateOverride?: WhatsAppState;
+  /** Merge extra keys into the persisted session context. */
+  contextPatchOverride?: Record<string, unknown>;
 }
 
 const OPEN_CREDIT_STATUSES = ["OUTSTANDING", "DUE_SOON", "OVERDUE", "PARTIALLY_PAID"] as const;
+
+const ADD_AGAIN_BUTTONS: WhatsAppButton[] = [
+  { id: "ADD",  title: "Add another" },
+  { id: "LIST", title: "Who's owing" },
+];
+
+/** Creates the credit, its score event and the vendor notification. Shared by the
+ *  direct path and the post-verification path. */
+async function finalizeCredit(input: {
+  vendorId: string;
+  vendor: { organizationId: string | null; branchId: string | null };
+  studentId: string;
+  customerName: string;
+  amount: number;
+  dueInMinutes: number;
+  remindersEnabled: boolean;
+}) {
+  const dueDate = new Date(Date.now() + input.dueInMinutes * 60_000);
+  await prisma.credit.create({
+    data: {
+      vendorId: input.vendorId,
+      organizationId: input.vendor.organizationId,
+      branchId: input.vendor.branchId,
+      studentId: input.studentId,
+      amount: input.amount,
+      dueDate,
+      status: "OUTSTANDING",
+      remindersEnabled: input.remindersEnabled,
+    },
+  });
+  await prisma.creditScoreEvent.create({
+    data: { studentId: input.studentId, vendorId: input.vendorId, eventType: "CREDIT_EXTENDED", amount: input.amount, scoreDelta: 0 },
+  });
+  await prisma.notification.create({
+    data: {
+      vendorId: input.vendorId,
+      title: "New Credit Added",
+      message: `₦${Number(input.amount).toLocaleString()} credit recorded for ${input.customerName} via WhatsApp.`,
+      type: "INFO",
+    },
+  });
+}
+
+/** Clears the pending-verification keys from the session context. */
+const CLEAR_PENDING_VERIFY = {
+  pvHmac: null, pvExpiresAt: null, pvPhone: null, pvMasked: null,
+  pcName: null, pcAmount: null, pcDue: null, pcReminders: null,
+} as const;
 
 /** Marks a credit fully paid: repayment, score event, score update, vendor notification. */
 async function settleCredit(
@@ -376,7 +454,8 @@ async function handleCustomerPaidClaim(
 async function runSideEffect(
   effect:    SideEffect,
   fromPhone: string,
-  vendorId?: string
+  vendorId?: string,
+  sessionContext: Record<string, unknown> = {}
 ): Promise<SideEffectResult> {
   switch (effect.type) {
 
@@ -409,6 +488,20 @@ async function runSideEffect(
       return { newVendorId: newVendor.id };
     }
 
+    case "SCORE_PREVIEW": {
+      // Warn the vendor about the customer's cross-vendor reliability before they
+      // decide the amount. Only overrides the prompt when the customer is known.
+      const preview = await getCustomerScorePreview({
+        phone: effect.data.customerPhone,
+        name: effect.data.customerName,
+      });
+      if (!preview?.found) return {};
+      return {
+        replyOverride: messages.addCreditAskAmountWithScore(effect.data.customerName, preview.warning),
+        buttonsOverride: [{ id: "CANCEL", title: "Cancel" }],
+      };
+    }
+
     case "CREATE_CREDIT": {
       if (!vendorId) return {};
       const { customerName, customerPhone, amount, dueInMinutes, remindersEnabled } = effect.data;
@@ -436,16 +529,33 @@ async function runSideEffect(
       const existingCustomer = await prisma.student.findUnique({
         where: { phone: normalCustomerPhone },
       });
+
+      // Existing number belonging to a customer this vendor has never served →
+      // verify with a code sent to the customer's own WhatsApp before attaching.
+      if (existingCustomer && !(await vendorKnowsCustomer(vendorId, existingCustomer.id))) {
+        let challenge;
+        try {
+          challenge = await sendCustomerVerification({ phone: normalCustomerPhone, storeName: vendor?.businessName ?? "the shop" });
+        } catch (err) {
+          console.error("[whatsapp] customer verification send failed:", err);
+          return { replyOverride: messages.verifyDeliveryFailed(), buttonsOverride: [{ id: "ADD", title: "Try again" }] as WhatsAppButton[] };
+        }
+        const masked = maskPhone(normalCustomerPhone);
+        return {
+          replyOverride: messages.verifyAskCode(masked),
+          buttonsOverride: [{ id: "RESEND", title: "Resend code" }, { id: "CANCEL", title: "Cancel" }],
+          stateOverride: "VERIFYING_CUSTOMER",
+          contextPatchOverride: {
+            pvHmac: challenge.hmac, pvExpiresAt: challenge.expiresAt, pvPhone: normalCustomerPhone, pvMasked: masked,
+            pcName: customerName, pcAmount: amount, pcDue: dueInMinutes, pcReminders: remindersEnabled,
+          },
+        };
+      }
+
+      // No verification needed: brand-new customer, or a repeat at this shop.
       const generatedCustomerId = await nextVendorCustomerId(vendorId, vendor?.businessName ?? "Customer");
       let customer = existingCustomer;
-
       if (existingCustomer) {
-        if (existingCustomer.fullName.trim().toLowerCase() !== customerName.trim().toLowerCase()) {
-          return {
-            replyOverride: `That phone number is already saved for ${existingCustomer.fullName}. Use that customer name or restart with a different phone number.`, buttonsOverride: [{ id: "ADD", title: "Try again" }] as WhatsAppButton[],
-          };
-        }
-
         if (!existingCustomer.matricNumber) {
           customer = await prisma.student.update({
             where: { id: existingCustomer.id },
@@ -463,34 +573,97 @@ async function runSideEffect(
           },
         });
       }
-      if (!customer) return {};
+      if (!customer || !vendor) return {};
 
-      const dueDate = new Date(Date.now() + dueInMinutes * 60_000);
-      await prisma.credit.create({
-        data: {
-          vendorId,
-          organizationId: vendor?.organizationId ?? null,
-          branchId: vendor?.branchId ?? null,
-          studentId: customer.id,
-          amount,
-          dueDate,
-          status: "OUTSTANDING",
-          remindersEnabled,
-        },
-      });
-      await prisma.creditScoreEvent.create({ data: { studentId: customer.id, vendorId, eventType: "CREDIT_EXTENDED", amount, scoreDelta: 0 } });
-
-      // Notify vendor on web dashboard
-      await prisma.notification.create({
-        data: {
-          vendorId,
-          title: "New Credit Added",
-          message: `₦${Number(amount).toLocaleString()} credit recorded for ${customerName} via WhatsApp.`,
-          type: "INFO",
-        },
+      await finalizeCredit({
+        vendorId,
+        vendor: { organizationId: vendor.organizationId, branchId: vendor.branchId },
+        studentId: customer.id,
+        customerName,
+        amount,
+        dueInMinutes,
+        remindersEnabled,
       });
 
-      return {};
+      return {}; // state machine already sent the "✅ Saved" confirmation
+    }
+
+    case "VERIFY_CUSTOMER_CODE": {
+      if (!vendorId) return { replyOverride: messages.noVendorAccount() };
+      const phone = String(sessionContext.pvPhone ?? "");
+      const hmac = String(sessionContext.pvHmac ?? "");
+      const expiresAt = Number(sessionContext.pvExpiresAt ?? 0);
+
+      if (!phone || !hmac || !verifyVerification(phone, effect.data.code, expiresAt, hmac)) {
+        return {
+          replyOverride: messages.verifyBadCode(),
+          buttonsOverride: [{ id: "RESEND", title: "Resend code" }, { id: "CANCEL", title: "Cancel" }],
+          stateOverride: "VERIFYING_CUSTOMER",
+        };
+      }
+
+      const vendor = await prisma.vendor.findUnique({
+        where: { id: vendorId },
+        select: { businessName: true, communityId: true, organizationId: true, branchId: true },
+      });
+      const customer = await prisma.student.findUnique({ where: { phone } });
+      if (!vendor || !customer) {
+        return { replyOverride: "Sorry, I couldn't complete that. Please try *ADD* again.", buttonsOverride: [{ id: "ADD", title: "Try again" }] as WhatsAppButton[], stateOverride: "IDLE", contextPatchOverride: { ...CLEAR_PENDING_VERIFY } };
+      }
+
+      if (!customer.matricNumber) {
+        await prisma.student.update({
+          where: { id: customer.id },
+          data: { matricNumber: await nextVendorCustomerId(vendorId, vendor.businessName) },
+        });
+      }
+
+      const amount = Number(sessionContext.pcAmount ?? 0);
+      const dueInMinutes = Number(sessionContext.pcDue ?? 0);
+      const remindersEnabled = sessionContext.pcReminders !== false;
+
+      await finalizeCredit({
+        vendorId,
+        vendor: { organizationId: vendor.organizationId, branchId: vendor.branchId },
+        studentId: customer.id,
+        customerName: customer.fullName,
+        amount,
+        dueInMinutes,
+        remindersEnabled,
+      });
+
+      const reply = messages.addCreditConfirmed(
+        customer.fullName,
+        amount,
+        friendlyDueText(dueInMinutes),
+        remindersEnabled ? reminderPromiseForDue(dueInMinutes) : messages.noReminderPromise(),
+      );
+      return {
+        replyOverride: `✅ Verified.\n\n${reply}`,
+        buttonsOverride: ADD_AGAIN_BUTTONS,
+        stateOverride: "IDLE",
+        contextPatchOverride: { ...CLEAR_PENDING_VERIFY },
+      };
+    }
+
+    case "RESEND_CUSTOMER_CODE": {
+      const phone = String(sessionContext.pvPhone ?? "");
+      if (!phone) {
+        return { replyOverride: "That request expired. Please start again with *ADD*.", buttonsOverride: [{ id: "ADD", title: "Add credit" }] as WhatsAppButton[], stateOverride: "IDLE", contextPatchOverride: { ...CLEAR_PENDING_VERIFY } };
+      }
+      const vendor = await prisma.vendor.findUnique({ where: { id: vendorId ?? "" }, select: { businessName: true } });
+      try {
+        const challenge = await sendCustomerVerification({ phone, storeName: vendor?.businessName ?? "the shop" });
+        return {
+          replyOverride: messages.verifyResent(maskPhone(phone)),
+          buttonsOverride: [{ id: "RESEND", title: "Resend code" }, { id: "CANCEL", title: "Cancel" }],
+          stateOverride: "VERIFYING_CUSTOMER",
+          contextPatchOverride: { pvHmac: challenge.hmac, pvExpiresAt: challenge.expiresAt },
+        };
+      } catch (err) {
+        console.error("[whatsapp] resend verification failed:", err);
+        return { replyOverride: messages.verifyDeliveryFailed(), buttonsOverride: [{ id: "CANCEL", title: "Cancel" }], stateOverride: "VERIFYING_CUSTOMER" };
+      }
     }
 
     case "CREATE_INVOICE": {

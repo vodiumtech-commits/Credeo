@@ -64,6 +64,11 @@ export const messages = {
     `How much does *${customerName}* owe? Send just the number.\n\n` +
     `Example: *2500*`,
 
+  addCreditAskAmountWithScore: (customerName: string, warning: string) =>
+    `${warning}\n\n` +
+    `How much does *${customerName}* owe? Send just the number.\n\n` +
+    `Example: *2500*`,
+
   addCreditAskDue: (customerName: string, amount: number) =>
     `${formatNaira(amount)} for *${customerName}*. ✓\n\n` +
     `When should they pay back? Reply with:\n` +
@@ -100,6 +105,20 @@ export const messages = {
 
   invalidPhone: () =>
     `That doesn't look like a valid phone number. Please send a valid Nigerian number.\n\nExample: *08012345678*`,
+
+  // ── Customer verification (number already belongs to a customer) ─────────
+  verifyAskCode: (maskedPhone: string) =>
+    `🔒 This number already belongs to a customer on Vodium.\n\n` +
+    `I've sent a 6-digit code to their WhatsApp (${maskedPhone}). Ask them to read it to you and send it here to confirm — then this credit joins their shared record.`,
+
+  verifyResent: (maskedPhone: string) =>
+    `📨 New code sent to the customer's WhatsApp (${maskedPhone}). Send it here once they read it to you.`,
+
+  verifyBadCode: () =>
+    `❌ That code is wrong or has expired.\n\nSend the latest code, tap *Resend code*, or *CANCEL* to stop.`,
+
+  verifyDeliveryFailed: () =>
+    `⚠️ I couldn't send a code to that number on WhatsApp. It may not be on WhatsApp. Ask the customer to message the Vodium bot first, then try again — or add the credit from your dashboard.`,
 
   noVendorAccount: () =>
     `You don't have a shop set up yet. Reply *START* to get started.`,

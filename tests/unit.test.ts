@@ -11,6 +11,7 @@ import { normalisePhone, formatNaira } from "../src/lib/utils";
 import { encryptSecret, decryptSecret } from "../src/lib/crypto/secrets";
 import { signOrderToken, verifyOrderToken } from "../src/lib/bnpl-token";
 import { detectIntent, parseInvoiceItem, step, type SessionContext } from "../src/lib/whatsapp/state-machine";
+import { signVerification, verifyVerification, maskPhone } from "../src/lib/customer-verify-token";
 
 test("normalisePhone handles Nigerian formats", () => {
   assert.equal(normalisePhone("08031234567"), "+2348031234567");
@@ -135,6 +136,64 @@ test("ADD flow asks whether to remind the customer and stores the choice", () =>
   const retry = send("ADDING_CREDIT_REMINDER", ctx, "maybe");
   assert.equal(retry.nextState, "ADDING_CREDIT_REMINDER");
   assert.equal(retry.sideEffects, undefined);
+});
+
+test("customer verification code signs, verifies, and rejects tampering/expiry", () => {
+  const phone = "+2348031234567";
+  const future = Date.now() + 60_000;
+  const hmac = signVerification(phone, "123456", future);
+  assert.equal(verifyVerification(phone, "123456", future, hmac), true);
+  assert.equal(verifyVerification(phone, "000000", future, hmac), false, "wrong code");
+  assert.equal(verifyVerification("+2348030000000", "123456", future, hmac), false, "wrong phone");
+  assert.equal(verifyVerification(phone, "123456", Date.now() - 1000, hmac), false, "expired");
+  assert.equal(verifyVerification(phone, "123456", future, hmac + "x"), false, "tampered hmac");
+  assert.match(maskPhone(phone), /4567$/);
+  assert.doesNotMatch(maskPhone(phone), /8031/);
+});
+
+test("ADD phone step requests a cross-vendor score preview", () => {
+  const r = step(
+    { state: "ADDING_CREDIT_PHONE", context: { creditCustomerName: "Ada" }, vendorId: "vendor_1" } as SessionContext,
+    { body: "08031234567", fromPhone: "+2348030000000" },
+  );
+  assert.equal(r.nextState, "ADDING_CREDIT_AMOUNT");
+  const preview = r.sideEffects?.[0];
+  assert.ok(preview && preview.type === "SCORE_PREVIEW");
+  if (preview?.type === "SCORE_PREVIEW") assert.equal(preview.data.customerPhone, "08031234567");
+});
+
+test("VERIFYING_CUSTOMER routes code entry, resend, and cancel", () => {
+  const ctx = { pvPhone: "+2348031234567", pvHmac: "h", pvExpiresAt: Date.now() + 60_000, pcName: "Ada", pcAmount: 2500, pcDue: 10080, pcReminders: true };
+
+  const code = step(
+    { state: "VERIFYING_CUSTOMER", context: ctx, vendorId: "vendor_1" } as SessionContext,
+    { body: "123456", fromPhone: "+2348030000000" },
+  );
+  const codeEffect = code.sideEffects?.[0];
+  assert.ok(codeEffect && codeEffect.type === "VERIFY_CUSTOMER_CODE");
+  if (codeEffect?.type === "VERIFY_CUSTOMER_CODE") assert.equal(codeEffect.data.code, "123456");
+
+  const resend = step(
+    { state: "VERIFYING_CUSTOMER", context: ctx, vendorId: "vendor_1" } as SessionContext,
+    { body: "RESEND", fromPhone: "+2348030000000" },
+  );
+  assert.equal(resend.sideEffects?.[0]?.type, "RESEND_CUSTOMER_CODE");
+
+  // Too-short input re-asks instead of firing a verify effect.
+  const tooShort = step(
+    { state: "VERIFYING_CUSTOMER", context: ctx, vendorId: "vendor_1" } as SessionContext,
+    { body: "12", fromPhone: "+2348030000000" },
+  );
+  assert.equal(tooShort.sideEffects, undefined);
+  assert.equal(tooShort.nextState, "VERIFYING_CUSTOMER");
+
+  const cancel = step(
+    { state: "VERIFYING_CUSTOMER", context: ctx, vendorId: "vendor_1" } as SessionContext,
+    { body: "CANCEL", fromPhone: "+2348030000000" },
+  );
+  assert.equal(cancel.nextState, "IDLE");
+  assert.equal(cancel.contextPatch?.pvPhone, null);
+  assert.equal(cancel.contextPatch?.pcAmount, null);
 });
 
 test("payment-claim buttons route to confirm/dispute side effects", () => {

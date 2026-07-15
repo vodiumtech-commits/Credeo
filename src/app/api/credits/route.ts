@@ -7,7 +7,13 @@ import { normalisePhoneNG } from "@/lib/utils";
 import { getStudentLimit, isPlanActive } from "@/lib/plan";
 import { nextVendorCustomerId } from "@/lib/customer-id";
 import { markOverdueCredits } from "@/lib/credit-lifecycle";
+import crypto from "crypto";
+import { vendorKnowsCustomer, maskPhone } from "@/lib/customer-verify";
+import { sendOtpCode } from "@/lib/otp-delivery";
+import { setOtpCookie, verifyOtpCookie, clearOtpCookie } from "@/lib/otp-cookie";
 import type { CreditStatus } from "@prisma/client";
+
+const VERIFY_PURPOSE = "credit-verify";
 
 // GET /api/credits?status=OVERDUE&search=emeka&page=1&limit=20
 export async function GET(req: NextRequest) {
@@ -61,6 +67,7 @@ const createSchema = z.object({
   amount:         z.number().positive(),
   description:    z.string().max(200).optional(),
   dueDate:        z.string().datetime(),
+  verificationCode: z.string().trim().min(4).max(8).optional(),
 });
 
 // POST /api/credits
@@ -97,7 +104,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid input", issues: parsed.error.issues }, { status: 400 });
   }
 
-  const { customerName, customerPhone, amount, description, dueDate } = parsed.data;
+  const { customerName, customerPhone, amount, description, dueDate, verificationCode } = parsed.data;
 
   const normalisedCustomerPhone = customerPhone ? normalisePhoneNG(customerPhone) : null;
   if (customerPhone && !normalisedCustomerPhone) {
@@ -123,13 +130,40 @@ export async function POST(req: NextRequest) {
   let student = existingStudent;
 
   if (existingStudent) {
-    if (existingStudent.fullName.trim().toLowerCase() !== customerName.trim().toLowerCase()) {
-      return NextResponse.json(
-        {
-          error: `This phone number is already saved for ${existingStudent.fullName}. Use that customer name or enter a different phone number.`,
-        },
-        { status: 409 }
-      );
+    // A real (non-pending) number that already belongs to a customer this vendor
+    // has never served must be verified with a code sent to the customer's own
+    // WhatsApp before we attach — this is what lets the same number be used
+    // across shops safely. Repeat customers at this shop skip verification.
+    const isRealNumber = !!normalisedCustomerPhone;
+    const knowsCustomer = await vendorKnowsCustomer(vendor.id, existingStudent.id);
+
+    if (isRealNumber && !knowsCustomer) {
+      if (!verificationCode) {
+        const rl = await rateLimit(`rl:credit-verify:${customerPhoneKey}`, 4, 600, true);
+        if (!rl.ok) {
+          return NextResponse.json({ error: "Too many code requests. Please wait a few minutes." }, { status: 429 });
+        }
+        // Send a code to the CUSTOMER's own WhatsApp and store the challenge in a
+        // signed httpOnly cookie keyed to this phone (never the raw code).
+        const code = String(crypto.randomInt(100000, 999999));
+        setOtpCookie(VERIFY_PURPOSE, customerPhoneKey, code);
+        await sendOtpCode({ phone: customerPhoneKey, code, storeName: vendor.businessName });
+        const debugCode = process.env.OTP_DEBUG_RETURN === "true" ? code : undefined;
+        return NextResponse.json({
+          needsVerification: true,
+          maskedPhone: maskPhone(customerPhoneKey),
+          ...(debugCode ? { debugCode } : {}),
+        });
+      }
+
+      const ok = verifyOtpCookie(VERIFY_PURPOSE, customerPhoneKey, verificationCode.trim());
+      if (!ok) {
+        return NextResponse.json(
+          { error: "That code is wrong or has expired. Ask the customer for the latest code.", needsVerification: true, maskedPhone: maskPhone(customerPhoneKey) },
+          { status: 400 }
+        );
+      }
+      clearOtpCookie(VERIFY_PURPOSE);
     }
 
     if (!existingStudent.matricNumber) {

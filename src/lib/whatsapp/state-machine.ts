@@ -55,6 +55,9 @@ export type SideEffect =
   | { type: "CREATE_VENDOR";  data: { name: string; businessName: string; communityName: string; phone: string } }
   | { type: "CREATE_CREDIT";  data: { vendorId: string; customerName: string; customerPhone: string; amount: number; dueInMinutes: number; remindersEnabled: boolean } }
   | { type: "CREATE_INVOICE"; data: { vendorId: string; customerName: string; customerPhone: string; items: InvoiceItemEntry[]; dueInMinutes: number } }
+  | { type: "SCORE_PREVIEW";  data: { customerName: string; customerPhone: string } }
+  | { type: "VERIFY_CUSTOMER_CODE"; data: { vendorId: string; code: string } }
+  | { type: "RESEND_CUSTOMER_CODE"; data: { vendorId: string } }
   | { type: "MARK_PAID";      data: { vendorId: string; customerName: string } }
   | { type: "CONFIRM_PAID";   data: { vendorId: string; creditId: string } }
   | { type: "DISPUTE_PAID";   data: { vendorId: string; creditId: string } }
@@ -96,6 +99,11 @@ const DUE_BUTTONS: BotButton[] = [
 const REMINDER_BUTTONS: BotButton[] = [
   { id: "REMIND",   title: "Yes, remind them" },
   { id: "NOREMIND", title: "No reminders" },
+];
+
+const VERIFY_BUTTONS: BotButton[] = [
+  { id: "RESEND", title: "Resend code" },
+  { id: "CANCEL", title: "Cancel" },
 ];
 
 /** Full command menu — WhatsApp caps reply buttons at 3, so HELP uses a list. */
@@ -201,11 +209,15 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
       if (phoneDigits.length < 7) {
         return { reply: messages.invalidPhone(), nextState: "ADDING_CREDIT_PHONE", buttons: CANCEL_BUTTON };
       }
+      // Ask for the amount, but let a SCORE_PREVIEW side effect prepend the
+      // customer's cross-vendor reliability warning when they're already known.
+      const previewName = String(session.context.creditCustomerName ?? "Customer");
       return {
-        reply: messages.addCreditAskAmount(String(session.context.creditCustomerName ?? "Customer")),
+        reply: messages.addCreditAskAmount(previewName),
         nextState: "ADDING_CREDIT_AMOUNT",
         contextPatch: { creditCustomerPhone: body },
         buttons: CANCEL_BUTTON,
+        sideEffects: [{ type: "SCORE_PREVIEW", data: { customerName: previewName, customerPhone: body } }],
       };
     }
 
@@ -280,6 +292,30 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
             data: { vendorId: session.vendorId!, customerName, customerPhone, amount, dueInMinutes, remindersEnabled },
           },
         ],
+      };
+    }
+
+    case "VERIFYING_CUSTOMER": {
+      // Vendor is entering the code we sent to an existing customer's WhatsApp.
+      if (upperBody === "RESEND" || upperBody === "RESEND CODE") {
+        return {
+          reply: "Sending a new code…",
+          nextState: "VERIFYING_CUSTOMER",
+          sideEffects: [{ type: "RESEND_CUSTOMER_CODE", data: { vendorId: session.vendorId! } }],
+        };
+      }
+      const code = body.replace(/\D/g, "");
+      if (code.length < 4) {
+        return {
+          reply: messages.verifyBadCode(),
+          nextState: "VERIFYING_CUSTOMER",
+          buttons: VERIFY_BUTTONS,
+        };
+      }
+      return {
+        reply: "Checking the code…",
+        nextState: "VERIFYING_CUSTOMER",
+        sideEffects: [{ type: "VERIFY_CUSTOMER_CODE", data: { vendorId: session.vendorId!, code } }],
       };
     }
 
@@ -629,5 +665,14 @@ function clearFlowContext(): Record<string, null> {
     invCustomerPhone: null,
     invItems: null,
     invDueMinutes: null,
+    // pending customer-verification keys
+    pvHmac: null,
+    pvExpiresAt: null,
+    pvPhone: null,
+    pvMasked: null,
+    pcName: null,
+    pcAmount: null,
+    pcDue: null,
+    pcReminders: null,
   };
 }

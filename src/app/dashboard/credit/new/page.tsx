@@ -10,9 +10,21 @@ import {
   Banknote,
   Calendar,
   AlertCircle,
+  ShieldCheck,
+  Loader2,
 } from "lucide-react";
 import { formatNaira } from "@/lib/utils";
 import { ShimmerButton } from "@/components/ui/shimmer-button";
+
+type ScorePreview = {
+  found: boolean;
+  fullName?: string;
+  score: number;
+  band: string;
+  tone: "good" | "building" | "bad" | "new";
+  vendorCount: number;
+  warning: string;
+};
 
 const DURATION_OPTIONS = [
   { label: "3 days", days: 3 },
@@ -22,7 +34,7 @@ const DURATION_OPTIONS = [
 ];
 
 // FIXED: Changed "student" to "customer" to match your state
-type StepName = "customer" | "details" | "confirm" | "done";
+type StepName = "customer" | "details" | "confirm" | "verify" | "done";
 
 const STEP_META = [
   { id: 1, key: "customer" as const, label: "Customer" }, // FIXED: key is now customer
@@ -44,8 +56,33 @@ export default function NewCreditPage() {
     dueTime: "18:00",
   });
 
+  // Cross-vendor reliability preview + customer verification state.
+  const [scorePreview, setScorePreview] = useState<ScorePreview | null>(null);
+  const [scoreLoading, setScoreLoading] = useState(false);
+  const [verifyCode, setVerifyCode] = useState("");
+  const [maskedPhone, setMaskedPhone] = useState("");
+
   function update(f: keyof typeof form, v: string) {
     setForm((p) => ({ ...p, [f]: v }));
+  }
+
+  async function loadScorePreview() {
+    const name = form.customerName.trim();
+    const phone = form.phone.trim();
+    if (!name && !phone) { setScorePreview(null); return; }
+    setScoreLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (phone) params.set("phone", phone);
+      if (name) params.set("name", name);
+      const res = await fetch(`/api/customers/score-preview?${params.toString()}`);
+      const data = await res.json();
+      setScorePreview(data.preview ?? null);
+    } catch {
+      setScorePreview(null);
+    } finally {
+      setScoreLoading(false);
+    }
   }
 
   const getDueDateTime = (): Date | null => {
@@ -93,7 +130,7 @@ export default function NewCreditPage() {
           ? 3
           : 3;
 
-  async function handleSubmit() {
+  async function submitCredit(verificationCode?: string) {
     setLoading(true);
     setError(null);
     try {
@@ -109,10 +146,25 @@ export default function NewCreditPage() {
           amount: parseFloat(form.amount),
           description: form.description || undefined,
           dueDate: dueDateTime.toISOString(),
+          ...(verificationCode ? { verificationCode } : {}),
         }),
       });
+      const data = await res.json().catch(() => ({}));
+
+      // This number belongs to an existing customer this shop hasn't served — a
+      // code was sent to the customer's WhatsApp. Move to the verify step.
+      if (res.ok && data.needsVerification) {
+        setMaskedPhone(data.maskedPhone ?? "");
+        setVerifyCode(data.debugCode ?? "");
+        setStep("verify");
+        return;
+      }
       if (!res.ok) {
-        const data = await res.json();
+        // A wrong/expired code keeps us on the verify step to retry.
+        if (data.needsVerification) {
+          setMaskedPhone(data.maskedPhone ?? maskedPhone);
+          setStep("verify");
+        }
         throw new Error(data.error ?? "Could not save credit");
       }
       setStep("done");
@@ -122,6 +174,8 @@ export default function NewCreditPage() {
       setLoading(false);
     }
   }
+
+  const handleSubmit = () => submitCredit();
 
   if (step === "done") {
     return (
@@ -267,6 +321,11 @@ export default function NewCreditPage() {
           })}
         </div>
 
+        {/* Cross-vendor reliability warning — shown before issuing credit */}
+        {(step === "details" || step === "confirm") && (
+          <ScoreBanner preview={scorePreview} loading={scoreLoading} />
+        )}
+
         {/* ── Step 1: Customer info ──────────────────────────────────── */}
         {/* FIXED: Changed check to step === "customer" */}
         {step === "customer" && (
@@ -316,7 +375,7 @@ export default function NewCreditPage() {
 
             <div className="flex justify-end pt-2">
               <button
-                onClick={() => setStep("details")}
+                onClick={() => { setStep("details"); loadScorePreview(); }}
                 disabled={!isStep1Valid}
                 className="btn-gold px-7 py-3 rounded-xl text-sm disabled:opacity-40 disabled:cursor-not-allowed"
               >
@@ -543,13 +602,110 @@ export default function NewCreditPage() {
           </div>
         )}
 
+        {/* ── Verify step: existing customer, new shop ─────────────────── */}
+        {step === "verify" && (
+          <div className="bg-vodium-charcoal rounded-2xl border border-white/[0.06] p-8 space-y-5">
+            <div className="flex items-center gap-3 mb-1">
+              <div className="w-9 h-9 rounded-xl bg-vodium-gold/10 border border-vodium-gold/20 flex items-center justify-center">
+                <ShieldCheck size={15} className="text-vodium-gold" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-vodium-cream">Verify the customer</h2>
+                <p className="text-xs text-vodium-cream/35">This number already belongs to a customer.</p>
+              </div>
+            </div>
+
+            <p className="rounded-xl border border-vodium-gold/15 bg-vodium-gold/[0.05] px-4 py-3 text-sm text-vodium-cream/60 leading-relaxed">
+              We sent a 6-digit code to the customer&rsquo;s WhatsApp
+              {maskedPhone ? <> ({maskedPhone})</> : null}. Ask them to read it to you and enter it below to
+              confirm it&rsquo;s really them — then this credit joins their shared Vodium record.
+            </p>
+
+            <StepField label="Verification code" required>
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="123456"
+                value={verifyCode}
+                onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                className="input-dark tracking-[0.4em] text-center text-lg"
+                autoFocus
+              />
+            </StepField>
+
+            {error && (
+              <div className="flex items-start gap-3 bg-rose-500/10 border border-rose-500/20 rounded-xl px-4 py-3 text-sm text-rose-400">
+                <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />
+                {error}
+              </div>
+            )}
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => { setStep("confirm"); setError(null); setVerifyCode(""); }}
+                className="flex-1 py-3.5 rounded-xl text-sm text-vodium-cream/40 hover:text-vodium-cream/70 border border-white/[0.06] hover:border-white/[0.14] transition-colors"
+              >
+                Back
+              </button>
+              <ShimmerButton
+                className="flex-[2] h-12 text-sm"
+                onClick={() => submitCredit(verifyCode)}
+              >
+                {loading ? "Verifying…" : "Verify & save"}
+              </ShimmerButton>
+            </div>
+
+            <button
+              onClick={() => submitCredit()}
+              disabled={loading}
+              className="w-full text-xs text-vodium-cream/35 hover:text-vodium-gold transition-colors disabled:opacity-40"
+            >
+              Didn&rsquo;t get it? Resend code
+            </button>
+          </div>
+        )}
+
         {/* WhatsApp hint */}
-        {step !== "confirm" && (
+        {(step === "customer" || step === "details") && (
           <p className="text-xs text-vodium-cream/25 text-center mt-6">
             You can also record via WhatsApp:{" "}
             <code className="text-vodium-gold/60 font-mono">
               ADD {form.customerName || "[name]"} {form.amount || "[amount]"}
             </code>
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ScoreBanner({ preview, loading }: { preview: ScorePreview | null; loading: boolean }) {
+  if (loading) {
+    return (
+      <div className="mb-6 flex items-center gap-2 rounded-xl border border-white/[0.06] bg-vodium-charcoal px-4 py-3 text-xs text-vodium-cream/40">
+        <Loader2 size={13} className="animate-spin text-vodium-gold" /> Checking this customer&rsquo;s Vodium record…
+      </div>
+    );
+  }
+  if (!preview) return null;
+
+  const styles: Record<ScorePreview["tone"], string> = {
+    good: "border-emerald-500/25 bg-emerald-500/[0.07] text-emerald-200",
+    building: "border-vodium-gold/25 bg-vodium-gold/[0.07] text-vodium-cream/80",
+    bad: "border-rose-500/25 bg-rose-500/[0.08] text-rose-200",
+    new: "border-white/[0.1] bg-white/[0.04] text-vodium-cream/60",
+  };
+  const Icon = preview.tone === "bad" ? AlertCircle : preview.tone === "good" ? ShieldCheck : User;
+
+  return (
+    <div className={`mb-6 flex items-start gap-3 rounded-xl border px-4 py-3.5 text-sm leading-relaxed ${styles[preview.tone]}`}>
+      <Icon size={16} className="flex-shrink-0 mt-0.5" />
+      <div>
+        <p>{preview.warning}</p>
+        {preview.found && (
+          <p className="mt-1 text-xs opacity-70">
+            Score is shared across every Vodium shop this customer uses. Check before you decide the amount.
           </p>
         )}
       </div>
