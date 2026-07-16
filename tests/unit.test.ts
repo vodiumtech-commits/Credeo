@@ -12,6 +12,7 @@ import { encryptSecret, decryptSecret } from "../src/lib/crypto/secrets";
 import { signOrderToken, verifyOrderToken } from "../src/lib/bnpl-token";
 import { detectIntent, parseInvoiceItem, step, type SessionContext } from "../src/lib/whatsapp/state-machine";
 import { signVerification, verifyVerification, maskPhone } from "../src/lib/customer-verify-token";
+import { ADMIN_ROUTE_ROLES } from "../src/lib/session-cookies";
 
 test("normalisePhone handles Nigerian formats", () => {
   assert.equal(normalisePhone("08031234567"), "+2348031234567");
@@ -136,6 +137,20 @@ test("ADD flow asks whether to remind the customer and stores the choice", () =>
   const retry = send("ADDING_CREDIT_REMINDER", ctx, "maybe");
   assert.equal(retry.nextState, "ADDING_CREDIT_REMINDER");
   assert.equal(retry.sideEffects, undefined);
+});
+
+test("dispute routes are restricted to super admin + customer care", () => {
+  // The rules are first-match-wins and end in a catch-all that allows every
+  // role, so a dispute rule must be matched BEFORE "/admin" / "/api/admin".
+  const roleFor = (path: string) =>
+    ADMIN_ROUTE_ROLES.find((r) => path.startsWith(r.prefix))?.roles ?? [];
+
+  for (const path of ["/admin/disputes", "/api/admin/disputes", "/api/admin/disputes/abc123"]) {
+    const roles = roleFor(path);
+    assert.deepEqual([...roles].sort(), ["CUSTOMER_CARE", "SUPER_ADMIN"], `${path} must not fall through to the catch-all`);
+    assert.ok(!roles.includes("CFO"), `${path} must not be reachable by CFO`);
+    assert.ok(!roles.includes("ANALYTICS"), `${path} must not be reachable by Analytics`);
+  }
 });
 
 test("customer verification code signs, verifies, and rejects tampering/expiry", () => {

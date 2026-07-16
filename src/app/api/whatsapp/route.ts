@@ -198,6 +198,10 @@ export async function POST(req: NextRequest) {
       const claimHandled = await handleCustomerPaidClaim(fromPhone, messageText, creds);
       if (claimHandled) return NextResponse.json({ ok: true });
 
+      // "Not my credit" opens a dispute for customer care to attend to.
+      const disputeHandled = await handleCustomerDispute(fromPhone, messageText, creds);
+      if (disputeHandled) return NextResponse.json({ ok: true });
+
       console.log(`[whatsapp] Rejected: unregistered user ${fromPhone}`);
       await sendWhatsAppMessage(
         fromPhone,
@@ -387,6 +391,100 @@ async function settleCredit(
   });
 
   return { customerName: customer.fullName, amount };
+}
+
+/**
+ * A customer (not a vendor) says a credit isn't theirs — open a dispute for the
+ * admin queue. Nothing is decided here: customer care reviews it. Because the
+ * Vodium score is shared across shops, this is the customer's route to recourse.
+ * Returns false when the sender isn't a known customer / isn't disputing.
+ */
+async function handleCustomerDispute(
+  fromPhone: string,
+  text: string,
+  creds?: { token: string; phoneId: string }
+): Promise<boolean> {
+  const upper = text.trim().toUpperCase();
+  const tapped = upper.match(/^DISPUTE_([\w-]+)$/);
+  const typed = ["NOT MINE", "NOT MY CREDIT", "DISPUTE", "NOT ME"].includes(upper);
+  if (!tapped && !typed) return false;
+
+  const student = await prisma.student.findUnique({ where: { phone: fromPhone } });
+  if (!student) return false;
+
+  // Resolve which credit. A tapped button carries its id; a typed message only
+  // works when there's exactly one open credit to point at.
+  let credit;
+  if (tapped) {
+    credit = await prisma.credit.findFirst({
+      // Scope to THIS customer so a guessed id can't dispute someone else's credit.
+      where: { id: tapped[1], studentId: student.id },
+      include: { vendor: { select: { id: true, businessName: true, phone: true, organizationId: true } } },
+    });
+    if (!credit) {
+      await sendWhatsAppMessage(fromPhone, messages.disputeNothingToDispute(), creds);
+      return true;
+    }
+  } else {
+    const open = await prisma.credit.findMany({
+      where: { studentId: student.id, status: { in: [...OPEN_CREDIT_STATUSES] } },
+      include: { vendor: { select: { id: true, businessName: true, phone: true, organizationId: true } } },
+      take: 2,
+    });
+    if (!open.length) {
+      await sendWhatsAppMessage(fromPhone, messages.disputeNothingToDispute(), creds);
+      return true;
+    }
+    if (open.length > 1) {
+      await sendWhatsAppMessage(fromPhone, messages.disputePickFromReminder(), creds);
+      return true;
+    }
+    credit = open[0];
+  }
+
+  const existing = await prisma.dispute.findFirst({
+    where: { creditId: credit.id, studentId: student.id, status: { in: ["OPEN", "IN_REVIEW"] } },
+    select: { id: true },
+  });
+  if (existing) {
+    await sendWhatsAppMessage(fromPhone, messages.disputeAlreadyOpen(), creds);
+    return true;
+  }
+
+  const amount = Number(credit.amount);
+  await prisma.dispute.create({
+    data: {
+      creditId: credit.id,
+      studentId: student.id,
+      vendorId: credit.vendor.id,
+      organizationId: credit.organizationId,
+      reason: tapped ? "Customer tapped 'Not my credit' on a reminder." : `Customer replied: "${text.trim()}"`,
+      status: "OPEN",
+    },
+  });
+
+  // Pause reminders while it's under review — don't chase someone over a credit
+  // they say isn't theirs.
+  await prisma.credit.update({ where: { id: credit.id }, data: { remindersEnabled: false } });
+
+  await prisma.notification.create({
+    data: {
+      vendorId: credit.vendor.id,
+      title: "Credit Disputed",
+      message: `${student.fullName} says the ₦${amount.toLocaleString()} you recorded is not theirs. Vodium is reviewing it.`,
+      type: "WARNING",
+    },
+  });
+
+  const vendorCreds = (await getOrgChannelCredentials(credit.vendor.organizationId)) ?? undefined;
+  try {
+    await sendWhatsAppMessage(credit.vendor.phone, messages.disputeToVendor(student.fullName, amount), vendorCreds);
+  } catch (err) {
+    console.error("[whatsapp] Failed to notify vendor of dispute:", err);
+  }
+
+  await sendWhatsAppMessage(fromPhone, messages.disputeAckToCustomer(credit.vendor.businessName, amount), creds);
+  return true;
 }
 
 /**

@@ -235,6 +235,7 @@ model Vendor {
   bnplOrders    BnplOrder[]
   ledgerEntries WalletLedgerEntry[]
   invoices      Invoice[]
+  disputes      Dispute[]
 
   @@index([communityId])
   @@index([organizationId])
@@ -281,6 +282,7 @@ model Student {
   paymentMandates PaymentMandate[]
   couponRedemptions CouponRedemption[]
   invoices      Invoice[]
+  disputes      Dispute[]
 
   @@index([communityId])
   @@index([organizationId])
@@ -320,6 +322,7 @@ model Credit {
   repayments      Repayment[]
   scoreEvents     CreditScoreEvent[]
   bnplOrders      BnplOrder[]
+  disputes        Dispute[]
 
   @@index([vendorId])
   @@index([organizationId])
@@ -337,6 +340,43 @@ enum CreditStatus {
   PARTIALLY_PAID    // some repayment received
   PAID              // fully repaid
   WRITTEN_OFF       // vendor wrote it off as a loss
+}
+
+// ─────────────────────────────────────────────
+// DISPUTES — a customer contests a credit logged against them.
+// Because the Vodium score is shared across every vendor, a wrong entry
+// damages a real person's reputation. This is their route to recourse.
+// ─────────────────────────────────────────────
+
+enum DisputeStatus {
+  OPEN        // raised by the customer, nobody has picked it up
+  IN_REVIEW   // customer care is looking into it
+  UPHELD      // customer was right — credit voided, score damage reversed
+  REJECTED    // credit stands
+}
+
+model Dispute {
+  id             String        @id @default(cuid())
+  creditId       String
+  credit         Credit        @relation(fields: [creditId], references: [id])
+  studentId      String
+  student        Student       @relation(fields: [studentId], references: [id])
+  vendorId       String
+  vendor         Vendor        @relation(fields: [vendorId], references: [id])
+  organizationId String?
+  reason         String?       // what the customer told us
+  status         DisputeStatus @default(OPEN)
+  resolution     String?       // customer care's note
+  handledById    String?       // AdminUser.id who attended to it
+  handledAt      DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([status])
+  @@index([vendorId])
+  @@index([studentId])
+  @@index([creditId])
+  @@index([createdAt])
 }
 
 model Repayment {

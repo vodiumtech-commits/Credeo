@@ -296,6 +296,37 @@ export const messages = {
   confirmNotFound: () =>
     `That credit is already settled or no longer open. Reply *LIST* to see what's outstanding.`,
 
+  // ── Customer disputes ("this credit isn't mine") ────────────────────────
+  disputeAckToCustomer: (vendorBusinessName: string, amount: number) =>
+    `🛡️ Thank you for telling us.\n\n` +
+    `We've opened a review of the *${formatNaira(amount)}* from *${vendorBusinessName}*. ` +
+    `Our team will look into it and get back to you.\n\n` +
+    `While it's under review we won't count it against your Vodium score.`,
+
+  disputeAlreadyOpen: () =>
+    `You've already reported this one. 👍 Our team is reviewing it and will get back to you.`,
+
+  disputeNothingToDispute: () =>
+    `You have no open credit to report right now.\n\n` +
+    `If you got a reminder you don't recognise, tap *Not my credit* on that message.`,
+
+  disputePickFromReminder: () =>
+    `You have credit at more than one shop, so I'm not sure which one you mean.\n\n` +
+    `Please tap *Not my credit* on the reminder for the one you don't recognise.`,
+
+  disputeToVendor: (customerName: string, amount: number) =>
+    `⚠️ *${customerName}* says the *${formatNaira(amount)}* you recorded is not theirs.\n\n` +
+    `Our team is reviewing it. No action needed from you — we'll be in touch if we need details.`,
+
+  disputeUpheldToCustomer: (vendorBusinessName: string, amount: number) =>
+    `✅ Review complete — you were right.\n\n` +
+    `The *${formatNaira(amount)}* from *${vendorBusinessName}* has been removed and it will not affect your Vodium score.`,
+
+  disputeRejectedToCustomer: (vendorBusinessName: string, amount: number) =>
+    `Review complete.\n\n` +
+    `We checked with *${vendorBusinessName}* and the *${formatNaira(amount)}* stands. ` +
+    `If you still disagree, please reply here and a human will help.`,
+
   // ── Proactive reminders (sent to customers) ─────────────────────────────
   reminderToCustomer: (
     customerName: string,

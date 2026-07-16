@@ -117,8 +117,11 @@ export async function GET(req: NextRequest) {
 
     try {
       // "I've paid" raises a claim the vendor must confirm — it never marks the
-      // credit paid on its own.
-      await sendWhatsAppButtons(student.phone, body, [{ id: "PAID", title: "I've paid ✓" }]);
+      // credit paid on its own. "Not my credit" opens a dispute for review.
+      await sendWhatsAppButtons(student.phone, body, [
+        { id: "PAID", title: "I've paid ✓" },
+        { id: `DISPUTE_${credit.id}`, title: "Not my credit" },
+      ]);
 
       // Stamp the credit so we don't remind again.
       await prisma.credit.update({

@@ -2,7 +2,7 @@ import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY || "re_placeholder_key");
 
-const TEAM_EMAIL = "victorkalejaye1@gmail.com";
+const TEAM_EMAIL = "support@vodiumledger.com";
 
 export async function sendNewsletterWelcome(subscriberEmail: string) {
   if (!process.env.RESEND_API_KEY) {
