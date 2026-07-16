@@ -20,6 +20,7 @@ import {
   Activity,
   Building2,
   ShieldAlert,
+  Megaphone,
 } from "lucide-react";
 import type { AdminRole } from "@/lib/session";
 
@@ -34,6 +35,7 @@ const ROLE_LABELS: Record<AdminRole, string> = {
   CFO: "CFO",
   CUSTOMER_CARE: "Customer Care",
   ANALYTICS: "Analytics",
+  MARKETING: "Marketing",
 };
 
 const ROLE_COLORS: Record<AdminRole, string> = {
@@ -41,6 +43,7 @@ const ROLE_COLORS: Record<AdminRole, string> = {
   CFO: "text-purple-400 bg-purple-400/10 border-purple-400/25",
   CUSTOMER_CARE: "text-sky-400 bg-sky-400/10 border-sky-400/25",
   ANALYTICS: "text-emerald-400 bg-emerald-400/10 border-emerald-400/25",
+  MARKETING: "text-pink-400 bg-pink-400/10 border-pink-400/25",
 };
 
 const NAV_BY_ROLE: Record<
@@ -54,6 +57,7 @@ const NAV_BY_ROLE: Record<
     { href: "/admin/finance", icon: TrendingUp, label: "Finance" },
     { href: "/admin/support", icon: Headphones, label: "Support" },
     { href: "/admin/disputes", icon: ShieldAlert, label: "Disputes" },
+    { href: "/admin/marketing", icon: Megaphone, label: "Marketing" },
     { href: "/admin/analytics", icon: BarChart3, label: "Analytics" },
     { href: "/admin/team", icon: Users, label: "Team" },
   ],
@@ -71,6 +75,10 @@ const NAV_BY_ROLE: Record<
   ANALYTICS: [
     { href: "/admin", icon: LayoutDashboard, label: "Overview" },
     { href: "/admin/analytics", icon: BarChart3, label: "Analytics" },
+  ],
+  MARKETING: [
+    { href: "/admin", icon: LayoutDashboard, label: "Overview" },
+    { href: "/admin/marketing", icon: Megaphone, label: "Marketing" },
   ],
 };
 

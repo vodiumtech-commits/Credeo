@@ -222,6 +222,9 @@ model Vendor {
   community    Community @relation(fields: [communityId], references: [id])
   location      String?
   status        VendorStatus @default(ACTIVE)
+  // Set once, at registration, from the /r/<code> referral cookie.
+  referredByAmbassadorId String?
+  referredBy             Ambassador? @relation(fields: [referredByAmbassadorId], references: [id])
   inviteToken          String?   @unique  // set when a staff member is invited; cleared on accept
   inviteTokenExpiresAt DateTime?
   createdAt     DateTime @default(now())
@@ -242,6 +245,7 @@ model Vendor {
   @@index([branchId])
   @@index([phone])
   @@index([email])
+  @@index([referredByAmbassadorId])
 }
 
 enum VendorType {
@@ -843,6 +847,39 @@ enum AdminRole {
   CFO
   CUSTOMER_CARE
   ANALYTICS
+  MARKETING
+}
+
+// ─────────────────────────────────────────────
+// AMBASSADORS — campus reps who recruit vendors.
+// Each gets a /r/<code> link; a vendor who registers through it is
+// attributed to them for life, so we can appraise on activation
+// (vendors who actually log credit) rather than raw signups.
+// ─────────────────────────────────────────────
+
+enum AmbassadorStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Ambassador {
+  id          String           @id @default(cuid())
+  name        String
+  code        String           @unique   // the /r/<code> slug, e.g. "TUNDE"
+  phone       String?
+  email       String?
+  campus      String?          // free text for now — "UNILAG", "OAU"
+  stipend     Decimal?         @db.Decimal(12, 2)  // ₦/month, for appraisal context
+  status      AmbassadorStatus @default(ACTIVE)
+  clicks      Int              @default(0)  // link visits, incremented by /r/<code>
+  notes       String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  vendors     Vendor[]
+
+  @@index([status])
+  @@index([code])
 }
 
 model AdminUser {

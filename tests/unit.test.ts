@@ -9,7 +9,8 @@ process.env.SECRET_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64"); // v
 
 import { normalisePhone, formatNaira } from "../src/lib/utils";
 import { encryptSecret, decryptSecret } from "../src/lib/crypto/secrets";
-import { signOrderToken, verifyOrderToken } from "../src/lib/bnpl-token";
+import { signOrderToken, verifyOrderToken, signAmbassadorToken, verifyAmbassadorToken, signInvoiceToken } from "../src/lib/bnpl-token";
+import { normaliseAmbassadorCode } from "../src/lib/referral";
 import { detectIntent, parseInvoiceItem, step, type SessionContext } from "../src/lib/whatsapp/state-machine";
 import { signVerification, verifyVerification, maskPhone } from "../src/lib/customer-verify-token";
 import { ADMIN_ROUTE_ROLES } from "../src/lib/session-cookies";
@@ -137,6 +138,43 @@ test("ADD flow asks whether to remind the customer and stores the choice", () =>
   const retry = send("ADDING_CREDIT_REMINDER", ctx, "maybe");
   assert.equal(retry.nextState, "ADDING_CREDIT_REMINDER");
   assert.equal(retry.sideEffects, undefined);
+});
+
+test("ambassador codes normalise and reject junk", () => {
+  assert.equal(normaliseAmbassadorCode("tunde"), "TUNDE");
+  assert.equal(normaliseAmbassadorCode("  Tunde  "), "TUNDE");
+  assert.equal(normaliseAmbassadorCode("UNILAG-01"), "UNILAG-01");
+  assert.equal(normaliseAmbassadorCode("ab"), null, "too short");
+  assert.equal(normaliseAmbassadorCode("-LEAD"), null, "cannot start with a dash");
+  assert.equal(normaliseAmbassadorCode("tun de"), null, "no spaces");
+  assert.equal(normaliseAmbassadorCode("../../etc"), null, "no path traversal");
+  assert.equal(normaliseAmbassadorCode(undefined), null);
+  assert.equal(normaliseAmbassadorCode(""), null);
+});
+
+test("ambassador stats tokens are signed and namespaced", () => {
+  const token = signAmbassadorToken("amb_abcdef123456");
+  assert.equal(verifyAmbassadorToken(token), "amb_abcdef123456");
+  assert.equal(verifyAmbassadorToken(token + "x"), null, "tampered");
+  assert.equal(verifyAmbassadorToken("garbage.token"), null);
+  // Namespaces must not be interchangeable — an invoice link must never open
+  // an ambassador's scoreboard.
+  assert.equal(verifyAmbassadorToken(signInvoiceToken("amb_abcdef123456")), null);
+  assert.equal(verifyOrderToken(signAmbassadorToken("amb_abcdef123456")), null);
+});
+
+test("marketing routes are restricted to super admin + marketing", () => {
+  const roleFor = (path: string) =>
+    ADMIN_ROUTE_ROLES.find((r) => path.startsWith(r.prefix))?.roles ?? [];
+
+  for (const path of ["/admin/marketing", "/api/admin/ambassadors", "/api/admin/ambassadors/abc"]) {
+    const roles = roleFor(path);
+    assert.deepEqual([...roles].sort(), ["MARKETING", "SUPER_ADMIN"], `${path} must not fall through to the catch-all`);
+  }
+  // Marketing must not reach vendor or finance data.
+  assert.ok(!roleFor("/admin/finance").includes("MARKETING"));
+  assert.ok(!roleFor("/admin/vendors").includes("MARKETING"));
+  assert.ok(!roleFor("/admin/disputes").includes("MARKETING"));
 });
 
 test("dispute routes are restricted to super admin + customer care", () => {

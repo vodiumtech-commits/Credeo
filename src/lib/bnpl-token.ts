@@ -49,6 +49,29 @@ export function verifyOrderToken(token: string): string | null {
   }
 }
 
+/**
+ * Signed public link for an ambassador's own stats page (same scheme, separate
+ * namespace). Lets a campus rep bookmark their numbers without an account.
+ */
+export function signAmbassadorToken(ambassadorId: string): string {
+  const payload = Buffer.from(ambassadorId, "utf8").toString("base64url");
+  return `${payload}.${hmac(`v1:ambassador:${payload}`)}`;
+}
+
+export function verifyAmbassadorToken(token: string): string | null {
+  try {
+    const dot = token.lastIndexOf(".");
+    if (dot === -1) return null;
+    const payload = token.slice(0, dot);
+    const incoming = token.slice(dot + 1);
+    if (!safeEqual(incoming, hmac(`v1:ambassador:${payload}`))) return null;
+    const id = Buffer.from(payload, "base64url").toString("utf8");
+    return id.length >= 10 ? id : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Signed public link for a digital invoice (same scheme, separate namespace). */
 export function signInvoiceToken(invoiceId: string): string {
   const payload = Buffer.from(invoiceId, "utf8").toString("base64url");

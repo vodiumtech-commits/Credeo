@@ -17,6 +17,8 @@ export const ADMIN_ROUTE_ROLES: Array<{ prefix: string; roles: string[] }> = [
   // (The API additionally restricts the resolve action to CUSTOMER_CARE.)
   { prefix: "/admin/disputes",  roles: ["SUPER_ADMIN", "CUSTOMER_CARE"] },
   { prefix: "/api/admin/disputes", roles: ["SUPER_ADMIN", "CUSTOMER_CARE"] },
+  { prefix: "/admin/marketing", roles: ["SUPER_ADMIN", "MARKETING"] },
+  { prefix: "/api/admin/ambassadors", roles: ["SUPER_ADMIN", "MARKETING"] },
   { prefix: "/admin/organizations", roles: ["SUPER_ADMIN"] },
   { prefix: "/api/admin/organizations", roles: ["SUPER_ADMIN"] },
   { prefix: "/api/admin/team",  roles: ["SUPER_ADMIN"] },

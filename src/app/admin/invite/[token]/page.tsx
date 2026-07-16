@@ -17,6 +17,7 @@ const ROLE_LABELS: Record<string, string> = {
   CFO: "CFO",
   CUSTOMER_CARE: "Customer Care",
   ANALYTICS: "Analytics",
+  MARKETING: "Marketing",
 };
 
 type Status = "loading" | "valid" | "invalid" | "expired" | "used";

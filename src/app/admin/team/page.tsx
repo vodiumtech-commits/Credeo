@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Users, UserPlus, Trash2, Mail, RefreshCw, Loader2, CheckCircle2, Clock, Shield, X } from "lucide-react";
 
-type AdminRole = "SUPER_ADMIN" | "CFO" | "CUSTOMER_CARE" | "ANALYTICS";
+type AdminRole = "SUPER_ADMIN" | "CFO" | "CUSTOMER_CARE" | "ANALYTICS" | "MARKETING";
 
 interface AdminMember {
   id:            string;
@@ -22,6 +22,7 @@ const ROLE_LABELS: Record<AdminRole, string> = {
   CFO:           "CFO",
   CUSTOMER_CARE: "Customer Care",
   ANALYTICS:     "Analytics",
+  MARKETING:     "Marketing",
 };
 
 const ROLE_COLORS: Record<AdminRole, string> = {
@@ -29,6 +30,7 @@ const ROLE_COLORS: Record<AdminRole, string> = {
   CFO:           "text-emerald-400   bg-emerald-500/10   border-emerald-500/20",
   CUSTOMER_CARE: "text-sky-400       bg-sky-500/10       border-sky-500/20",
   ANALYTICS:     "text-purple-400    bg-purple-500/10    border-purple-500/20",
+  MARKETING:     "text-pink-400      bg-pink-500/10      border-pink-500/20",
 };
 
 const ROLE_DESC: Record<AdminRole, string> = {
@@ -36,6 +38,7 @@ const ROLE_DESC: Record<AdminRole, string> = {
   CFO:           "Finance & revenue metrics",
   CUSTOMER_CARE: "Vendor support & outreach",
   ANALYTICS:     "Platform insights & trends",
+  MARKETING:     "Ambassadors & growth tracking",
 };
 
 export default function AdminTeamPage() {

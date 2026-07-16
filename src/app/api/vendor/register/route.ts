@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { z } from "zod";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { REFERRAL_COOKIE, normaliseAmbassadorCode } from "@/lib/referral";
 import { rateLimit } from "@/lib/redis";
 import { normalisePhone } from "@/lib/utils";
 import { parseCommunity } from "@/lib/community";
@@ -156,6 +158,20 @@ async function handleVerify(json: unknown) {
 
   const subscriptionTrialEndsAt = trialEndsAt();
 
+  // Credit the campus ambassador whose /r/<code> link brought this vendor in.
+  // Best-effort: an unknown, inactive or expired code must never block a signup.
+  const referralCode = normaliseAmbassadorCode(cookies().get(REFERRAL_COOKIE)?.value);
+  let referredByAmbassadorId: string | null = null;
+  if (referralCode) {
+    const ambassador = await prisma.ambassador
+      .findUnique({ where: { code: referralCode }, select: { id: true, status: true } })
+      .catch((err) => {
+        console.error("[register] ambassador lookup failed:", err);
+        return null;
+      });
+    if (ambassador?.status === "ACTIVE") referredByAmbassadorId = ambassador.id;
+  }
+
   const vendor = await prisma.vendor.create({
     data: {
       businessName,
@@ -167,6 +183,7 @@ async function handleVerify(json: unknown) {
       communityId:  communityObj.id,
       location,
       status:        "ACTIVE",
+      referredByAmbassadorId,
       subscription: {
         create: {
           plan:          "STARTER",

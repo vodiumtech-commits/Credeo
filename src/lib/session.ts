@@ -26,7 +26,8 @@ export type VendorWithSub = Vendor & {
   memberships: OrganizationMembership[];
 };
 
-export type AdminRole = "SUPER_ADMIN" | "CFO" | "CUSTOMER_CARE" | "ANALYTICS";
+// Keep in sync with the AdminRole enum in prisma/schema.prisma.
+export type AdminRole = "SUPER_ADMIN" | "CFO" | "CUSTOMER_CARE" | "ANALYTICS" | "MARKETING";
 
 export interface AdminTokenPayload {
   id:   string;   // DB AdminUser.id, or "__super__" for ADMIN_SECRET login

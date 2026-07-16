@@ -5,7 +5,7 @@ import { getAdminSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { sendAdminInviteEmail } from "@/lib/email/admin-invite";
 
-const INVITE_ROLES = ["CFO", "CUSTOMER_CARE", "ANALYTICS", "SUPER_ADMIN"] as const;
+const INVITE_ROLES = ["CFO", "CUSTOMER_CARE", "ANALYTICS", "MARKETING", "SUPER_ADMIN"] as const;
 
 const inviteSchema = z.object({
   name:  z.string().min(2).max(100).trim(),
