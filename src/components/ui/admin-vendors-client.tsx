@@ -16,6 +16,8 @@ export interface AdminVendorRow {
   community:    { shortName: string | null; name: string };
   subscription: { plan: string; status: string; monthlyAmount: number } | null;
   totalTracked: number;
+  totalRecovered: number;
+  lastLoggedAt: string | null;
   creditsLogged: number;
   customersCount: number;
   subMrr:        number;
@@ -169,7 +171,10 @@ export function AdminVendorsClient({
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-vodium-cream truncate leading-tight">{v.businessName}</p>
-                  <p className="text-[10px] text-vodium-cream/35 mt-0.5">{v.ownerName}</p>
+                  <p className="text-[10px] text-vodium-cream/35 mt-0.5 flex items-center gap-1.5">
+                    <span className="truncate">{v.ownerName}</span>
+                    <ActivityBadge lastLoggedAt={v.lastLoggedAt} />
+                  </p>
                 </div>
               </div>
 
@@ -185,7 +190,10 @@ export function AdminVendorsClient({
 
               <div className="col-span-2 text-right">
                 <p className="text-sm text-vodium-cream font-medium">{formatNaira(v.totalTracked)}</p>
-                <p className="text-[10px] text-vodium-cream/28 mt-0.5">{v.creditsLogged} credits</p>
+                <p className="text-[10px] text-vodium-cream/28 mt-0.5">
+                  {v.creditsLogged} credits
+                  {v.totalTracked > 0 && ` · ${Math.round((v.totalRecovered / v.totalTracked) * 100)}% back`}
+                </p>
               </div>
 
               <div className="col-span-1 text-right">
@@ -232,5 +240,25 @@ export function AdminVendorsClient({
           : `Showing ${filtered.length} of ${vendors.length}`}
       </div>
     </div>
+  );
+}
+
+/**
+ * Days since this vendor last logged a credit. Silence is the churn signal —
+ * it shows up here long before a subscription is cancelled.
+ */
+function ActivityBadge({ lastLoggedAt }: { lastLoggedAt: string | null }) {
+  if (!lastLoggedAt) {
+    return <span className="shrink-0 text-[9px] px-1.5 py-0.5 rounded border border-white/10 text-vodium-cream/30">never logged</span>;
+  }
+  const days = Math.floor((Date.now() - new Date(lastLoggedAt).getTime()) / 86_400_000);
+  if (days <= 7) return null; // healthy — no badge, keeps the row quiet
+  const cls = days >= 14
+    ? "border-[#d03b3b]/30 text-[#d03b3b]"
+    : "border-[#fab219]/30 text-[#fab219]";
+  return (
+    <span className={`shrink-0 text-[9px] px-1.5 py-0.5 rounded border ${cls}`}>
+      quiet {days}d
+    </span>
   );
 }

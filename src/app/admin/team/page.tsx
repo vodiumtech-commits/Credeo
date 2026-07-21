@@ -119,12 +119,19 @@ export default function AdminTeamPage() {
 
       {/* Role legend */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {(Object.keys(ROLE_LABELS) as AdminRole[]).map((r) => (
-          <div key={r} className={`border rounded-xl p-4 ${ROLE_COLORS[r]}`}>
-            <p className="text-xs font-bold uppercase tracking-wider mb-1">{ROLE_LABELS[r]}</p>
-            <p className="text-xs opacity-60 leading-relaxed">{ROLE_DESC[r]}</p>
-          </div>
-        ))}
+        {(Object.keys(ROLE_LABELS) as AdminRole[]).map((r) => {
+          const held = team.filter((m) => m.role === r).length;
+          return (
+            <div key={r} className={`border rounded-xl p-4 ${ROLE_COLORS[r]}`}>
+              <div className="flex items-baseline justify-between gap-2 mb-1">
+                <p className="text-xs font-bold uppercase tracking-wider">{ROLE_LABELS[r]}</p>
+                {/* Who actually holds this role — an empty critical role is worth seeing */}
+                <span className="text-sm font-serif tabular-nums opacity-80">{held}</span>
+              </div>
+              <p className="text-xs opacity-60 leading-relaxed">{ROLE_DESC[r]}</p>
+            </div>
+          );
+        })}
       </div>
 
       {/* Team table */}

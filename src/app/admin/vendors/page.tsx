@@ -37,7 +37,10 @@ export default async function AdminVendorsPage() {
       by:    ["vendorId"],
       where: { vendorId: { in: vendorIds } },
       _count: { _all: true },
-      _sum:   { amount: true },
+      // _max.createdAt is the churn signal: a vendor who stops logging has
+      // stopped using Vodium, long before they cancel.
+      _sum:   { amount: true, amountRepaid: true },
+      _max:   { createdAt: true },
     }),
     prisma.credit.findMany({
       where:    { vendorId: { in: vendorIds } },
@@ -56,6 +59,11 @@ export default async function AdminVendorsPage() {
   const trialVendors    = vendors.filter((v) => v.subscription?.status === "TRIAL").length;
   const inactiveVendors = vendors.filter((v) => v.status !== "ACTIVE").length;
   const totalVendors    = vendors.length;
+  const quietCutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
+  const quietVendors = vendors.filter((v) => {
+    const last = aggMap.get(v.id)?._max.createdAt;
+    return last && last.getTime() < quietCutoff;
+  }).length;
 
   const mrr    = planCounts.filter((p) => p.status === "ACTIVE").reduce((s, p) => s + Number(p._sum.monthlyAmount ?? 0), 0);
   const avgMrr = activeVendors > 0 ? Math.round(mrr / activeVendors) : 0;
@@ -81,6 +89,8 @@ export default async function AdminVendorsPage() {
         ? { plan: v.subscription.plan, status: v.subscription.status, monthlyAmount: Number(v.subscription.monthlyAmount) }
         : null,
       totalTracked:  Number(agg?._sum.amount ?? 0),
+      totalRecovered: Number(agg?._sum.amountRepaid ?? 0),
+      lastLoggedAt:  agg?._max.createdAt ? agg._max.createdAt.toISOString() : null,
       creditsLogged: agg?._count._all ?? 0,
       customersCount: customerCountMap.get(v.id) ?? 0,
       subMrr:        v.subscription?.status === "ACTIVE" ? Number(v.subscription.monthlyAmount ?? 0) : 0,
@@ -98,6 +108,9 @@ export default async function AdminVendorsPage() {
         </h1>
         <p className="text-vodium-cream/40 text-sm mt-0.5">
           {activeVendors} active · {trialVendors} on trial · {inactiveVendors} inactive
+          {quietVendors > 0 && (
+            <span className="text-[#fab219]"> · {quietVendors} gone quiet (14+ days)</span>
+          )}
         </p>
       </div>
 
