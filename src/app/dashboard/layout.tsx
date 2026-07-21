@@ -331,7 +331,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </aside>
 
       {/* Main */}
-      <div className="flex-1 md:ml-60 flex flex-col min-h-screen">
+      <div className="flex-1 min-w-0 md:ml-60 flex flex-col min-h-screen">
         {/* Sticky header */}
         <header className="sticky top-0 z-20 bg-[#0A0A0A]/95 backdrop-blur-xl border-b border-white/[0.05] px-5 min-h-[3.5rem] pt-safe flex items-center justify-between">
           {/* Left: hamburger + breadcrumb */}

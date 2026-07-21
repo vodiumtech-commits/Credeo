@@ -72,7 +72,7 @@ export function ChartCard({
 }) {
   const [asTable, setAsTable] = useState(false);
   return (
-    <div className={`rounded-2xl border border-white/[0.06] bg-vodium-charcoal p-5 md:p-6 ${className}`}>
+    <div className={`min-w-0 rounded-2xl border border-white/[0.06] bg-vodium-charcoal p-5 md:p-6 ${className}`}>
       <div className="flex items-start justify-between gap-3 mb-5">
         <div>
           <h3 className="text-sm font-semibold text-vodium-cream">{title}</h3>
@@ -95,8 +95,10 @@ export function ChartCard({
 
 export function DataTable({ head, rows }: { head: string[]; rows: (string | number)[][] }) {
   if (!rows.length) return <Empty />;
+  // min-w-0 on the scroll container: without it a grid/flex ancestor keeps its
+  // automatic min-width and the horizontal scroll never engages.
   return (
-    <div className="overflow-x-auto -mx-1">
+    <div className="min-w-0 overflow-x-auto -mx-1">
       <table className="w-full text-xs min-w-[320px]">
         <thead>
           <tr>

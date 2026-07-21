@@ -317,7 +317,7 @@ export function AdminShell({ name, role, children }: Props) {
       </aside>
 
       {/* ── Main ────────────────────────────────────────────────────────────── */}
-      <div className="flex-1 md:ml-14 xl:ml-[220px] flex flex-col min-h-screen transition-all duration-300">
+      <div className="flex-1 min-w-0 md:ml-14 xl:ml-[220px] flex flex-col min-h-screen transition-all duration-300">
         {/* Sticky header */}
         <header className="bg-[#0A0A0A]/95 backdrop-blur-xl border-b border-white/[0.05] sticky top-0 z-20 px-5 md:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
