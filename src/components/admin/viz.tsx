@@ -198,6 +198,9 @@ export function TrendArea({
   height?: number;
 }) {
   if (!data.length) return <Empty />;
+  // A trend needs at least two periods; one point renders as a lone dot in an
+  // empty plot, which reads as a broken chart. Say so instead.
+  if (data.length === 1) return <Empty label="Only one period so far — a trend needs at least two" />;
   return (
     <ResponsiveContainer width="100%" height={height}>
       <AreaChart data={data} margin={{ top: 4, right: 8, left: -18, bottom: 0 }}>
@@ -242,6 +245,7 @@ export function TrendLine({
   fmt?: (v: number) => string;
 }) {
   if (!data.length) return <Empty />;
+  if (data.length === 1) return <Empty label="Only one period so far — a trend needs at least two" />;
   return (
     <ResponsiveContainer width="100%" height={height}>
       <LineChart data={data} margin={{ top: 4, right: 8, left: -6, bottom: 0 }}>
