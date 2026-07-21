@@ -165,7 +165,11 @@ export function setAdminSession(id: string = "__super__", role: AdminRole = "SUP
   cookies().set(ADMIN_COOKIE, buildAdminToken(id, role), {
     httpOnly: true,
     secure:   process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    // "lax", not "strict": strict withholds the cookie on cross-site top-level
+    // navigation (opening an /admin link from email or WhatsApp), which looks
+    // like a random logout. Lax still blocks cross-site POSTs, so CSRF cover
+    // is unchanged. Matches the vendor session cookie.
+    sameSite: "lax",
     maxAge:   ADMIN_COOKIE_AGE,
     path:     "/",
   });
@@ -176,7 +180,7 @@ export function clearAdminSession(): void {
   cookies().set(ADMIN_COOKIE, "", {
     httpOnly: true,
     secure:   process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    sameSite: "lax", // must match setAdminSession or the cookie will not be cleared
     maxAge:   0,
     path:     "/",
   });

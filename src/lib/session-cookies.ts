@@ -23,6 +23,11 @@ export const ADMIN_ROUTE_ROLES: Array<{ prefix: string; roles: string[] }> = [
   { prefix: "/api/admin/organizations", roles: ["SUPER_ADMIN"] },
   { prefix: "/api/admin/team",  roles: ["SUPER_ADMIN"] },
   { prefix: "/api/admin/vendors", roles: ["SUPER_ADMIN", "CUSTOMER_CARE"] },
-  { prefix: "/admin",           roles: ["SUPER_ADMIN", "CFO", "CUSTOMER_CARE", "ANALYTICS"] },
-  { prefix: "/api/admin",       roles: ["SUPER_ADMIN", "CFO", "CUSTOMER_CARE", "ANALYTICS"] },
+  // The support API must mirror the /admin/support page, or CFO/ANALYTICS could
+  // read vendor support data through the API that the UI denies them.
+  { prefix: "/api/admin/support", roles: ["SUPER_ADMIN", "CUSTOMER_CARE"] },
+  // Catch-alls: every admin role must appear here, otherwise that role is bounced
+  // from /admin (the shared overview) into a redirect loop.
+  { prefix: "/admin",           roles: ["SUPER_ADMIN", "CFO", "CUSTOMER_CARE", "ANALYTICS", "MARKETING"] },
+  { prefix: "/api/admin",       roles: ["SUPER_ADMIN", "CFO", "CUSTOMER_CARE", "ANALYTICS", "MARKETING"] },
 ];

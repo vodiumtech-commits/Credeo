@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { getAdminSession } from "@/lib/session";
 import type { VendorStatus } from "@prisma/client";
 
 const patchSchema = z.object({
@@ -13,6 +14,14 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
+    // Defence in depth: middleware already gates /api/admin/vendors, but a
+    // handler that suspends a vendor must not rely on that alone.
+    const session = getAdminSession();
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!["SUPER_ADMIN", "CUSTOMER_CARE"].includes(session.role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const json = await req.json();
     const parsed = patchSchema.safeParse(json);
     if (!parsed.success) {

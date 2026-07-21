@@ -163,6 +163,39 @@ test("ambassador stats tokens are signed and namespaced", () => {
   assert.equal(verifyOrderToken(signAmbassadorToken("amb_abcdef123456")), null);
 });
 
+test("every admin role can reach the shared /admin overview", () => {
+  // A role missing from the catch-all is redirected from /admin to /admin —
+  // an infinite redirect loop, not a permission error.
+  const catchAllPage = ADMIN_ROUTE_ROLES.find((r) => r.prefix === "/admin");
+  const catchAllApi  = ADMIN_ROUTE_ROLES.find((r) => r.prefix === "/api/admin");
+  for (const role of ["SUPER_ADMIN", "CFO", "CUSTOMER_CARE", "ANALYTICS", "MARKETING"]) {
+    assert.ok(catchAllPage?.roles.includes(role), `${role} missing from /admin catch-all`);
+    assert.ok(catchAllApi?.roles.includes(role), `${role} missing from /api/admin catch-all`);
+  }
+});
+
+test("each admin API mirrors the permissions of its page", () => {
+  const rolesFor = (path: string) =>
+    ADMIN_ROUTE_ROLES.find((r) => path.startsWith(r.prefix))?.roles ?? [];
+
+  // An API must never be reachable by a role that cannot open the matching page,
+  // or the UI restriction is cosmetic.
+  for (const [page, api] of [
+    ["/admin/support", "/api/admin/support/vendors"],
+    ["/admin/vendors", "/api/admin/vendors/abc"],
+    ["/admin/team", "/api/admin/team"],
+    ["/admin/disputes", "/api/admin/disputes/abc"],
+    ["/admin/organizations", "/api/admin/organizations"],
+    ["/admin/marketing", "/api/admin/ambassadors"],
+  ] as const) {
+    assert.deepEqual(
+      [...rolesFor(api)].sort(),
+      [...rolesFor(page)].sort(),
+      `${api} does not match the permissions of ${page}`,
+    );
+  }
+});
+
 test("marketing routes are restricted to super admin + marketing", () => {
   const roleFor = (path: string) =>
     ADMIN_ROUTE_ROLES.find((r) => path.startsWith(r.prefix))?.roles ?? [];

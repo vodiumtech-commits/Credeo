@@ -195,7 +195,16 @@ async function verifyAdminToken(token: string): Promise<AdminTokenPayload | null
 }
 
 async function hmac(input: string): Promise<string> {
-  const secret = process.env.SESSION_SECRET || "dev-only-secret-change-me-before-production";
+  // FAIL CLOSED. The dev fallback below is a constant published in this repo, so
+  // silently using it in production would let anyone forge an admin cookie and
+  // reach every admin page. Throwing here is caught by the verify* callers,
+  // which return null -> the request is treated as unauthenticated.
+  const configured = process.env.SESSION_SECRET;
+  if (!configured && process.env.NODE_ENV === "production") {
+    console.error("[middleware] SESSION_SECRET is not set in production — refusing to verify sessions");
+    throw new Error("SESSION_SECRET missing");
+  }
+  const secret = configured || "dev-only-secret-change-me-before-production";
   const key = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(secret),
