@@ -53,7 +53,9 @@ export const messages = {
   // ── ADD credit flow ────────────────────────────────────────────────────
   addCreditAskCustomer: () =>
     `Who took the credit? Send their full name.\n\n` +
-    `Example: *Chidi Okeke*`,
+    `Example: *Chidi Okeke*\n\n` +
+    `_Tip: next time send it all at once —_\n` +
+    `_*ADD Chidi Okeke 08012345678 2500 7d*_`,
 
   addCreditAskPhone: (customerName: string) =>
     `What is *${customerName}'s* WhatsApp number?\n\n` +
@@ -342,7 +344,8 @@ export const messages = {
   // ── HELP & misc ────────────────────────────────────────────────────────
   help: () =>
     `*Vodium Ledger commands:*\n\n` +
-    `• *ADD* : record a new credit\n` +
+    `• *ADD Chidi 08012345678 2500 7d* : log a credit in one message\n` +
+    `• *ADD* : record a credit step by step\n` +
     `• *INVOICE* : create & send an invoice\n` +
     `• *PAID [name]* : mark a credit paid\n` +
     `• *LIST* : see who owes you\n` +

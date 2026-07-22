@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { prisma } from "../../../lib/prisma";
+import { getRedis } from "../../../lib/redis";
 import { computeScore } from "../../../lib/credit-score/score";
 import { nextVendorCustomerId } from "../../../lib/customer-id";
 import { formatNaira, normalisePhone } from "../../../lib/utils";
@@ -159,38 +160,55 @@ export async function POST(req: NextRequest) {
 
   console.log(`[whatsapp] ← ${fromPhone}: "${messageText}"`);
 
+  // Meta retries a delivery it thinks failed (including when we simply replied
+  // slowly), re-sending the SAME message id. Without this guard a retry replays
+  // the whole turn — which can log a credit or send an invoice twice.
+  if (await isDuplicateMessage(message.id)) {
+    console.log(`[whatsapp] duplicate ${message.id} ignored`);
+    return NextResponse.json({ ok: true });
+  }
+
   // ── Process message (wrapped so errors never escape) ────────────────────────
   try {
-    const channel = phoneNumberId
-      ? await prisma.whatsAppChannel.findUnique({
-          where: { phoneNumberId },
-          select: { id: true, organizationId: true, status: true },
-        })
-      : null;
+    // These two don't depend on each other — run them together rather than
+    // paying two sequential round-trips before the bot can even start thinking.
+    const [channel, vendorByPhone] = await Promise.all([
+      phoneNumberId
+        ? prisma.whatsAppChannel.findUnique({
+            where: { phoneNumberId },
+            select: { id: true, organizationId: true, status: true },
+          })
+        : Promise.resolve(null),
+      prisma.vendor.findUnique({ where: { phone: fromPhone } }),
+    ]);
 
     // Reply from the store's own WhatsApp number when this message arrived on a
     // store channel; otherwise fall back to the global Vodium number.
-    const creds = (await getOrgChannelCredentials(channel?.organizationId)) ?? undefined;
+    const [credsRaw, session] = await Promise.all([
+      getOrgChannelCredentials(channel?.organizationId),
+      prisma.whatsAppSession.upsert({
+        where:  { phone: fromPhone },
+        update: {
+          lastInteractionAt: new Date(),
+          ...(channel ? { channelId: channel.id, organizationId: channel.organizationId } : {}),
+        },
+        create: {
+          phone: fromPhone,
+          state: "IDLE",
+          context: {},
+          ...(channel ? { channelId: channel.id, organizationId: channel.organizationId } : {}),
+        },
+      }),
+    ]);
+    const creds = credsRaw ?? undefined;
 
-    // Load or create session
-    const session = await prisma.whatsAppSession.upsert({
-      where:  { phone: fromPhone },
-      update: {
-        lastInteractionAt: new Date(),
-        ...(channel ? { channelId: channel.id, organizationId: channel.organizationId } : {}),
-      },
-      create: {
-        phone: fromPhone,
-        state: "IDLE",
-        context: {},
-        ...(channel ? { channelId: channel.id, organizationId: channel.organizationId } : {}),
-      },
-    });
-
-    // Resolve vendor — restrict BOT to registered vendors only
-    const vendor = session.vendorId
-      ? await prisma.vendor.findUnique({ where: { id: session.vendorId } })
-      : await prisma.vendor.findUnique({ where: { phone: fromPhone } });
+    // Resolve vendor — restrict BOT to registered vendors only. The by-phone
+    // lookup above already covers the common case, so only re-query when the
+    // session is linked to a different vendor id.
+    const vendor =
+      session.vendorId && session.vendorId !== vendorByPhone?.id
+        ? await prisma.vendor.findUnique({ where: { id: session.vendorId } })
+        : vendorByPhone;
 
     if (!vendor) {
       // Customers replying "PAID" to a reminder raise a claim — the vendor must
@@ -298,6 +316,26 @@ export async function POST(req: NextRequest) {
 
   // Always 200 so Meta doesn't retry or suspend the webhook
   return NextResponse.json({ ok: true });
+}
+
+/**
+ * True if this Meta message id has already been handled.
+ *
+ * Fails OPEN: if Redis is unavailable we process the message rather than drop
+ * a real vendor's credit. That trades a rare duplicate for never losing work.
+ */
+async function isDuplicateMessage(messageId: string | undefined): Promise<boolean> {
+  if (!messageId) return false;
+  const redis = getRedis();
+  if (!redis) return false;
+  try {
+    // NX = only set if absent; the first caller wins and everyone else is a dupe.
+    const first = await redis.set(`wa:msg:${messageId}`, "1", { nx: true, ex: 600 });
+    return first === null;
+  } catch (err) {
+    console.error("[whatsapp] dedup check failed (processing anyway):", err);
+    return false;
+  }
 }
 
 // ── side-effect executor ──────────────────────────────────────────────────────

@@ -277,6 +277,9 @@ model Student {
   organization   Organization? @relation(fields: [organizationId], references: [id])
   vodiumScore   Int      @default(500)  // 0–1000 scale, 500 = unscored baseline
   scoreUpdatedAt DateTime?
+  // Set when Meta reports this number as permanently undeliverable (blocked the
+  // bot, or not a WhatsApp user). Stops reminders retrying forever.
+  whatsappBlockedAt DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

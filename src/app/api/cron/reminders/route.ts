@@ -10,7 +10,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { sendWhatsAppButtons } from "@/lib/whatsapp/outbound";
+import { sendWhatsAppButtons, WhatsAppSendError } from "@/lib/whatsapp/outbound";
 import { messages } from "@/lib/whatsapp/messages";
 import { reminderLeadMinutesForDue } from "@/lib/whatsapp/state-machine";
 import { applyDailyDefaultDecay, markOverdueCredits, sendOverdueReminders } from "@/lib/credit-lifecycle";
@@ -58,6 +58,8 @@ export async function GET(req: NextRequest) {
       student: {
         // Only send to students with a real phone number (not a pending: placeholder)
         NOT: { phone: { startsWith: "pending:" } },
+        // ...and skip anyone Meta has told us is permanently undeliverable.
+        whatsappBlockedAt: null,
       },
     },
     include: {
@@ -68,6 +70,7 @@ export async function GET(req: NextRequest) {
 
   let sent = 0;
   let failed = 0;
+  let blocked = 0;
   const vendorSentCount: Record<string, number> = {};
 
   // Merchants can turn off customer reminders — respect that (cached per org).
@@ -134,6 +137,30 @@ export async function GET(req: NextRequest) {
     } catch (err) {
       console.error(`[cron/reminders] failed for credit ${credit.id}:`, err);
       failed++;
+
+      // A permanent failure means this customer blocked the bot or isn't on
+      // WhatsApp. Retrying every cron run would burn Meta quota forever, so
+      // record it, stop reminding this credit, and hand the follow-up back to
+      // the vendor — who can still reach them in person.
+      if (err instanceof WhatsAppSendError && err.permanent) {
+        blocked++;
+        await prisma.student.update({
+          where: { id: student.id },
+          data: { whatsappBlockedAt: now },
+        }).catch(() => {});
+        await prisma.credit.update({
+          where: { id: credit.id },
+          data: { reminderSentAt: now },
+        }).catch(() => {});
+        await prisma.notification.create({
+          data: {
+            vendorId: credit.vendorId,
+            title: "Customer unreachable on WhatsApp",
+            message: `We couldn't deliver a reminder to ${student.fullName} — they may have blocked the Vodium number or the number isn't on WhatsApp. Please follow up with them directly.`,
+            type: "WARNING",
+          },
+        }).catch(() => {});
+      }
     }
   }
 
@@ -154,6 +181,10 @@ export async function GET(req: NextRequest) {
     });
   }
 
+  if (blocked > 0) {
+    console.warn(`[cron/reminders] ${blocked} customer(s) unreachable on WhatsApp — reminders stopped for them`);
+  }
+
   const totalSent = sent + overdueReminders.sent;
   const totalFailed = failed + overdueReminders.failed;
   console.log(
@@ -163,6 +194,7 @@ export async function GET(req: NextRequest) {
     ok: true,
     sent: totalSent,
     failed: totalFailed,
+    blocked, // customers newly marked unreachable this run
     total: credits.length + overdueReminders.total,
     skipped: { preDue: skipped, overdue: overdueReminders.skipped, invoices: invoiceReminders.skipped },
     overdue: overdueLifecycle,

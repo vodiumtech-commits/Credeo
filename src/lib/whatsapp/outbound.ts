@@ -11,6 +11,56 @@
 
 const META_API_VERSION = "v19.0";
 
+/**
+ * A failed WhatsApp send, carrying enough detail for the caller to decide
+ * whether retrying is worth it.
+ *
+ * `permanent` means this recipient will not receive messages no matter how many
+ * times we try — they blocked the business number, the number isn't on
+ * WhatsApp, or it's malformed. Callers MUST stop retrying those, otherwise a
+ * single blocked customer burns Meta quota on every cron run forever.
+ */
+export class WhatsAppSendError extends Error {
+  readonly status: number;
+  readonly code?: number;
+  readonly permanent: boolean;
+
+  constructor(message: string, status: number, code?: number) {
+    super(message);
+    this.name = "WhatsAppSendError";
+    this.status = status;
+    this.code = code;
+    this.permanent = isPermanentFailure(status, code);
+  }
+}
+
+/**
+ * Meta error codes that mean "this recipient is unreachable" rather than
+ * "try again later". See developers.facebook.com/docs/whatsapp/cloud-api/support/error-codes
+ *   131026 — message undeliverable (blocked us, or not a WhatsApp user)
+ *   131051 — unsupported message type for this recipient
+ *   131052 — media download error (recipient side)
+ *   100    — invalid parameter (e.g. malformed phone number)
+ */
+const PERMANENT_CODES = new Set([131026, 131051, 131052, 100]);
+
+/** 429 and 5xx are always worth retrying; 4xx with a permanent code is not. */
+export function isPermanentFailure(status: number, code?: number): boolean {
+  if (status === 429 || status >= 500) return false;
+  if (code !== undefined && PERMANENT_CODES.has(code)) return true;
+  return false;
+}
+
+/** Pulls Meta's numeric error code out of an error response body. */
+export function parseMetaErrorCode(body: string): number | undefined {
+  try {
+    const parsed = JSON.parse(body) as { error?: { code?: number } };
+    return typeof parsed.error?.code === "number" ? parsed.error.code : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function sendWhatsAppMessage(
   to: string,
   body: string,
@@ -48,7 +98,7 @@ export async function sendWhatsAppMessage(
   if (!res.ok) {
     const err = await res.text();
     console.error(`[WhatsApp outbound] Meta API error ${res.status}: ${err}`);
-    throw new Error(`WhatsApp send failed: ${res.status}`);
+    throw new WhatsAppSendError(`WhatsApp outbound send failed: ${res.status}`, res.status, parseMetaErrorCode(err));
   }
 }
 
@@ -108,7 +158,7 @@ export async function sendWhatsAppButtons(
   if (!res.ok) {
     const err = await res.text();
     console.error(`[WhatsApp buttons] Meta API error ${res.status}: ${err}`);
-    throw new Error(`WhatsApp interactive send failed: ${res.status}`);
+    throw new WhatsAppSendError(`WhatsApp buttons send failed: ${res.status}`, res.status, parseMetaErrorCode(err));
   }
 }
 
@@ -175,7 +225,7 @@ export async function sendWhatsAppList(
   if (!res.ok) {
     const err = await res.text();
     console.error(`[WhatsApp list] Meta API error ${res.status}: ${err}`);
-    throw new Error(`WhatsApp list send failed: ${res.status}`);
+    throw new WhatsAppSendError(`WhatsApp list send failed: ${res.status}`, res.status, parseMetaErrorCode(err));
   }
 }
 
@@ -221,6 +271,6 @@ export async function sendWhatsAppTemplate(
   if (!res.ok) {
     const err = await res.text();
     console.error(`[WhatsApp template] Meta API error ${res.status}: ${err}`);
-    throw new Error(`WhatsApp template send failed: ${res.status}`);
+    throw new WhatsAppSendError(`WhatsApp template send failed: ${res.status}`, res.status, parseMetaErrorCode(err));
   }
 }

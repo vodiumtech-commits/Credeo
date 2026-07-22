@@ -11,7 +11,8 @@ import { normalisePhone, formatNaira } from "../src/lib/utils";
 import { encryptSecret, decryptSecret } from "../src/lib/crypto/secrets";
 import { signOrderToken, verifyOrderToken, signAmbassadorToken, verifyAmbassadorToken, signInvoiceToken } from "../src/lib/bnpl-token";
 import { normaliseAmbassadorCode } from "../src/lib/referral";
-import { detectIntent, parseInvoiceItem, step, type SessionContext } from "../src/lib/whatsapp/state-machine";
+import { detectIntent, parseInvoiceItem, parseQuickCredit, step, type SessionContext } from "../src/lib/whatsapp/state-machine";
+import { isPermanentFailure, parseMetaErrorCode } from "../src/lib/whatsapp/outbound";
 import { signVerification, verifyVerification, maskPhone } from "../src/lib/customer-verify-token";
 import { ADMIN_ROUTE_ROLES } from "../src/lib/session-cookies";
 
@@ -104,6 +105,65 @@ test("WhatsApp invoice flow walks to a CREATE_INVOICE side effect", () => {
     assert.equal(effect.data.dueInMinutes, 7 * 1440);
   }
   assert.equal(ctx.invStep, null); // flow context cleared
+});
+
+test("one-shot ADD collapses six prompts into one message", () => {
+  const q = parseQuickCredit("ADD Chidi Okeke 08012345678 2500 7d");
+  assert.ok(q, "should parse the documented one-shot form");
+  assert.equal(q!.customerName, "Chidi Okeke");
+  assert.equal(q!.customerPhone, "08012345678");
+  assert.equal(q!.amount, 2500);
+  assert.equal(q!.dueInMinutes, 7 * 1440);
+
+  // Due date is optional and defaults to a week.
+  const noDue = parseQuickCredit("ADD Ada 08031234567 1500");
+  assert.equal(noDue?.dueInMinutes, 7 * 1440);
+  assert.equal(noDue?.amount, 1500);
+
+  // A trailing bare number is the AMOUNT, never "N days" — otherwise
+  // "ADD Ada 0803... 1500" would silently become a 1500-day credit.
+  assert.equal(parseQuickCredit("ADD Ada 08031234567 1500")?.amount, 1500);
+
+  // Money formatting and other due forms survive.
+  assert.equal(parseQuickCredit("ADD Ada 08031234567 ₦2,500 END")?.amount, 2500);
+  assert.equal(parseQuickCredit("ADD Ada 08031234567 900 2h")?.dueInMinutes, 120);
+
+  // Incomplete input falls back to the guided flow rather than guessing.
+  assert.equal(parseQuickCredit("ADD"), null);
+  assert.equal(parseQuickCredit("ADD Chidi"), null);
+  assert.equal(parseQuickCredit("ADD Chidi 2500"), null, "no phone → guided flow");
+  assert.equal(parseQuickCredit("ADD Chidi 08012345678 abc"), null, "no amount");
+
+  // And the intent router must recognise the argument form at all.
+  assert.equal(detectIntent("ADD Chidi 08012345678 2500"), "ADD");
+  assert.equal(detectIntent("ADD"), "ADD");
+});
+
+test("one-shot ADD jumps straight to the reminder question", () => {
+  const r = step(
+    { state: "IDLE", context: {}, vendorId: "vendor_1" } as SessionContext,
+    { body: "ADD Chidi Okeke 08012345678 2500 7d", fromPhone: "+2348030000000" },
+  );
+  assert.equal(r.nextState, "ADDING_CREDIT_REMINDER");
+  assert.equal(r.contextPatch?.creditCustomerName, "Chidi Okeke");
+  assert.equal(r.contextPatch?.creditAmount, 2500);
+  assert.deepEqual(r.buttons?.map((b) => b.id), ["REMIND", "NOREMIND"]);
+});
+
+test("permanent vs transient WhatsApp failures are classified correctly", () => {
+  // Blocked / not-on-WhatsApp → never retry.
+  assert.equal(isPermanentFailure(400, 131026), true, "undeliverable");
+  assert.equal(isPermanentFailure(400, 100), true, "invalid number");
+  // Rate limits and outages → always retry.
+  assert.equal(isPermanentFailure(429, 131026), false, "rate limit wins");
+  assert.equal(isPermanentFailure(500), false);
+  assert.equal(isPermanentFailure(503, 100), false, "outage wins");
+  // Unknown 4xx → treat as transient rather than silently giving up.
+  assert.equal(isPermanentFailure(400, 999999), false);
+  assert.equal(isPermanentFailure(400), false);
+
+  assert.equal(parseMetaErrorCode('{"error":{"code":131026,"message":"x"}}'), 131026);
+  assert.equal(parseMetaErrorCode("not json"), undefined);
 });
 
 test("ADD flow asks whether to remind the customer and stores the choice", () => {

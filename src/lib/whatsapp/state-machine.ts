@@ -70,6 +70,8 @@ export function detectIntent(body: string): Intent {
   const t = body.trim().toUpperCase();
   if (t === "START" || t === "BEGIN" || t === "HI" || t === "HELLO") return "START";
   if (t === "ADD" || t === "NEW" || t === "CREDIT")                   return "ADD";
+  // "ADD Chidi 08012345678 2500 7d" — the one-shot form the dashboard advertises
+  if (/^(ADD|NEW|CREDIT)\s+\S/.test(t))                                return "ADD";
   if (t === "INVOICE" || t === "BILL")                                 return "INVOICE";
   if (t.startsWith("PAID"))                                            return "PAID";
   if (t === "LIST" || t === "OWE" || t === "OWING" || t === "WHO")   return "LIST";
@@ -353,9 +355,27 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
       }
       return { reply: messages.onboardingAskName(), nextState: "ONBOARDING_NAME" };
 
-    case "ADD":
+    case "ADD": {
       if (!session.vendorId) return { reply: messages.noVendorAccount(), nextState: "IDLE" };
+
+      // One-shot: "ADD Chidi 08012345678 2500 7d" skips all six prompts.
+      const quick = parseQuickCredit(body);
+      if (quick) {
+        return {
+          reply: messages.addCreditAskReminders(quick.customerName),
+          nextState: "ADDING_CREDIT_REMINDER",
+          contextPatch: {
+            creditCustomerName: quick.customerName,
+            creditCustomerPhone: quick.customerPhone,
+            creditAmount: quick.amount,
+            creditDueMinutes: quick.dueInMinutes,
+          },
+          buttons: REMINDER_BUTTONS,
+        };
+      }
+
       return { reply: messages.addCreditAskCustomer(), nextState: "ADDING_CREDIT_STUDENT", buttons: CANCEL_BUTTON };
+    }
 
     case "INVOICE":
       if (!session.vendorId) return { reply: messages.noVendorAccount(), nextState: "IDLE" };
@@ -531,6 +551,61 @@ const INVOICE_CONFIRM_BUTTONS: BotButton[] = [
   { id: "SEND",   title: "Send it ✓" },
   { id: "CANCEL", title: "Cancel" },
 ];
+
+export interface QuickCredit {
+  customerName: string;
+  customerPhone: string;
+  amount: number;
+  dueInMinutes: number;
+}
+
+/**
+ * One-shot credit entry: `ADD Chidi Okeke 08012345678 2500 7d`.
+ *
+ * This is the 15-second path the product principle asks for — one message
+ * instead of six prompts. Order is fixed and unambiguous because each field has
+ * a distinct shape: the phone is the long digit run, the amount is the money,
+ * the optional trailing token is the due date, and whatever is left is the name.
+ *
+ * Returns null when the message isn't a complete one-shot (the caller then
+ * falls back to the guided flow), so a bare "ADD" still works as before.
+ */
+export function parseQuickCredit(input: string): QuickCredit | null {
+  const body = input.trim().replace(/^(ADD|NEW|CREDIT)\s+/i, "");
+  const tokens = body.split(/\s+/).filter(Boolean);
+  if (tokens.length < 3) return null; // needs at least name + phone + amount
+
+  // Due date: only if the LAST token looks like a duration/date, never a bare
+  // number — a trailing bare number is the amount, not "N days".
+  let dueInMinutes = 7 * 1440; // sensible default: one week
+  const last = tokens[tokens.length - 1];
+  if (/^(\d+\s*[mhdMHD]|END|end|\d{1,2}[-/]\d{1,2}[-/]\d{4})$/.test(last)) {
+    const parsed = parseDueDuration(last);
+    if (!parsed) return null;
+    dueInMinutes = parsed;
+    tokens.pop();
+  }
+  if (tokens.length < 3) return null;
+
+  // Amount is the last remaining token.
+  const amount = parseAmount(tokens[tokens.length - 1]);
+  if (!amount) return null;
+  tokens.pop();
+
+  // Phone: the last token that is a plausible run of digits.
+  let phoneIdx = -1;
+  for (let i = tokens.length - 1; i >= 0; i--) {
+    if (tokens[i].replace(/\D/g, "").length >= 7) { phoneIdx = i; break; }
+  }
+  if (phoneIdx === -1) return null;
+  const customerPhone = tokens[phoneIdx];
+  tokens.splice(phoneIdx, 1);
+
+  const customerName = tokens.join(" ").trim();
+  if (customerName.length < 2 || /^[\d+]/.test(customerName)) return null;
+
+  return { customerName, customerPhone, amount, dueInMinutes };
+}
 
 /**
  * Parses "Rice, 2, 1500" (item, qty, unit price) or "Delivery, 500" (qty 1).
