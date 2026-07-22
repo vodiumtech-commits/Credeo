@@ -21,12 +21,44 @@ export function NotificationBell() {
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   useEffect(() => {
-    // Initial fetch
-    fetchNotifications();
+    // Poll only while the tab is actually being looked at.
+    //
+    // The old version polled every 30s unconditionally, so a dashboard left
+    // open in a background tab kept hitting the API ~2,880 times a day — each
+    // request paying middleware HMAC verification plus a database query. That
+    // is the single largest consumer of serverless CPU in this app, and none
+    // of it is useful: nobody is reading a hidden tab. Notifications are not
+    // real-time critical, so a slower cadence plus an immediate refresh when
+    // the tab regains focus is both cheaper and no worse to use.
+    const POLL_MS = 120_000;
+    let interval: ReturnType<typeof setInterval> | undefined;
 
-    // Poll every 30 seconds for new notifications
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
+    function start() {
+      if (interval !== undefined) return;
+      interval = setInterval(fetchNotifications, POLL_MS);
+    }
+    function stop() {
+      if (interval === undefined) return;
+      clearInterval(interval);
+      interval = undefined;
+    }
+    function onVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        fetchNotifications(); // catch up immediately on return
+        start();
+      } else {
+        stop();
+      }
+    }
+
+    fetchNotifications();
+    if (document.visibilityState === "visible") start();
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, []);
 
   useEffect(() => {
