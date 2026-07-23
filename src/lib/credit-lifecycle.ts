@@ -1,11 +1,13 @@
 import { prisma } from "@/lib/prisma";
-import { sendWhatsAppMessage } from "@/lib/whatsapp/outbound";
+import { sendWhatsAppMessage, WhatsAppSendError } from "@/lib/whatsapp/outbound";
 import { getOrgChannelCredentials, type ChannelCredentials } from "@/lib/whatsapp/channel-token";
 import { createReminderPrefResolver } from "@/lib/reminder-prefs";
 import { messages } from "@/lib/whatsapp/messages";
 
 const DEFAULT_SCORE_DELTA = -80;
 const OVERDUE_REMINDER_INTERVAL_MS = 3 * 86_400_000;
+/** Escalate a reminder the customer never answered after this long. */
+const ESCALATION_AFTER_MS = 2 * 60 * 60 * 1000; // 2 hours
 
 // Ongoing penalty: a customer who stays in default loses points every day until
 // they pay. Floored so default decay alone can't zero out a score.
@@ -257,4 +259,81 @@ export async function sendOverdueReminders(scope: LifecycleScope & { force?: boo
   }
 
   return { sent, failed, skipped, total: grouped.size, vendorSentCount };
+}
+
+/**
+ * Firmer follow-up when a reminder goes unanswered.
+ *
+ * A customer who neither replied nor paid within ESCALATION_AFTER_MS of a
+ * reminder gets one louder WhatsApp nudge, and the vendor is told to follow up
+ * in person. Fires AT MOST ONCE per credit (guarded by escalatedAt), so the
+ * total cost is capped at one extra message — this keeps WhatsApp quota under
+ * control while still chasing silent debtors.
+ *
+ * "Answered" = replied or paid (reminderRespondedAt). We deliberately do NOT
+ * depend on WhatsApp read receipts: many customers disable them, which would
+ * make everyone look unread and escalate the whole book.
+ */
+export async function sendEscalations(scope: LifecycleScope = {}) {
+  const now = scope.now ?? new Date();
+  const cutoff = new Date(now.getTime() - ESCALATION_AFTER_MS);
+
+  const stale = await prisma.credit.findMany({
+    where: {
+      ...(scope.vendorId ? { vendorId: scope.vendorId } : {}),
+      status: { in: ["OUTSTANDING", "DUE_SOON", "OVERDUE"] },
+      remindersEnabled: true,
+      reminderSentAt: { not: null, lte: cutoff },
+      reminderRespondedAt: null,
+      escalatedAt: null,
+      student: { whatsappBlockedAt: null, NOT: { phone: { startsWith: "pending:" } } },
+    },
+    include: { student: true, vendor: true },
+    orderBy: { reminderSentAt: "asc" },
+    take: 200, // bound each run so a backlog can't blow the CPU/quota budget
+  });
+
+  // Respect the merchant-level pre-due reminder switch — if they turned off
+  // customer messaging, don't escalate either.
+  const remindersAllowed = createReminderPrefResolver();
+
+  let sent = 0;
+  let failed = 0;
+  let skipped = 0;
+
+  for (const credit of stale) {
+    if (!(await remindersAllowed(credit.vendor.organizationId, "preDue"))) {
+      skipped++;
+      continue;
+    }
+
+    const owed = Number(credit.amount) - Number(credit.amountRepaid);
+    const body = messages.escalationToCustomer(credit.student.fullName, credit.vendor.businessName, owed);
+
+    try {
+      await sendWhatsAppMessage(credit.student.phone, body);
+      await prisma.credit.update({ where: { id: credit.id }, data: { escalatedAt: now } });
+      await prisma.notification.create({
+        data: {
+          vendorId: credit.vendorId,
+          title: "Customer not responding",
+          message: `${credit.student.fullName} hasn't answered the reminder for ₦${owed.toLocaleString()}. We sent a firmer follow-up — you may want to reach out directly.`,
+          type: "WARNING",
+        },
+      });
+      sent++;
+    } catch (err) {
+      failed++;
+      // A blocked / unreachable number: stop escalating and record it, same as
+      // the pre-due path, so we never retry a dead number.
+      if (err instanceof WhatsAppSendError && err.permanent) {
+        await prisma.student.update({ where: { id: credit.student.id }, data: { whatsappBlockedAt: now } }).catch(() => {});
+        await prisma.credit.update({ where: { id: credit.id }, data: { escalatedAt: now } }).catch(() => {});
+      } else {
+        console.error(`[escalations] failed for credit ${credit.id}:`, err);
+      }
+    }
+  }
+
+  return { sent, failed, skipped, total: stale.length };
 }

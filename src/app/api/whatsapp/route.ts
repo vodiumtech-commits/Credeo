@@ -233,6 +233,14 @@ export async function POST(req: NextRequest) {
         : vendorByPhone;
 
     if (!vendor) {
+      // Any reply from a customer counts as "responded" — mark their open
+      // reminded credits so the escalation sweep leaves them alone. Cheap and
+      // fire-and-forget; never block the reply on it.
+      prisma.credit.updateMany({
+        where: { student: { phone: fromPhone }, reminderSentAt: { not: null }, reminderRespondedAt: null, status: { in: ["OUTSTANDING", "DUE_SOON", "OVERDUE"] } },
+        data: { reminderRespondedAt: new Date() },
+      }).catch((err) => console.error("[whatsapp] responded-stamp failed:", err));
+
       // Customers replying "PAID" to a reminder raise a claim — the vendor must
       // confirm before the credit is actually marked paid.
       const claimHandled = await handleCustomerPaidClaim(fromPhone, messageText, creds);

@@ -323,6 +323,8 @@ model Credit {
   remindersEnabled      Boolean  @default(true)  // vendor's per-credit choice: message the customer or not
   reminderSentAt        DateTime?      // set when a pre-due reminder is dispatched
   overdueReminderSentAt DateTime?      // set when the latest overdue reminder is dispatched
+  reminderRespondedAt   DateTime?      // customer replied or paid after a reminder
+  escalatedAt           DateTime?      // firmer follow-up sent after silence
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

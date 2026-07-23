@@ -329,6 +329,12 @@ export const messages = {
     `We checked with *${vendorBusinessName}* and the *${formatNaira(amount)}* stands. ` +
     `If you still disagree, please reply here and a human will help.`,
 
+  // ── Escalation: firmer follow-up after a reminder goes unanswered ────────
+  escalationToCustomer: (customerName: string, vendorBusinessName: string, amount: number) =>
+    `Hi *${customerName}*,\n\n` +
+    `This is a follow-up from *${vendorBusinessName}* — your balance of *${formatNaira(amount)}* is still open and we haven't heard back.\n\n` +
+    `Please settle it as soon as you can, or reply here to let them know when you'll pay. Paying keeps your Vodium score healthy for future credit. 🙏`,
+
   // ── Proactive reminders (sent to customers) ─────────────────────────────
   reminderToCustomer: (
     customerName: string,

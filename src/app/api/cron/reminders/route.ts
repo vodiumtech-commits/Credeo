@@ -13,7 +13,7 @@ import { prisma } from "@/lib/prisma";
 import { sendWhatsAppButtons, WhatsAppSendError } from "@/lib/whatsapp/outbound";
 import { messages } from "@/lib/whatsapp/messages";
 import { reminderLeadMinutesForDue } from "@/lib/whatsapp/state-machine";
-import { applyDailyDefaultDecay, markOverdueCredits, sendOverdueReminders } from "@/lib/credit-lifecycle";
+import { applyDailyDefaultDecay, markOverdueCredits, sendOverdueReminders, sendEscalations } from "@/lib/credit-lifecycle";
 import { createReminderPrefResolver } from "@/lib/reminder-prefs";
 import { markOverdueInvoices, sendOverdueInvoiceReminders } from "@/lib/invoice-lifecycle";
 
@@ -41,6 +41,8 @@ export async function GET(req: NextRequest) {
   const overdueLifecycle = await markOverdueCredits({ now });
   const defaultDecay = await applyDailyDefaultDecay({ now });
   const overdueReminders = await sendOverdueReminders({ now });
+  // Firmer follow-up to anyone who ignored a reminder ≥2h ago (once per credit).
+  const escalations = await sendEscalations({ now });
 
   // Invoices follow the same stream: mark overdue, then remind.
   const overdueInvoices = await markOverdueInvoices({ now });
@@ -195,6 +197,7 @@ export async function GET(req: NextRequest) {
     sent: totalSent,
     failed: totalFailed,
     blocked, // customers newly marked unreachable this run
+    escalations,
     total: credits.length + overdueReminders.total,
     skipped: { preDue: skipped, overdue: overdueReminders.skipped, invoices: invoiceReminders.skipped },
     overdue: overdueLifecycle,
