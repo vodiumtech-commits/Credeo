@@ -88,6 +88,7 @@ export async function POST(req: NextRequest) {
       organizationId: ctx.organizationId,
       fullName: data.customerName,
       phone: data.customerPhone,
+      actingVendorPhone: ctx.vendor.phone,
     });
 
     const coupon = data.couponCode

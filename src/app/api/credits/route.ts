@@ -112,13 +112,11 @@ export async function POST(req: NextRequest) {
   }
   const customerPhoneKey = normalisedCustomerPhone ?? `pending:${Date.now()}`;
 
-  const existingVendor = await prisma.vendor.findUnique({
-    where: { phone: customerPhoneKey },
-    select: { businessName: true },
-  });
-  if (existingVendor) {
+  // Anyone can be a debtor, including another shop's vendor — the shared credit
+  // graph is keyed by phone. The only number we refuse is the vendor's own.
+  if (normalisedCustomerPhone && normalisedCustomerPhone === normalisePhoneNG(vendor.phone)) {
     return NextResponse.json(
-      { error: "This phone number belongs to a vendor account. Use the customer's WhatsApp number." },
+      { error: "You can't log a credit against your own number." },
       { status: 409 }
     );
   }

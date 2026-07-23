@@ -76,6 +76,7 @@ export async function POST(req: NextRequest) {
       organizationId: ctx.organizationId,
       fullName: data.customerName,
       phone: data.customerPhone,
+      actingVendorPhone: ctx.vendor.phone,
     });
 
     const invoice = await prisma.invoice.create({

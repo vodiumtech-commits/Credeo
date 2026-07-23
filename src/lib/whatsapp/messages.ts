@@ -59,7 +59,7 @@ export const messages = {
 
   addCreditAskPhone: (customerName: string) =>
     `What is *${customerName}'s* WhatsApp number?\n\n` +
-    `We need this to send them a polite reminder. Send the number in any format.\n\n` +
+    `Type it, or tap 📎 and *share their contact* — no typing needed.\n\n` +
     `Example: *08012345678*`,
 
   addCreditAskAmount: (customerName: string) =>
@@ -132,7 +132,7 @@ export const messages = {
 
   invoiceAskPhone: (customerName: string) =>
     `What is *${customerName}'s* WhatsApp number?\n\n` +
-    `The invoice will be sent to them there.\n\n` +
+    `Type it, or tap 📎 and *share their contact*. The invoice goes to them there.\n\n` +
     `Example: *08012345678*`,
 
   invoiceAskItems: (customerName: string) =>

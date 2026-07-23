@@ -49,13 +49,19 @@ interface MetaTextMessage {
   from:      string;   // E.164 without "+"
   id:        string;
   timestamp: string;
-  type:      "text" | "interactive" | string;
+  type:      "text" | "interactive" | "contacts" | string;
   text?:     { body: string };
   interactive?: {
     type: string;
     button_reply?: { id: string; title: string };
     list_reply?:   { id: string; title: string };
   };
+  // Sent when a user shares a phone contact (📎 → Contact). Lets a vendor pick
+  // the debtor from their address book instead of typing the number.
+  contacts?: Array<{
+    name?:  { formatted_name?: string };
+    phones?: Array<{ phone?: string; wa_id?: string }>;
+  }>;
 }
 
 interface MetaWebhook {
@@ -73,6 +79,17 @@ interface MetaWebhook {
       };
     }>;
   }>;
+}
+
+/**
+ * Pull a usable phone number out of a shared WhatsApp contact card. Prefers the
+ * WhatsApp id (already normalised) and falls back to the raw phone field.
+ */
+function sharedContactPhone(contacts: MetaTextMessage["contacts"]): string | undefined {
+  const phone = contacts?.[0]?.phones?.[0];
+  if (!phone) return undefined;
+  const raw = phone.wa_id ?? phone.phone;
+  return raw ? raw.trim() : undefined;
 }
 
 // ── GET — webhook verification ────────────────────────────────────────────────
@@ -143,12 +160,17 @@ export async function POST(req: NextRequest) {
 
   // Text messages carry a body; button taps arrive as "interactive" replies whose
   // id we treat exactly like typed text (e.g. tapping [Add credit] sends "ADD").
+  // A shared contact card becomes its phone number, so at any "what's the
+  // number?" step a vendor can pick the debtor from their contacts instead of
+  // typing — the phone-parsing steps strip non-digits anyway.
   const rawText =
     message?.type === "text"
       ? message.text?.body
       : message?.type === "interactive"
         ? message.interactive?.button_reply?.id ?? message.interactive?.list_reply?.id
-        : undefined;
+        : message?.type === "contacts"
+          ? sharedContactPhone(message.contacts)
+          : undefined;
 
   // Silently ack status updates, delivery receipts, unsupported media, etc.
   if (!message || !rawText?.trim()) {
@@ -652,13 +674,12 @@ async function runSideEffect(
         select: { businessName: true, communityId: true, organizationId: true, branchId: true },
       });
 
-      const existingVendor = await prisma.vendor.findUnique({
-        where: { phone: normalCustomerPhone },
-        select: { businessName: true },
-      });
-      if (existingVendor) {
+      // Anyone can be a debtor, including another shop's vendor — the only
+      // number we refuse is the vendor's OWN (you don't owe yourself).
+      if (normalCustomerPhone === fromPhone) {
         return {
-          replyOverride: "That phone number belongs to a vendor account. Please use the customer's WhatsApp number and try ADD again.", buttonsOverride: [{ id: "ADD", title: "Try again" }] as WhatsAppButton[],
+          replyOverride: "That's your own number 🙂 — you can't log a credit against yourself. Send the customer's WhatsApp number.",
+          buttonsOverride: [{ id: "ADD", title: "Try again" }] as WhatsAppButton[],
         };
       }
 
@@ -831,6 +852,7 @@ async function runSideEffect(
           organizationId: vendor.organizationId,
           fullName: customerName,
           phone: customerPhone,
+          actingVendorPhone: vendor.phone,
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : "I couldn't save that customer.";

@@ -36,16 +36,19 @@ export async function getOrCreateCustomerForVendor(input: {
   organizationId: string | null;
   fullName: string;
   phone: string;
+  /** The acting vendor's own phone — used only to block self-credit. */
+  actingVendorPhone?: string | null;
 }) {
   const phone = normalisePhone(input.phone);
   if (!phone) throw new Error("Enter a valid customer phone number.");
 
-  const vendorPhoneOwner = await prisma.vendor.findUnique({
-    where: { phone },
-    select: { id: true },
-  });
-  if (vendorPhoneOwner) {
-    throw new Error("This phone number belongs to a vendor account. Use the customer's phone number.");
+  // A vendor can be a debtor at another shop — the customer graph is shared by
+  // phone. The one thing we forbid is a vendor logging a credit against their
+  // OWN number: you don't extend credit to yourself, and allowing it would let
+  // a vendor inflate their own Vodium score.
+  const ownPhone = input.actingVendorPhone ? normalisePhone(input.actingVendorPhone) : null;
+  if (ownPhone && ownPhone === phone) {
+    throw new Error("You can't log a credit against your own number.");
   }
 
   const existing = await prisma.student.findUnique({ where: { phone } });
