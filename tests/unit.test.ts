@@ -270,6 +270,13 @@ test("marketing routes are restricted to super admin + marketing", () => {
   assert.ok(!roleFor("/admin/disputes").includes("MARKETING"));
 });
 
+test("WhatsApp bot-profile route is super-admin only", () => {
+  const roles = ADMIN_ROUTE_ROLES.find((r) => "/api/admin/whatsapp-profile".startsWith(r.prefix))?.roles ?? [];
+  assert.deepEqual([...roles], ["SUPER_ADMIN"], "only the super admin manages the bot's public identity");
+  // Must not fall through to a broader catch-all.
+  assert.ok(roles.length === 1);
+});
+
 test("dispute routes are restricted to super admin + customer care", () => {
   // The rules are first-match-wins and end in a catch-all that allows every
   // role, so a dispute rule must be matched BEFORE "/admin" / "/api/admin".

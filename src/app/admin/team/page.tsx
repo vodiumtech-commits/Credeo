@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Users, UserPlus, Trash2, Mail, RefreshCw, Loader2, CheckCircle2, Clock, Shield, X } from "lucide-react";
+import { BotProfilePanel } from "@/components/admin/bot-profile-panel";
 
 type AdminRole = "SUPER_ADMIN" | "CFO" | "CUSTOMER_CARE" | "ANALYTICS" | "MARKETING";
 
@@ -301,6 +302,9 @@ export default function AdminTeamPage() {
           The <strong className="text-vodium-cream/70">Super Admin</strong> account (accessed via the master password) is not listed here and cannot be deleted. Staff admin accounts created here use email + password login.
         </p>
       </div>
+
+      {/* Bot's public identity — logo + profile customers see on WhatsApp */}
+      <BotProfilePanel />
     </div>
   );
 }
