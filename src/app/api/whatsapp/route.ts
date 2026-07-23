@@ -23,6 +23,7 @@ import { signInvoiceToken } from "../../../lib/bnpl-token";
 import { messages } from "../../../lib/whatsapp/messages";
 import { sendWhatsAppButtons, sendWhatsAppList, sendWhatsAppMessage, type WhatsAppButton } from "../../../lib/whatsapp/outbound";
 import { getOrgChannelCredentials } from "../../../lib/whatsapp/channel-token";
+import { contactPhoneFrom } from "../../../lib/whatsapp/contact";
 import { parseCommunity } from "../../../lib/community";
 import { createSoloOrganizationForVendor, trialEndsAt } from "../../../lib/tenant";
 import {
@@ -79,17 +80,6 @@ interface MetaWebhook {
       };
     }>;
   }>;
-}
-
-/**
- * Pull a usable phone number out of a shared WhatsApp contact card. Prefers the
- * WhatsApp id (already normalised) and falls back to the raw phone field.
- */
-function sharedContactPhone(contacts: MetaTextMessage["contacts"]): string | undefined {
-  const phone = contacts?.[0]?.phones?.[0];
-  if (!phone) return undefined;
-  const raw = phone.wa_id ?? phone.phone;
-  return raw ? raw.trim() : undefined;
 }
 
 // ── GET — webhook verification ────────────────────────────────────────────────
@@ -169,7 +159,7 @@ export async function POST(req: NextRequest) {
       : message?.type === "interactive"
         ? message.interactive?.button_reply?.id ?? message.interactive?.list_reply?.id
         : message?.type === "contacts"
-          ? sharedContactPhone(message.contacts)
+          ? contactPhoneFrom(message.contacts)
           : undefined;
 
   // Silently ack status updates, delivery receipts, unsupported media, etc.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -12,7 +12,14 @@ import {
   AlertCircle,
   ShieldCheck,
   Loader2,
+  BookUser,
 } from "lucide-react";
+
+// The browser Contact Picker API (Chrome on Android; installed PWA). Typed
+// locally because it's not in the ambient DOM lib. Feature-detected before use.
+type ContactsManager = {
+  select: (props: string[], opts?: { multiple?: boolean }) => Promise<Array<{ name?: string[]; tel?: string[] }>>;
+};
 import { formatNaira } from "@/lib/utils";
 import { ShimmerButton } from "@/components/ui/shimmer-button";
 
@@ -64,6 +71,30 @@ export default function NewCreditPage() {
 
   function update(f: keyof typeof form, v: string) {
     setForm((p) => ({ ...p, [f]: v }));
+  }
+
+  // "Pick from contacts" — the real, tappable contact picker. It only exists in
+  // the browser (Chrome/Android, installed PWA), never inside WhatsApp, because
+  // WhatsApp does not let a bot browse a user's address book.
+  const [contactsSupported, setContactsSupported] = useState(false);
+  useEffect(() => {
+    setContactsSupported(typeof navigator !== "undefined" && "contacts" in navigator);
+  }, []);
+
+  async function pickFromContacts() {
+    try {
+      const mgr = (navigator as unknown as { contacts?: ContactsManager }).contacts;
+      if (!mgr) return;
+      const picked = await mgr.select(["name", "tel"], { multiple: false });
+      const chosen = picked[0];
+      if (!chosen) return;
+      const tel = chosen.tel?.[0];
+      const name = chosen.name?.[0];
+      if (tel) update("phone", tel.replace(/\s+/g, ""));
+      if (name && !form.customerName.trim()) update("customerName", name);
+    } catch {
+      // The user cancelled the picker, or permission was denied — no-op.
+    }
   }
 
   async function loadScorePreview() {
@@ -363,14 +394,26 @@ export default function NewCreditPage() {
               label="WhatsApp number"
               hint="For sending automated reminders."
             >
-              <input
-                type="tel"
-                inputMode="tel"
-                placeholder="0801 234 5678"
-                value={form.phone}
-                onChange={(e) => update("phone", e.target.value)}
-                className="input-dark"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  placeholder="0801 234 5678"
+                  value={form.phone}
+                  onChange={(e) => update("phone", e.target.value)}
+                  className="input-dark flex-1"
+                />
+                {contactsSupported && (
+                  <button
+                    type="button"
+                    onClick={pickFromContacts}
+                    className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-vodium-gold/30 bg-vodium-gold/[0.06] px-3 text-sm text-vodium-gold hover:bg-vodium-gold/10 transition-colors"
+                    title="Pick the customer from your phone contacts"
+                  >
+                    <BookUser size={15} /> Contacts
+                  </button>
+                )}
+              </div>
             </StepField>
 
             <div className="flex justify-end pt-2">

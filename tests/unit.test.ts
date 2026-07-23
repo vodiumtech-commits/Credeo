@@ -13,6 +13,7 @@ import { signOrderToken, verifyOrderToken, signAmbassadorToken, verifyAmbassador
 import { normaliseAmbassadorCode } from "../src/lib/referral";
 import { detectIntent, parseInvoiceItem, parseQuickCredit, step, type SessionContext } from "../src/lib/whatsapp/state-machine";
 import { isPermanentFailure, parseMetaErrorCode } from "../src/lib/whatsapp/outbound";
+import { contactPhoneFrom } from "../src/lib/whatsapp/contact";
 import { signVerification, verifyVerification, maskPhone } from "../src/lib/customer-verify-token";
 import { ADMIN_ROUTE_ROLES } from "../src/lib/session-cookies";
 
@@ -105,6 +106,37 @@ test("WhatsApp invoice flow walks to a CREATE_INVOICE side effect", () => {
     assert.equal(effect.data.dueInMinutes, 7 * 1440);
   }
   assert.equal(ctx.invStep, null); // flow context cleared
+});
+
+test("shared WhatsApp contact card yields the customer's number", () => {
+  // The exact shape Meta delivers for 📎 → Contact.
+  assert.equal(
+    contactPhoneFrom([{ name: { formatted_name: "Chidi" }, phones: [{ phone: "+234 801 234 5678", wa_id: "2348012345678", type: "CELL" }] }]),
+    "2348012345678",
+    "prefers the normalised wa_id",
+  );
+  // Contact not on WhatsApp → no wa_id, only a formatted phone. Still usable.
+  assert.equal(
+    contactPhoneFrom([{ phones: [{ phone: "0803-123-4567" }] }]),
+    "0803-123-4567",
+  );
+  // Several numbers: take the first that has enough digits.
+  assert.equal(
+    contactPhoneFrom([{ phones: [{ phone: "123" }, { wa_id: "2348030000000" }] }]),
+    "2348030000000",
+  );
+  // Email-only card (no phones) → nothing, so the bot ignores it gracefully.
+  assert.equal(contactPhoneFrom([{ name: { formatted_name: "No Phone" }, phones: [] }]), undefined);
+  assert.equal(contactPhoneFrom(undefined), undefined);
+
+  // End to end: sharing a contact at the phone step advances the ADD flow.
+  const shared = contactPhoneFrom([{ phones: [{ wa_id: "2348012345678" }] }]);
+  const r = step(
+    { state: "ADDING_CREDIT_PHONE", context: { creditCustomerName: "Chidi" }, vendorId: "vendor_1" } as SessionContext,
+    { body: shared!, fromPhone: "+2348030000000" },
+  );
+  assert.equal(r.nextState, "ADDING_CREDIT_AMOUNT", "the shared number is accepted as the phone");
+  assert.equal(r.contextPatch?.creditCustomerPhone, "2348012345678");
 });
 
 test("one-shot ADD collapses six prompts into one message", () => {
