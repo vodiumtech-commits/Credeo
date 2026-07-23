@@ -25,6 +25,7 @@ import { ShimmerButton } from "@/components/ui/shimmer-button";
 
 type ScorePreview = {
   found: boolean;
+  blacklisted?: boolean;
   fullName?: string;
   score: number;
   band: string;
@@ -740,6 +741,9 @@ function ScoreBanner({ preview, loading }: { preview: ScorePreview | null; loadi
     new: "border-white/[0.1] bg-white/[0.04] text-vodium-cream/60",
   };
   const Icon = preview.tone === "bad" ? AlertCircle : preview.tone === "good" ? ShieldCheck : User;
+  const footnote = preview.blacklisted
+    ? "Reminders can no longer be delivered to this customer — you would have to chase payment yourself."
+    : "Score is shared across every Vodium shop this customer uses. Check before you decide the amount.";
 
   return (
     <div className={`mb-6 flex items-start gap-3 rounded-xl border px-4 py-3.5 text-sm leading-relaxed ${styles[preview.tone]}`}>
@@ -747,9 +751,7 @@ function ScoreBanner({ preview, loading }: { preview: ScorePreview | null; loadi
       <div>
         <p>{preview.warning}</p>
         {preview.found && (
-          <p className="mt-1 text-xs opacity-70">
-            Score is shared across every Vodium shop this customer uses. Check before you decide the amount.
-          </p>
+          <p className="mt-1 text-xs opacity-70">{footnote}</p>
         )}
       </div>
     </div>

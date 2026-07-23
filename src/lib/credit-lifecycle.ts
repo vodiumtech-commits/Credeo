@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { sendWhatsAppMessage, WhatsAppSendError } from "@/lib/whatsapp/outbound";
 import { getOrgChannelCredentials, type ChannelCredentials } from "@/lib/whatsapp/channel-token";
 import { createReminderPrefResolver } from "@/lib/reminder-prefs";
-import { messages } from "@/lib/whatsapp/messages";
+import { messages, payToBlock } from "@/lib/whatsapp/messages";
 
 const DEFAULT_SCORE_DELTA = -80;
 const OVERDUE_REMINDER_INTERVAL_MS = 3 * 86_400_000;
@@ -240,7 +240,8 @@ export async function sendOverdueReminders(scope: LifecycleScope & { force?: boo
           item.student.fullName,
           item.vendor.businessName,
           item.totalOwed,
-          dueText
+          dueText,
+          payToBlock(item.vendor)
         ),
         creds ?? undefined
       );
@@ -308,7 +309,7 @@ export async function sendEscalations(scope: LifecycleScope = {}) {
     }
 
     const owed = Number(credit.amount) - Number(credit.amountRepaid);
-    const body = messages.escalationToCustomer(credit.student.fullName, credit.vendor.businessName, owed);
+    const body = messages.escalationToCustomer(credit.student.fullName, credit.vendor.businessName, owed, payToBlock(credit.vendor));
 
     try {
       await sendWhatsAppMessage(credit.student.phone, body);

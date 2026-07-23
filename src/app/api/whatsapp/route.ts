@@ -644,6 +644,15 @@ async function runSideEffect(
       return { newVendorId: newVendor.id };
     }
 
+    case "SAVE_BANK": {
+      const { bankName, accountNumber, accountName } = effect.data;
+      await prisma.vendor.update({
+        where: { id: effect.data.vendorId },
+        data: { bankName, bankAccountNumber: accountNumber, bankAccountName: accountName },
+      });
+      return {}; // the state machine already sent the confirmation
+    }
+
     case "SCORE_PREVIEW": {
       // Warn the vendor about the customer's cross-vendor reliability before they
       // decide the amount. Only overrides the prompt when the customer is known.

@@ -20,6 +20,7 @@ export type Intent =
   | "HELP"
   | "DASHBOARD"
   | "SUPPORT"
+  | "BANK"
   | "FREE_TEXT";
 
 export interface IncomingMessage {
@@ -58,6 +59,7 @@ export type SideEffect =
   | { type: "SCORE_PREVIEW";  data: { customerName: string; customerPhone: string } }
   | { type: "VERIFY_CUSTOMER_CODE"; data: { vendorId: string; code: string } }
   | { type: "RESEND_CUSTOMER_CODE"; data: { vendorId: string } }
+  | { type: "SAVE_BANK";      data: { vendorId: string; bankName: string; accountNumber: string; accountName: string } }
   | { type: "MARK_PAID";      data: { vendorId: string; customerName: string } }
   | { type: "CONFIRM_PAID";   data: { vendorId: string; creditId: string } }
   | { type: "DISPUTE_PAID";   data: { vendorId: string; creditId: string } }
@@ -79,6 +81,7 @@ export function detectIntent(body: string): Intent {
   if (t === "HELP" || t === "?" || t === "MENU" || t === "COMMANDS")  return "HELP";
   if (t === "DASHBOARD" || t === "WEB" || t === "PORTAL")             return "DASHBOARD";
   if (t === "SUPPORT" || t === "AGENT" || t === "HUMAN")              return "SUPPORT";
+  if (t === "ACCOUNT" || t === "BANK" || t === "PAYMENT")              return "BANK";
   return "FREE_TEXT";
 }
 
@@ -117,6 +120,7 @@ const MENU_LIST: BotList = {
     { id: "PAID",      title: "Mark paid",       description: "Record a customer's repayment" },
     { id: "LIST",      title: "Who's owing",     description: "See all outstanding credits" },
     { id: "SCORE",     title: "Check a score",   description: "A customer's reliability score" },
+    { id: "ACCOUNT",   title: "Payment details", description: "Bank details shown on reminders" },
     { id: "DASHBOARD", title: "Dashboard link",  description: "Open your full web dashboard" },
     { id: "SUPPORT",   title: "Talk to a human", description: "Get help within 24 hours" },
   ],
@@ -342,6 +346,9 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
 
   // ── invoice flow (tracked in session context, not a dedicated DB state) ──
 
+  const bankResult = stepBankFlow(session, body);
+  if (bankResult) return bankResult;
+
   const invoiceResult = stepInvoiceFlow(session, body, upperBody);
   if (invoiceResult) return invoiceResult;
 
@@ -421,6 +428,15 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
       return { reply: messages.scoreLookupAsk(), nextState: "LOOKING_UP_SCORE", buttons: CANCEL_BUTTON };
     }
 
+    case "BANK":
+      if (!session.vendorId) return { reply: messages.noVendorAccount(), nextState: "IDLE" };
+      return {
+        reply: messages.bankAskName(),
+        nextState: "IDLE",
+        contextPatch: { ...clearFlowContext(), bankStep: "name" },
+        buttons: CANCEL_BUTTON,
+      };
+
     case "DASHBOARD":
       return {
         reply: `Open your dashboard here:\n${process.env.NEXT_PUBLIC_APP_URL ?? "https://vodiumledger.com"}/dashboard`,
@@ -452,6 +468,56 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
 }
 
 // ─── invoice flow ─────────────────────────────────────────────────────────────
+
+
+function stepBankFlow(session: SessionContext, body: string): StepResult | null {
+  const bankStep = typeof session.context.bankStep === "string" ? session.context.bankStep : null;
+  if (!bankStep) return null;
+
+  switch (bankStep) {
+    case "name":
+      return {
+        reply: messages.bankAskNumber(body),
+        nextState: "IDLE",
+        contextPatch: { bankName: body, bankStep: "number" },
+        buttons: CANCEL_BUTTON,
+      };
+
+    case "number": {
+      const digits = body.replace(/\D/g, "");
+      if (digits.length < 6 || digits.length > 20) {
+        return { reply: messages.bankInvalidNumber(), nextState: "IDLE", buttons: CANCEL_BUTTON };
+      }
+      return {
+        reply: messages.bankAskAccountName(),
+        nextState: "IDLE",
+        contextPatch: { bankAccountNumber: digits, bankStep: "account" },
+        buttons: CANCEL_BUTTON,
+      };
+    }
+
+    case "account": {
+      const bankName = String(session.context.bankName ?? "");
+      const accountNumber = String(session.context.bankAccountNumber ?? "");
+      if (!bankName || !accountNumber) {
+        return { reply: messages.bankAskName(), nextState: "IDLE", contextPatch: { bankStep: "name" }, buttons: CANCEL_BUTTON };
+      }
+      return {
+        reply: messages.bankSaved(bankName, accountNumber, body),
+        nextState: "IDLE",
+        contextPatch: { bankStep: null, bankName: null, bankAccountNumber: null },
+        buttons: MAIN_BUTTONS,
+        sideEffects: [{
+          type: "SAVE_BANK",
+          data: { vendorId: session.vendorId!, bankName, accountNumber, accountName: body },
+        }],
+      };
+    }
+
+    default:
+      return null;
+  }
+}
 
 function stepInvoiceFlow(session: SessionContext, body: string, upperBody: string): StepResult | null {
   const invStep = typeof session.context.invStep === "string" ? session.context.invStep : null;
@@ -749,5 +815,8 @@ function clearFlowContext(): Record<string, null> {
     pcAmount: null,
     pcDue: null,
     pcReminders: null,
+    bankStep: null,
+    bankName: null,
+    bankAccountNumber: null,
   };
 }

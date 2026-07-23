@@ -23,6 +23,21 @@ function invoiceItemLines(items: InvoiceItemEntry[]): string {
     .join("\n");
 }
 
+
+/**
+ * The "how do I pay you" block appended to customer reminders. Returns an empty
+ * string when the vendor hasn't set details, so copy stays clean either way.
+ */
+export function payToBlock(bank?: {
+  bankName?: string | null;
+  bankAccountNumber?: string | null;
+  bankAccountName?: string | null;
+}): string {
+  if (!bank?.bankName || !bank?.bankAccountNumber) return "";
+  const name = bank.bankAccountName ? `\n${bank.bankAccountName}` : "";
+  return `\n\n🏦 *Pay to:*\n${bank.bankName} — ${bank.bankAccountNumber}${name}`;
+}
+
 export const messages = {
   // ── Welcome & onboarding ───────────────────────────────────────────────
   welcome: () =>
@@ -330,10 +345,11 @@ export const messages = {
     `If you still disagree, please reply here and a human will help.`,
 
   // ── Escalation: firmer follow-up after a reminder goes unanswered ────────
-  escalationToCustomer: (customerName: string, vendorBusinessName: string, amount: number) =>
+  escalationToCustomer: (customerName: string, vendorBusinessName: string, amount: number, payTo = "") =>
     `Hi *${customerName}*,\n\n` +
-    `This is a follow-up from *${vendorBusinessName}* — your balance of *${formatNaira(amount)}* is still open and we haven't heard back.\n\n` +
-    `Please settle it as soon as you can, or reply here to let them know when you'll pay. Paying keeps your Vodium score healthy for future credit. 🙏`,
+    `This is a follow-up from *${vendorBusinessName}* — your balance of *${formatNaira(amount)}* is still open and we haven't heard back.` +
+    payTo +
+    `\n\nPlease settle it as soon as you can, or reply here to let them know when you'll pay. Paying keeps your Vodium score healthy for future credit. 🙏`,
 
   // ── Proactive reminders (sent to customers) ─────────────────────────────
   reminderToCustomer: (
@@ -341,11 +357,31 @@ export const messages = {
     vendorBusinessName: string,
     amount: number,
     dueDateText: string,
+    payTo = "",
   ) =>
     `Hi *${customerName}* 👋\n\n` +
-    `Friendly reminder from *${vendorBusinessName}*: you have *${formatNaira(amount)}* due ${dueDateText}.\n\n` +
-    `Paying on time builds your Vodium credit score, it'll help you access better products in future.\n\n` +
+    `Friendly reminder from *${vendorBusinessName}*: you have *${formatNaira(amount)}* due ${dueDateText}.` +
+    payTo +
+    `\n\nPaying on time builds your Vodium credit score, it'll help you access better products in future.\n\n` +
     `Reply *PAID* once you've settled.`,
+
+  // ── Vendor payout details (shown to customers on reminders) ─────────────
+  bankAskName: () =>
+    `Let's add your payment details so customers can pay you directly from a reminder. 🏦\n\n` +
+    `Which bank? Send the name.\n\nExample: *GTBank*`,
+
+  bankAskNumber: (bankName: string) =>
+    `Got it — *${bankName}*.\n\nWhat's the account number?\n\nExample: *0123456789*`,
+
+  bankAskAccountName: () =>
+    `And the account name exactly as it appears at the bank?\n\nExample: *Mama Bisi Provisions*`,
+
+  bankInvalidNumber: () =>
+    `That doesn't look like an account number. Send the digits only.\n\nExample: *0123456789*`,
+
+  bankSaved: (bankName: string, accountNumber: string, accountName: string) =>
+    `✅ Saved.\n\n🏦 *${bankName}* — ${accountNumber}\n${accountName}\n\n` +
+    `From now on every reminder I send your customers will show these details, so they can pay without asking you. Reply *ACCOUNT* any time to change them.`,
 
   // ── HELP & misc ────────────────────────────────────────────────────────
   help: () =>
@@ -356,6 +392,7 @@ export const messages = {
     `• *PAID [name]* : mark a credit paid\n` +
     `• *LIST* : see who owes you\n` +
     `• *SCORE [name]* : check a customer's reliability\n` +
+    `• *ACCOUNT* : set the bank details shown on reminders\n` +
     `• *DASHBOARD* : get a link to your full dashboard\n` +
     `• *SUPPORT* : talk to a human`,
 

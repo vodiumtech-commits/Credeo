@@ -68,6 +68,8 @@ export interface ScorePreview {
   score: number;
   band: string;
   tone: ScoreTone;
+  /** True when this customer blocked the reminder bot — a blacklist signal. */
+  blacklisted: boolean;
   vendorCount: number;   // how many distinct shops have extended this customer credit
   creditCount: number;
   summary: string;
@@ -103,6 +105,7 @@ export async function getCustomerScorePreview(input: {
     // Identifier given but no record yet — brand-new customer.
     return {
       found: false,
+      blacklisted: false,
       score: 500,
       band: "New",
       tone: "new",
@@ -119,6 +122,30 @@ export async function getCustomerScorePreview(input: {
   const creditCount = student.scoreEvents.filter((e) => e.eventType === "CREDIT_EXTENDED").length;
 
   const acrossShops = vendorCount > 1 ? ` across ${vendorCount} shops` : "";
+  const blacklisted = Boolean(student.whatsappBlockedAt);
+
+  // Blocking the reminder bot is a deliberate act of evasion, so it outranks
+  // whatever the payment history says — a good score earned elsewhere should not
+  // hide the fact that this person has cut off contact.
+  if (blacklisted) {
+    return {
+      found: true,
+      blacklisted: true,
+      studentId: student.id,
+      fullName: student.fullName,
+      score,
+      band: "Blacklisted",
+      tone: "bad",
+      vendorCount,
+      creditCount,
+      summary,
+      warning:
+        `🚫 *Blacklisted — this customer blocked the reminder bot.* We can no longer reach them on WhatsApp, ` +
+        `so no reminder will be delivered and you would have to chase payment yourself. ` +
+        `Vodium score ${score}/1000${acrossShops}. Consider cash only.`,
+    };
+  }
+
   const warning =
     tone === "new"
       ? "🆕 New to Vodium — no credit history yet, so there's no score signal."
@@ -130,6 +157,7 @@ export async function getCustomerScorePreview(input: {
 
   return {
     found: true,
+    blacklisted: false,
     studentId: student.id,
     fullName: student.fullName,
     score,

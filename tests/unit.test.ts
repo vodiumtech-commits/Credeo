@@ -14,6 +14,7 @@ import { normaliseAmbassadorCode } from "../src/lib/referral";
 import { detectIntent, parseInvoiceItem, parseQuickCredit, step, type SessionContext } from "../src/lib/whatsapp/state-machine";
 import { isPermanentFailure, parseMetaErrorCode } from "../src/lib/whatsapp/outbound";
 import { contactPhoneFrom } from "../src/lib/whatsapp/contact";
+import { messages, payToBlock } from "../src/lib/whatsapp/messages";
 import { signVerification, verifyVerification, maskPhone } from "../src/lib/customer-verify-token";
 import { ADMIN_ROUTE_ROLES } from "../src/lib/session-cookies";
 
@@ -137,6 +138,64 @@ test("shared WhatsApp contact card yields the customer's number", () => {
   );
   assert.equal(r.nextState, "ADDING_CREDIT_AMOUNT", "the shared number is accepted as the phone");
   assert.equal(r.contextPatch?.creditCustomerPhone, "2348012345678");
+});
+
+test("vendor bank details render on reminders, and are optional", () => {
+  assert.equal(payToBlock(undefined), "", "no details → no block");
+  assert.equal(payToBlock({ bankName: "GTBank" }), "", "account number required too");
+
+  const block = payToBlock({ bankName: "GTBank", bankAccountNumber: "0123456789", bankAccountName: "Mama Bisi Stores" });
+  assert.match(block, /Pay to/);
+  assert.match(block, /GTBank/);
+  assert.match(block, /0123456789/);
+  assert.match(block, /Mama Bisi Stores/);
+
+  // The block must actually reach the customer-facing reminder.
+  const reminder = messages.reminderToCustomer("Chidi", "Mama Bisi Stores", 2500, "tomorrow", block);
+  assert.match(reminder, /0123456789/);
+  // ...and its absence must not leave a hole in the copy.
+  const plain = messages.reminderToCustomer("Chidi", "Mama Bisi Stores", 2500, "tomorrow");
+  assert.doesNotMatch(plain, /Pay to/);
+  assert.match(plain, /Reply \*PAID\*/);
+});
+
+test("ACCOUNT flow collects bank details and saves them", () => {
+  const send = (context: Record<string, unknown>, body: string) =>
+    step({ state: "IDLE", context, vendorId: "vendor_1" } as SessionContext, { body, fromPhone: "+2348030000000" });
+  const advance = (c: Record<string, unknown>, p?: Record<string, unknown>) => ({ ...c, ...(p ?? {}) });
+
+  assert.equal(detectIntent("ACCOUNT"), "BANK");
+  assert.equal(detectIntent("bank"), "BANK");
+
+  let ctx: Record<string, unknown> = {};
+  let r = send(ctx, "ACCOUNT");
+  ctx = advance(ctx, r.contextPatch);
+  assert.equal(ctx.bankStep, "name");
+
+  r = send(ctx, "GTBank");
+  ctx = advance(ctx, r.contextPatch);
+  assert.equal(ctx.bankStep, "number");
+
+  // Junk account numbers are rejected rather than saved.
+  const bad = send(ctx, "abc");
+  assert.match(bad.reply, /doesn't look like an account number/i);
+  assert.equal(bad.contextPatch, undefined);
+
+  r = send(ctx, "0123456789");
+  ctx = advance(ctx, r.contextPatch);
+  assert.equal(ctx.bankStep, "account");
+  assert.equal(ctx.bankAccountNumber, "0123456789");
+
+  r = send(ctx, "Mama Bisi Stores");
+  ctx = advance(ctx, r.contextPatch);
+  const effect = r.sideEffects?.[0];
+  assert.ok(effect && effect.type === "SAVE_BANK");
+  if (effect?.type === "SAVE_BANK") {
+    assert.equal(effect.data.bankName, "GTBank");
+    assert.equal(effect.data.accountNumber, "0123456789");
+    assert.equal(effect.data.accountName, "Mama Bisi Stores");
+  }
+  assert.equal(ctx.bankStep, null, "flow context cleared after saving");
 });
 
 test("one-shot ADD collapses six prompts into one message", () => {

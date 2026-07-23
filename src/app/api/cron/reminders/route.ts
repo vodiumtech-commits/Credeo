@@ -11,7 +11,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppButtons, WhatsAppSendError } from "@/lib/whatsapp/outbound";
-import { messages } from "@/lib/whatsapp/messages";
+import { messages, payToBlock } from "@/lib/whatsapp/messages";
 import { reminderLeadMinutesForDue } from "@/lib/whatsapp/state-machine";
 import { applyDailyDefaultDecay, markOverdueCredits, sendOverdueReminders, sendEscalations } from "@/lib/credit-lifecycle";
 import { createReminderPrefResolver } from "@/lib/reminder-prefs";
@@ -117,7 +117,8 @@ export async function GET(req: NextRequest) {
       student.fullName,
       vendor.businessName,
       Number(credit.amount) - Number(credit.amountRepaid),
-      dueTxt
+      dueTxt,
+      payToBlock(vendor) // vendor's bank details, or "" when unset
     );
 
     try {

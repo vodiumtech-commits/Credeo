@@ -222,6 +222,11 @@ model Vendor {
   community    Community @relation(fields: [communityId], references: [id])
   location      String?
   status        VendorStatus @default(ACTIVE)
+  // Payout details shown to customers on reminders so they can pay without
+  // having to ask the vendor for an account number.
+  bankName          String?
+  bankAccountNumber String?
+  bankAccountName   String?
   // Set once, at registration, from the /r/<code> referral cookie.
   referredByAmbassadorId String?
   referredBy             Ambassador? @relation(fields: [referredByAmbassadorId], references: [id])
