@@ -9,13 +9,18 @@
  * Per-day work (score decay) lives in /api/cron/daily so it is not repeated
  * 288 times a day.
  *
- * PLAN REQUIREMENT: sub-daily crons need Vercel Pro. On Hobby, Vercel caps cron
- * at once per day, and this route will simply not fire on its stated schedule.
- * The fallback is any external scheduler (e.g. cron-job.org) calling this URL
- * every 5 minutes with `Authorization: Bearer <CRON_SECRET>`.
+ * SCHEDULING IS EXTERNAL. This project does not use Vercel cron; the schedule
+ * lives in cron-job.org, which must call:
  *
- * (This note lives here rather than in vercel.json because that file is schema
- * validated by Vercel — an unknown key such as "$comment" fails the build.)
+ *     GET https://www.vodiumledger.com/api/cron/reminders
+ *     Authorization: Bearer <CRON_SECRET>
+ *
+ * every 5 minutes. That interval is not arbitrary — it must stay at or below
+ * the shortest reminder window the bot can produce (10 minutes, for a "30M"
+ * credit), or short-dated credits are never reminded at all.
+ *
+ * Because the schedule is not in this repo, changing the lead times here has a
+ * consequence nothing in the codebase can enforce: update the external job too.
  * Finds every credit within its reminder window that hasn't been reminded yet,
  * sends a WhatsApp message to the student, and stamps reminderSentAt.
  *

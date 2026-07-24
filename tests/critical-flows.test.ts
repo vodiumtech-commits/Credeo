@@ -13,7 +13,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 
 process.env.SESSION_SECRET = "test-session-secret";
 process.env.SECRET_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
@@ -223,60 +223,49 @@ test("INVARIANT unparseable input never silently drops a vendor out of a flow", 
 
 // ── Invariant 3: reminders actually fire ─────────────────────────────────────
 
-test("INVARIANT the cron runs often enough to hit the shortest reminder window", () => {
-  // The bug this exists to prevent: reminders were scheduled once a day while
-  // the bot offered 30-minute credits (a 10-minute reminder window). The window
-  // opened and closed between runs, so short-dated credits were NEVER reminded —
-  // and once overdue they dropped out of the pre-due query entirely.
-  const vercelConfig = JSON.parse(
-    readFileSync(new URL("../vercel.json", import.meta.url), "utf8"),
-  ) as { crons: Array<{ path: string; schedule: string }> };
-
-  const reminders = vercelConfig.crons.find((c) => c.path === "/api/cron/reminders");
-  assert.ok(reminders, "the reminders cron must be scheduled at all");
-
-  // Only the every-N-minutes form can satisfy a sub-hour window.
-  const everyNMinutes = reminders!.schedule.match(/^\*\/(\d+) \* \* \* \*$/);
-  assert.ok(
-    everyNMinutes,
-    `reminders run on "${reminders!.schedule}" — anything less frequent than */N minutes cannot serve a 30-minute credit`,
-  );
-
-  const intervalMinutes = Number(everyNMinutes![1]);
-  // The shortest window the bot's own menu can produce: "30M" → 10-minute lead.
-  const shortestWindow = reminderLeadMinutesForDue(30);
-  assert.ok(
-    intervalMinutes <= shortestWindow,
-    `cron every ${intervalMinutes}m cannot land inside a ${shortestWindow}m window`,
-  );
-});
-
-test("INVARIANT vercel.json contains only keys Vercel accepts", () => {
-  // A build-breaking mistake made once: a "$comment" key was added to document
-  // the cron schedule. Vercel schema-validates this file and rejects unknown
-  // top-level properties, so EVERY deploy failed until it was removed. Config
-  // files are not a place for prose — the rationale lives in the route.
-  const raw = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8"));
-
-  // Conservative allowlist: only what this project actually uses.
-  const ALLOWED = new Set([
-    "crons", "buildCommand", "installCommand", "devCommand", "framework",
-    "outputDirectory", "regions", "functions", "headers", "redirects",
-    "rewrites", "cleanUrls", "trailingSlash", "images", "git", "github",
-  ]);
-
-  for (const key of Object.keys(raw)) {
+test("INVARIANT the cron endpoints an external scheduler calls still exist", () => {
+  // Scheduling happens OUTSIDE this repo (cron-job.org), so these URLs are a
+  // public contract. Renaming or moving one of these routes would stop that
+  // schedule firing with no build error and no other test failure — reminders
+  // would simply go quiet, exactly the failure merchants reported.
+  for (const endpoint of ["reminders", "daily", "subscriptions"]) {
+    const route = new URL(`../src/app/api/cron/${endpoint}/route.ts`, import.meta.url);
     assert.ok(
-      ALLOWED.has(key),
-      `vercel.json has "${key}", which Vercel's schema will reject — this breaks every deploy`,
+      existsSync(route),
+      `/api/cron/${endpoint} is gone — the external scheduler still calls it and would 404 silently`,
+    );
+    assert.match(
+      readFileSync(route, "utf8"),
+      /CRON_SECRET/,
+      `/api/cron/${endpoint} must stay protected by CRON_SECRET`,
     );
   }
+});
 
-  // Each cron must name a real route and a schedule.
-  for (const cron of raw.crons ?? []) {
-    assert.match(cron.path, /^\/api\//, `cron path "${cron.path}" must be an API route`);
-    assert.ok(cron.schedule?.length, `cron ${cron.path} has no schedule`);
-  }
+test("INVARIANT the required external cron cadence stays documented", () => {
+  // Reminders are scheduled OUTSIDE this repo (cron-job.org), so no test can
+  // read the real schedule. What a test CAN do is pin the requirement: the
+  // shortest window the bot's own menu produces is 10 minutes ("30M" credits),
+  // so the external job must run at least that often. If someone tightens the
+  // lead times below this, that scheduler has to be tightened too — and this
+  // failure is where they find out.
+  const shortestWindow = reminderLeadMinutesForDue(30);
+  assert.equal(
+    shortestWindow,
+    10,
+    "shortest reminder window changed — update the cron-job.org interval to match",
+  );
+
+  // The requirement must stay written down where the next person will look.
+  const routeSrc = readFileSync(
+    new URL("../src/app/api/cron/reminders/route.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(
+    routeSrc,
+    /every 5 minutes|external scheduler|cron-job/i,
+    "the reminders route must document how often it needs to be called",
+  );
 });
 
 test("INVARIANT a credit inside its window is always reminder-due", () => {
