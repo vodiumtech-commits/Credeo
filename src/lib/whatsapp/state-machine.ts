@@ -6,6 +6,7 @@
  */
 
 import { messages, type InvoiceItemEntry } from "./messages";
+import { matchIntent, isEscapeCommand, isAffirmative, isNegative } from "./nlu";
 import type { WhatsAppState } from "@prisma/client";
 
 // ─── public types ─────────────────────────────────────────────────────────────
@@ -70,10 +71,12 @@ export type SideEffect =
 
 export function detectIntent(body: string): Intent {
   const t = body.trim().toUpperCase();
+
+  // Exact commands first — identical to the original table, so no existing
+  // behaviour can regress no matter what the language layer decides.
   if (t === "START" || t === "BEGIN" || t === "HI" || t === "HELLO") return "START";
   if (t === "ADD" || t === "NEW" || t === "CREDIT")                   return "ADD";
-  // "ADD Chidi 08012345678 2500 7d" — the one-shot form the dashboard advertises
-  if (/^(ADD|NEW|CREDIT)\s+\S/.test(t))                                return "ADD";
+  if (/^(ADD|NEW|CREDIT)\s+\S/.test(t))                              return "ADD";
   if (t === "INVOICE" || t === "BILL")                                 return "INVOICE";
   if (t.startsWith("PAID"))                                            return "PAID";
   if (t === "LIST" || t === "OWE" || t === "OWING" || t === "WHO")   return "LIST";
@@ -82,7 +85,10 @@ export function detectIntent(body: string): Intent {
   if (t === "DASHBOARD" || t === "WEB" || t === "PORTAL")             return "DASHBOARD";
   if (t === "SUPPORT" || t === "AGENT" || t === "HUMAN")              return "SUPPORT";
   if (t === "ACCOUNT" || t === "BANK" || t === "PAYMENT")              return "BANK";
-  return "FREE_TEXT";
+
+  // Then the tolerant layer: natural phrasing, Pidgin, and typos.
+  // "add credit for chidi", "who dey owe me", "hlep" all resolve here.
+  return matchIntent(body) as Intent;
 }
 
 // ─── main step function ───────────────────────────────────────────────────────
@@ -132,11 +138,11 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
   const intent = detectIntent(body);
   const upperBody = body.toUpperCase();
 
-  if (intent === "HELP") {
+  if (intent === "HELP" || isEscapeCommand(body, "help")) {
     return { reply: messages.help(), nextState: "IDLE", contextPatch: clearFlowContext(), list: MENU_LIST };
   }
 
-  if (upperBody === "CANCEL" || upperBody === "STOP") {
+  if (isEscapeCommand(body, "cancel")) {
     return { reply: messages.cancelled(), nextState: "IDLE", contextPatch: clearFlowContext(), buttons: MAIN_BUTTONS };
   }
 
@@ -261,9 +267,9 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
 
     case "ADDING_CREDIT_REMINDER": {
       const remindersEnabled =
-        upperBody === "REMIND" || upperBody === "YES" || upperBody === "Y"
+        upperBody === "REMIND" || isAffirmative(body)
           ? true
-          : upperBody === "NOREMIND" || upperBody === "NO" || upperBody === "N"
+          : upperBody === "NOREMIND" || isNegative(body)
             ? false
             : null;
       if (remindersEnabled === null) {
@@ -740,13 +746,42 @@ export function friendlyDueText(dueInMinutes: number): string {
 }
 
 export function parseAmount(input: string): number | null {
-  const cleaned = input.replace(/[₦,\s]/g, "");
+  // Accepts the shapes vendors actually type: "2500", "₦2,500", "2500 naira",
+  // "2k", "2.5k". Anything else is rejected rather than guessed at — a wrong
+  // amount on someone's ledger is worse than asking again.
+  const cleaned = input
+    .toLowerCase()
+    .replace(/naira|ngn|₦/g, "")
+    .replace(/[,\s]/g, "")
+    .trim();
+
+  // "2k" / "2.5k" → thousands
+  const k = cleaned.match(/^(\d+(?:\.\d+)?)k$/);
+  if (k) {
+    const n = parseFloat(k[1]) * 1000;
+    return n > 0 ? n : null;
+  }
+
+  if (!/^\d+(\.\d+)?$/.test(cleaned)) return null;
   const n = parseFloat(cleaned);
   return isNaN(n) || n <= 0 ? null : n;
 }
 
 export function parseDueDuration(input: string): number | null {
   const cleaned = input.trim().toUpperCase();
+
+  // Everyday phrasing, resolved deterministically.
+  const words = cleaned.replace(/[^A-Z ]/g, "").trim();
+  if (words === "TODAY" || words === "TONIGHT")      return 12 * 60;
+  if (words === "TOMORROW")                           return 1440;
+  if (words === "NEXT WEEK" || words === "ONE WEEK" || words === "A WEEK") return 7 * 1440;
+  if (words === "TWO WEEKS" || words === "2 WEEKS")   return 14 * 1440;
+  if (words === "NEXT MONTH" || words === "ONE MONTH" || words === "A MONTH") return 30 * 1440;
+  if (words === "END OF MONTH" || words === "MONTH END" || words === "ENDS") {
+    const now = new Date();
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return Math.max(1, Math.ceil((end.getTime() - now.getTime()) / 60_000));
+  }
 
   // Handle "END" (end of month)
   if (cleaned === "END") {

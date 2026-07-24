@@ -20,6 +20,9 @@ process.env.SECRET_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
 
 import {
   step,
+  detectIntent,
+  parseAmount,
+  parseDueDuration,
   isReminderDue,
   reminderLeadMinutesForDue,
   type SessionContext,
@@ -88,6 +91,88 @@ test("INVARIANT the debtor's number is confirmed before the credit is written", 
       `"${p.name}" reached the save step without showing the number back to the vendor`,
     );
   }
+});
+
+// ── Invariant 1b: the bot understands how vendors actually type ──────────────
+
+test("INVARIANT every documented command still resolves exactly as before", () => {
+  // Regression guard for the language layer: the tolerant matcher must never
+  // change what an existing command does.
+  const exact: Array<[string, string]> = [
+    ["START", "START"], ["ADD", "ADD"], ["INVOICE", "INVOICE"], ["LIST", "LIST"],
+    ["PAID", "PAID"], ["SCORE", "SCORE"], ["HELP", "HELP"], ["DASHBOARD", "DASHBOARD"],
+    ["SUPPORT", "SUPPORT"], ["ACCOUNT", "BANK"],
+    ["PAID Chidi", "PAID"], ["SCORE Ada", "SCORE"],
+    ["ADD Chidi 08012345678 2500", "ADD"],
+  ];
+  for (const [input, expected] of exact) {
+    assert.equal(detectIntent(input), expected, `"${input}" must still mean ${expected}`);
+  }
+});
+
+test("INVARIANT natural phrasing, Pidgin and typos reach the right command", () => {
+  // Every one of these previously fell through to "Sorry, I didn't catch that",
+  // which is the moment a vendor decides the bot is broken and stops using it.
+  const natural: Array<[string, string]> = [
+    ["add credit", "ADD"],
+    ["i want to add credit", "ADD"],
+    ["abeg add credit for chidi", "ADD"],
+    ["record debt", "ADD"],
+    ["who is owing me", "LIST"],
+    ["who dey owe me", "LIST"],
+    ["show my list", "LIST"],
+    ["my debtors", "LIST"],
+    ["check my book", "LIST"],
+    ["mark as paid", "PAID"],
+    ["customer don pay", "PAID"],
+    ["send invoice", "INVOICE"],
+    ["create invoice", "INVOICE"],
+    ["check score", "SCORE"],
+    ["can i trust this person", "SCORE"],
+    ["my account details", "BANK"],
+    ["set my bank", "BANK"],
+    ["talk to human", "SUPPORT"],
+    ["what can you do", "HELP"],
+    ["open dashboard", "DASHBOARD"],
+    // typos
+    ["hlep", "HELP"],
+    ["invoce", "INVOICE"],
+    ["dashbord", "DASHBOARD"],
+    ["acount", "BANK"],
+  ];
+  for (const [input, expected] of natural) {
+    assert.equal(detectIntent(input), expected, `"${input}" should reach ${expected}`);
+  }
+});
+
+test("INVARIANT the matcher stays strict enough not to hijack real data", () => {
+  // Customer names and free text must NOT be mistaken for commands, or the bot
+  // would run the wrong action on someone's ledger.
+  for (const notACommand of [
+    "Chidi Okeke", "Adebayo", "Mama Bisi Provisions", "Blessing",
+    "08012345678", "2500", "he said he will pay me next tomorrow morning",
+  ]) {
+    assert.equal(detectIntent(notACommand), "FREE_TEXT", `"${notACommand}" must not be read as a command`);
+  }
+});
+
+test("INVARIANT amounts and dates accept how vendors write them", () => {
+  assert.equal(parseAmount("2500"), 2500);
+  assert.equal(parseAmount("₦2,500"), 2500);
+  assert.equal(parseAmount("2500 naira"), 2500);
+  assert.equal(parseAmount("2k"), 2000);
+  assert.equal(parseAmount("2.5k"), 2500);
+  // Junk must still be refused rather than guessed.
+  assert.equal(parseAmount("plenty"), null);
+  assert.equal(parseAmount("-5"), null);
+  assert.equal(parseAmount(""), null);
+
+  assert.equal(parseDueDuration("tomorrow"), 1440);
+  assert.equal(parseDueDuration("next week"), 7 * 1440);
+  assert.equal(parseDueDuration("two weeks"), 14 * 1440);
+  assert.equal(parseDueDuration("7"), 7 * 1440);
+  assert.equal(parseDueDuration("2h"), 120);
+  assert.equal(parseDueDuration("rubbish"), null);
 });
 
 // ── Invariant 2: no dead ends ────────────────────────────────────────────────

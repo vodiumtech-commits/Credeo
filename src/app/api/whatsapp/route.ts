@@ -323,11 +323,20 @@ export async function POST(req: NextRequest) {
 
   } catch (err) {
     console.error("[whatsapp] Error processing message from", fromPhone, ":", err);
-    // Attempt a fallback reply so the user isn't left hanging
+    // Never leave the vendor at a dead end. An error reply with no next action
+    // is the moment people give up on the bot, so always offer a way forward —
+    // retrying the thing they were doing, or falling back to the menu.
     try {
-      await sendWhatsAppMessage(
+      await sendWhatsAppButtons(
         fromPhone,
-        "Sorry, I ran into a problem. Please try again in a moment or visit your dashboard."
+        "Sorry — something went wrong on my side. Nothing was lost.\n\nTap below to try again.",
+        [
+          { id: "ADD",  title: "Add credit" },
+          { id: "LIST", title: "Who's owing" },
+          { id: "HELP", title: "Menu" },
+        ],
+        // No org credentials in scope here — the platform number is the right
+        // sender for an error reply regardless of which channel it arrived on.
       );
     } catch (sendErr) {
       console.error("[whatsapp] Failed to send fallback message:", sendErr);
