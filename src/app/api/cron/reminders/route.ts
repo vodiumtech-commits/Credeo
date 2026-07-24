@@ -205,8 +205,13 @@ export async function GET(req: NextRequest) {
 
   const totalSent = sent + overdueReminders.sent;
   const totalFailed = failed + overdueReminders.failed;
+  // Say WHY nothing was sent, not just that it wasn't — "sent=0 total=1"
+  // alone reads like a fault when it's usually a credit whose reminder
+  // window simply hasn't opened yet.
   console.log(
-    `[cron/reminders] sent=${totalSent} failed=${totalFailed} total=${credits.length + overdueReminders.total}`
+    `[cron/reminders] sent=${totalSent} failed=${totalFailed} ` +
+    `total=${credits.length + overdueReminders.total} notYetDue=${notYetDue} ` +
+    `skipped=${skipped + overdueReminders.skipped} blocked=${blocked}`
   );
   return NextResponse.json({
     ok: true,
