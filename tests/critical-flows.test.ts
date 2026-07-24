@@ -14,7 +14,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
-import { isValidTemplateName } from "../src/lib/otp-delivery";
+import { isValidTemplateName, normaliseTemplateName } from "../src/lib/otp-delivery";
 
 process.env.SESSION_SECRET = "test-session-secret";
 process.env.SECRET_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
@@ -236,6 +236,17 @@ test("INVARIANT a WhatsApp template name is rejected before it wastes API calls"
   assert.equal(isValidTemplateName("OTP_CODE"), false, "uppercase is invalid");
   assert.equal(isValidTemplateName("otp-code"), false, "hyphens are invalid");
   assert.equal(isValidTemplateName(""), false);
+
+  // A loosely-written name is coerced rather than abandoned, so an existing
+  // template still gets used: "Vodium Ledger" → "vodium_ledger".
+  assert.equal(normaliseTemplateName("Vodium Ledger"), "vodium_ledger");
+  assert.equal(normaliseTemplateName("OTP Code"), "otp_code");
+  assert.equal(normaliseTemplateName("otp-code"), "otp_code");
+  assert.equal(normaliseTemplateName("  Verification Code  "), "verification_code");
+  // Already valid names pass through untouched.
+  assert.equal(normaliseTemplateName("otp_code"), "otp_code");
+  // Nothing usable left → null, and the caller skips the template path.
+  assert.equal(normaliseTemplateName("!!!"), null);
 });
 
 test("INVARIANT the cron endpoints an external scheduler calls still exist", () => {
