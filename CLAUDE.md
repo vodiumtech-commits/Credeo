@@ -44,9 +44,9 @@ Capture proprietary repayment data on tens of thousands of Nigerian consumers in
 - **Next.js 14 + TypeScript** (App Router)
 - **Tailwind + shadcn/ui** for styling
 - **PostgreSQL via Supabase** + **Prisma** ORM
-- **Phone OTP via Twilio Verify** for auth (no passwords, no email)
-- **Twilio WhatsApp Business API** for the bot
-- **Termii** for SMS fallback
+- **Email + password with an email OTP second step** for vendor auth (`/api/auth/login`), sent via **Resend**
+- **Meta WhatsApp Cloud API** for the bot (Graph API; not Twilio)
+- **WhatsApp OTP** for customer verification codes, sent from the platform number
 - **Paystack** for vendor subscription billing
 - **Upstash Redis** for cache + rate limiting
 - **PostHog** for product analytics
@@ -101,10 +101,10 @@ Headers: **Playfair Display**. Body: **Inter**.
 ```
 prisma/schema.prisma          ← all entities
 src/app/                      ← Next.js routes
-  api/whatsapp/route.ts       ← Twilio webhook
-  api/auth/                   ← phone OTP
+  api/whatsapp/route.ts       ← Meta Cloud API webhook
+  api/auth/                   ← email + password + email OTP
   dashboard/                  ← vendor web UI
-  login/page.tsx              ← phone OTP login
+  login/page.tsx              ← email + password login
 src/lib/
   prisma.ts                   ← DB client singleton
   utils.ts                    ← cn(), formatNaira(), normalisePhoneNG()
