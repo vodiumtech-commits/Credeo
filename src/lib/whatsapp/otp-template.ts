@@ -221,9 +221,19 @@ export async function ensureOtpTemplate(): Promise<OtpTemplateStatus & { created
   };
   if (!res.ok) {
     console.error("[otp-template] template create failed:", res.status, JSON.stringify(json.error ?? json));
+    // Subcode 2388185: Meta requires completed Business Verification before an
+    // account may create AUTHENTICATION templates. No token or ID fixes this —
+    // it's a one-time verification of the business itself.
+    const needsVerification = (json.error as { error_subcode?: number } | undefined)?.error_subcode === 2388185;
     return {
       ...current, created: false,
-      detail: json.error?.error_user_msg ?? explainMetaError(res.status, json.error),
+      detail: needsVerification
+        ? "Meta requires Business Verification before this account may create OTP (authentication) templates. " +
+          "Complete it once in Meta Business Settings → Security Center → Start verification (business name, " +
+          "address and a registration document — CAC certificate works). Approval usually takes a few days; " +
+          "come back and click this button after. Until then, debtors can still receive codes if they message " +
+          "the bot first — the panel below the vendor flow already guides this."
+        : json.error?.error_user_msg ?? explainMetaError(res.status, json.error),
     };
   }
 
