@@ -99,26 +99,56 @@ async function getWabaId(token: string, phoneId: string): Promise<{ id: string }
     console.error("[otp-template] token inspection failed:", res.status, JSON.stringify(json.error ?? json));
     return { error: explainMetaError(res.status, json.error) + manualFix };
   }
-  if (wabaIds.size === 0) {
-    console.error("[otp-template] token manages no WhatsApp accounts:", JSON.stringify(json.data?.granular_scopes ?? []));
-    return {
-      error:
-        "This access token doesn't list any WhatsApp Business Account it can manage — regenerate it with whatsapp_business_management ticked and the WhatsApp account assigned to the system user." +
-        manualFix,
-    };
-  }
-  if (wabaIds.size === 1) return { id: [...wabaIds][0] };
 
-  // Several WABAs — the right one owns our sending phone number.
-  for (const id of wabaIds) {
+  /** Does this WABA own our sending number? Guards every discovered candidate. */
+  async function ownsPhone(id: string): Promise<boolean> {
     const r = await fetch(`${GRAPH}/${id}/phone_numbers?fields=id&limit=100`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     const j = (await r.json().catch(() => ({}))) as { data?: Array<{ id: string }> };
-    if (j.data?.some((p) => p.id === phoneId)) return { id };
+    return Boolean(j.data?.some((p) => p.id === phoneId));
   }
-  console.error(`[otp-template] none of ${wabaIds.size} WABAs own phone ${phoneId}`);
-  return { error: "The token manages several WhatsApp accounts, but none of them own this phone number." + manualFix };
+
+  if (wabaIds.size === 1) return { id: [...wabaIds][0] };
+  if (wabaIds.size > 1) {
+    for (const id of wabaIds) if (await ownsPhone(id)) return { id };
+    console.error(`[otp-template] none of ${wabaIds.size} scoped WABAs own phone ${phoneId}`);
+    return { error: "The token manages several WhatsApp accounts, but none of them own this phone number." + manualFix };
+  }
+
+  // No target_ids at all = the token's access is UNRESTRICTED (all assets of
+  // the business) — common for admin system users. The scopes carry no asset
+  // list then, so walk business → owned WABAs instead. Documented edge:
+  // GET /{business-id}/owned_whatsapp_business_accounts.
+  const bizRes = await fetch(`${GRAPH}/me/businesses?fields=id&limit=25`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const bizJson = (await bizRes.json().catch(() => ({}))) as {
+    data?: Array<{ id: string }>;
+    error?: { code?: number; message?: string };
+  };
+  if (bizRes.ok && bizJson.data?.length) {
+    for (const biz of bizJson.data) {
+      const r = await fetch(`${GRAPH}/${biz.id}/owned_whatsapp_business_accounts?fields=id&limit=100`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const j = (await r.json().catch(() => ({}))) as { data?: Array<{ id: string }> };
+      for (const waba of j.data ?? []) {
+        if (await ownsPhone(waba.id)) return { id: waba.id };
+      }
+      // A business with exactly one WABA needs no phone match to be right.
+      if ((j.data?.length ?? 0) === 1 && bizJson.data.length === 1) return { id: j.data![0].id };
+    }
+  } else {
+    console.error("[otp-template] business walk failed:", bizRes.status, JSON.stringify(bizJson.error ?? {}));
+  }
+
+  console.error("[otp-template] could not discover the WABA automatically:", JSON.stringify(json.data?.granular_scopes ?? []));
+  return {
+    error:
+      "The token has WhatsApp management access, but the account it belongs to can't be discovered automatically from it." +
+      manualFix,
+  };
 }
 
 /** All message templates on the account (name, status, language, category). */
