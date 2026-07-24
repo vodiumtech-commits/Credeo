@@ -77,10 +77,22 @@ export function OtpTemplatePanel() {
         {state?.resolvedName ? <span className="opacity-60"> · using &ldquo;{state.resolvedName}&rdquo;</span> : null}
       </div>
 
-      {state?.detail && !state.active && (
+      {state?.detail && !state.active && state.detail !== msg?.text && (
         <div className="flex items-start gap-2 rounded-lg px-3 py-2 mb-3 text-xs bg-rose-500/10 border border-rose-500/20 text-rose-300">
           <AlertTriangle size={13} className="mt-0.5 shrink-0" />
           <span>{state.detail}</span>
+        </div>
+      )}
+
+      {state?.detail?.includes("whatsapp_business_management") && (
+        <div className="rounded-lg px-3 py-2 mb-3 text-xs bg-black/25 border border-white/[0.08] text-vodium-cream/55 leading-relaxed">
+          <strong className="text-vodium-cream/80">Fix:</strong> in Meta{" "}
+          <strong className="text-vodium-cream/80">Business Settings → Users → System users</strong>, pick the
+          system user behind your token, click <strong className="text-vodium-cream/80">Generate new token</strong>,
+          tick <strong className="text-vodium-cream/80">whatsapp_business_messaging</strong> AND{" "}
+          <strong className="text-vodium-cream/80">whatsapp_business_management</strong>, then update{" "}
+          <code className="text-vodium-gold/80">WHATSAPP_ACCESS_TOKEN</code> in Vercel and redeploy. Come back and
+          click the button again.
         </div>
       )}
 
