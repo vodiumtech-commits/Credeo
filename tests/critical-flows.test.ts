@@ -14,7 +14,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
-import { isValidTemplateName, normaliseTemplateName } from "../src/lib/otp-delivery";
+import { isValidTemplateName, normaliseTemplateName, resolveConfiguredTemplateName, DEFAULT_OTP_TEMPLATE_NAME } from "../src/lib/otp-delivery";
 
 process.env.SESSION_SECRET = "test-session-secret";
 process.env.SECRET_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
@@ -429,4 +429,51 @@ test("no OTP path claims 'code sent' when nothing was delivered", () => {
   assert.ok(webhook.includes("verifyCantReach"), "bot must have an honest can't-reach reply");
   const credits = readFileSync("src/app/api/credits/route.ts", "utf8");
   assert.match(credits, /delivered:\s*channel === "whatsapp"/, "web API must report delivery honestly");
+});
+
+// ── New-debtor verification and OTP template resolution ──────────────────────
+
+test("OTP template name resolves without any env configuration", () => {
+  const prev = process.env.WHATSAPP_OTP_TEMPLATE_NAME;
+  try {
+    // Unset → the platform default the admin console creates. This is what
+    // makes "create template" a one-click setup with no env change.
+    delete process.env.WHATSAPP_OTP_TEMPLATE_NAME;
+    assert.equal(resolveConfiguredTemplateName(), DEFAULT_OTP_TEMPLATE_NAME);
+
+    // A loosely-written override is coerced, an exact one passes through.
+    process.env.WHATSAPP_OTP_TEMPLATE_NAME = "Vodium Ledger";
+    assert.equal(resolveConfiguredTemplateName(), "vodium_ledger");
+    process.env.WHATSAPP_OTP_TEMPLATE_NAME = "otp_code";
+    assert.equal(resolveConfiguredTemplateName(), "otp_code");
+
+    // Garbage never blocks OTP — fall back to the default rather than none.
+    process.env.WHATSAPP_OTP_TEMPLATE_NAME = "!!!";
+    assert.equal(resolveConfiguredTemplateName(), DEFAULT_OTP_TEMPLATE_NAME);
+  } finally {
+    if (prev === undefined) delete process.env.WHATSAPP_OTP_TEMPLATE_NAME;
+    else process.env.WHATSAPP_OTP_TEMPLATE_NAME = prev;
+  }
+});
+
+test("a new debtor can be saved without a code, an existing customer cannot", () => {
+  // The state machine forwards the skip as a side effect…
+  const r = send("VERIFYING_CUSTOMER", { pvNew: true, pvPhone: "+2348012345678" }, "SKIP_VERIFY");
+  assert.equal(r.sideEffects?.[0]?.type, "SKIP_VERIFY");
+
+  // …and the webhook re-checks pvNew server-side before honouring it — a
+  // forged button press must never join an existing customer's record.
+  const webhook = readFileSync("src/app/api/whatsapp/route.ts", "utf8");
+  assert.match(webhook, /case "SKIP_VERIFY":[\s\S]{0,600}pvNew !== true/, "SKIP_VERIFY must re-check pvNew");
+
+  // The web API mirrors it: skipVerification only exists in the NEW-student
+  // branch; the existing-student branch still demands the code.
+  const credits = readFileSync("src/app/api/credits/route.ts", "utf8");
+  const existingBranch = credits.slice(credits.indexOf("if (existingStudent) {"), credits.indexOf("} else {"));
+  assert.ok(!existingBranch.includes("skipVerification"), "existing customers must never be skippable");
+});
+
+test("verification still never blocks cancelling", () => {
+  const r = send("VERIFYING_CUSTOMER", { pvNew: true, pvPhone: "+2348012345678", pvHmac: "h", pvExpiresAt: Date.now() + 60_000 }, "CANCEL");
+  assert.equal(r.nextState, "IDLE");
 });

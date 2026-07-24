@@ -68,6 +68,9 @@ const createSchema = z.object({
   description:    z.string().max(200).optional(),
   dueDate:        z.string().datetime(),
   verificationCode: z.string().trim().min(4).max(8).optional(),
+  // Save a BRAND-NEW debtor without their code (never honoured for a number
+  // that already belongs to a customer — that record needs its owner's code).
+  skipVerification: z.boolean().optional(),
 });
 
 // POST /api/credits
@@ -104,7 +107,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid input", issues: parsed.error.issues }, { status: 400 });
   }
 
-  const { customerName, customerPhone, amount, description, dueDate, verificationCode } = parsed.data;
+  const { customerName, customerPhone, amount, description, dueDate, verificationCode, skipVerification } = parsed.data;
 
   const normalisedCustomerPhone = customerPhone ? normalisePhoneNG(customerPhone) : null;
   if (customerPhone && !normalisedCustomerPhone) {
@@ -177,6 +180,41 @@ export async function POST(req: NextRequest) {
       });
     }
   } else {
+    // BRAND-NEW debtor with a real number: send a code to their WhatsApp to
+    // prove the number is real and its owner consents — but let the vendor
+    // save without it (skipVerification), because verification must never
+    // block logging a credit. Numbers we can't verify are still reminded.
+    if (normalisedCustomerPhone && !skipVerification) {
+      if (!verificationCode) {
+        const rl = await rateLimit(`rl:credit-verify:${customerPhoneKey}`, 4, 600, true);
+        if (!rl.ok) {
+          return NextResponse.json({ error: "Too many code requests. Please wait a few minutes." }, { status: 429 });
+        }
+        const code = String(crypto.randomInt(100000, 999999));
+        setOtpCookie(VERIFY_PURPOSE, customerPhoneKey, code);
+        const { channel } = await sendOtpCode({ phone: customerPhoneKey, code, storeName: vendor.businessName });
+        const debugCode = process.env.OTP_DEBUG_RETURN === "true" ? code : undefined;
+        return NextResponse.json({
+          needsVerification: true,
+          allowSkip: true, // new debtor — no existing record to protect
+          maskedPhone: maskPhone(customerPhoneKey),
+          delivered: channel === "whatsapp",
+          ...(channel !== "whatsapp"
+            ? { deliveryHint: "We couldn't reach that number on WhatsApp yet. Ask the customer to send 'hi' to the Vodium Ledger WhatsApp number and resend the code — or save without verification." }
+            : {}),
+          ...(debugCode ? { debugCode } : {}),
+        });
+      }
+      const ok = verifyOtpCookie(VERIFY_PURPOSE, customerPhoneKey, verificationCode.trim());
+      if (!ok) {
+        return NextResponse.json(
+          { error: "That code is wrong or has expired. Ask the customer for the latest code.", needsVerification: true, allowSkip: true, maskedPhone: maskPhone(customerPhoneKey) },
+          { status: 400 }
+        );
+      }
+      clearOtpCookie(VERIFY_PURPOSE);
+    }
+
     student = await prisma.student.create({
       data: {
         fullName: customerName,

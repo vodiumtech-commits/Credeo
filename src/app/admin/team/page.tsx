@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Users, UserPlus, Trash2, Mail, RefreshCw, Loader2, CheckCircle2, Clock, Shield, X } from "lucide-react";
-import { BotProfilePanel } from "@/components/admin/bot-profile-panel";
+import { BotProfilePanel, OtpTemplatePanel } from "@/components/admin/bot-profile-panel";
 
 type AdminRole = "SUPER_ADMIN" | "CFO" | "CUSTOMER_CARE" | "ANALYTICS" | "MARKETING";
 
@@ -305,6 +305,9 @@ export default function AdminTeamPage() {
 
       {/* Bot's public identity — logo + profile customers see on WhatsApp */}
       <BotProfilePanel />
+
+      {/* Meta OTP template — required for codes to reach first-time customers */}
+      <OtpTemplatePanel />
     </div>
   );
 }

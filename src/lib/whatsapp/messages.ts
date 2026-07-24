@@ -160,6 +160,21 @@ export const messages = {
     `❌ That code is wrong or has expired.\n\nSend the latest code, tap *Resend code*, or *CANCEL* to stop.`,
 
   /**
+   * A BRAND-NEW debtor: the code proves the number is real and its owner is
+   * present. Unlike the cross-vendor case there is no existing record to
+   * protect, so the vendor may save without the code — verification is the
+   * default, never a roadblock (15-second rule).
+   */
+  verifyNewAskCode: (maskedPhone: string) =>
+    `🔐 I've sent a 6-digit code to ${maskedPhone} to confirm the number is really theirs.\n\n` +
+    `Ask the customer to read it to you and send it here — a verified number means reminders reach the right person.\n\n` +
+    `Can't get the code right now? Tap *Save without code*.`,
+
+  savedUnverified: () =>
+    `✅ Saved — number not verified yet. Reminders will still be sent to it; ` +
+    `double-check the number if they don't get them.`,
+
+  /**
    * The code could not be DELIVERED (no approved OTP template + the customer
    * has never messaged the bot, so Meta's 24-hour rule blocks free text).
    * Honest + actionable beats pretending it was sent: the customer opening a

@@ -433,7 +433,7 @@ async function finalizeCredit(input: {
 
 /** Clears the pending-verification keys from the session context. */
 const CLEAR_PENDING_VERIFY = {
-  pvHmac: null, pvExpiresAt: null, pvPhone: null, pvMasked: null,
+  pvHmac: null, pvExpiresAt: null, pvPhone: null, pvMasked: null, pvNew: null,
   pcName: null, pcAmount: null, pcDue: null, pcReminders: null,
 } as const;
 
@@ -710,9 +710,16 @@ async function runSideEffect(
         where: { phone: normalCustomerPhone },
       });
 
-      // Existing number belonging to a customer this vendor has never served →
-      // verify with a code sent to the customer's own WhatsApp before attaching.
-      if (existingCustomer && !(await vendorKnowsCustomer(vendorId, existingCustomer.id))) {
+      // Send a code to the customer's own WhatsApp before attaching:
+      //  • existing customer at a NEW shop — mandatory, protects their shared
+      //    record (no skip);
+      //  • brand-new number — proves the number is real and its owner is
+      //    present, but the vendor may skip: verification must never block
+      //    logging a credit (15-second rule).
+      // Repeat customers at this shop skip codes entirely.
+      const isNewCustomer = !existingCustomer;
+      const needsCode = isNewCustomer || !(await vendorKnowsCustomer(vendorId, existingCustomer.id));
+      if (needsCode) {
         let challenge;
         try {
           challenge = await sendCustomerVerification({ phone: normalCustomerPhone, storeName: vendor?.businessName ?? "the shop" });
@@ -727,19 +734,24 @@ async function runSideEffect(
           // vendors end up waiting on a code that never arrives — tell them
           // what to do instead. The challenge is still stored, so once the
           // customer opens a chat, Resend delivers.
-          replyOverride: challenge.channel === "whatsapp"
-            ? messages.verifyAskCode(masked)
-            : messages.verifyCantReach(masked),
-          buttonsOverride: [{ id: "RESEND", title: "Resend code" }, { id: "CANCEL", title: "Cancel" }],
+          replyOverride: challenge.channel !== "whatsapp"
+            ? messages.verifyCantReach(masked)
+            : isNewCustomer
+              ? messages.verifyNewAskCode(masked)
+              : messages.verifyAskCode(masked),
+          buttonsOverride: isNewCustomer
+            ? [{ id: "RESEND", title: "Resend code" }, { id: "SKIP_VERIFY", title: "Save without code" }, { id: "CANCEL", title: "Cancel" }]
+            : [{ id: "RESEND", title: "Resend code" }, { id: "CANCEL", title: "Cancel" }],
           stateOverride: "VERIFYING_CUSTOMER",
           contextPatchOverride: {
             pvHmac: challenge.hmac, pvExpiresAt: challenge.expiresAt, pvPhone: normalCustomerPhone, pvMasked: masked,
+            pvNew: isNewCustomer,
             pcName: customerName, pcAmount: amount, pcDue: dueInMinutes, pcReminders: remindersEnabled,
           },
         };
       }
 
-      // No verification needed: brand-new customer, or a repeat at this shop.
+      // No verification needed: a repeat customer at this shop.
       const generatedCustomerId = await nextVendorCustomerId(vendorId, vendor?.businessName ?? "Customer");
       let customer = existingCustomer;
       if (existingCustomer) {
@@ -793,7 +805,20 @@ async function runSideEffect(
         where: { id: vendorId },
         select: { businessName: true, communityId: true, organizationId: true, branchId: true },
       });
-      const customer = await prisma.student.findUnique({ where: { phone } });
+      let customer = await prisma.student.findUnique({ where: { phone } });
+      // A brand-new debtor has no record until their number is confirmed —
+      // create it now, verified.
+      if (!customer && vendor && sessionContext.pvNew === true) {
+        customer = await prisma.student.create({
+          data: {
+            fullName: String(sessionContext.pcName ?? "Customer"),
+            phone,
+            matricNumber: await nextVendorCustomerId(vendorId, vendor.businessName),
+            communityId: vendor.communityId ?? null,
+            organizationId: vendor.organizationId ?? null,
+          },
+        });
+      }
       if (!vendor || !customer) {
         return { replyOverride: "Sorry, I couldn't complete that. Please try *ADD* again.", buttonsOverride: [{ id: "ADD", title: "Try again" }] as WhatsAppButton[], stateOverride: "IDLE", contextPatchOverride: { ...CLEAR_PENDING_VERIFY } };
       }
@@ -839,20 +864,86 @@ async function runSideEffect(
         return { replyOverride: "That request expired. Please start again with *ADD*.", buttonsOverride: [{ id: "ADD", title: "Add credit" }] as WhatsAppButton[], stateOverride: "IDLE", contextPatchOverride: { ...CLEAR_PENDING_VERIFY } };
       }
       const vendor = await prisma.vendor.findUnique({ where: { id: vendorId ?? "" }, select: { businessName: true } });
+      const resendButtons: WhatsAppButton[] = sessionContext.pvNew === true
+        ? [{ id: "RESEND", title: "Resend code" }, { id: "SKIP_VERIFY", title: "Save without code" }, { id: "CANCEL", title: "Cancel" }]
+        : [{ id: "RESEND", title: "Resend code" }, { id: "CANCEL", title: "Cancel" }];
       try {
         const challenge = await sendCustomerVerification({ phone, storeName: vendor?.businessName ?? "the shop" });
         return {
           replyOverride: challenge.channel === "whatsapp"
             ? messages.verifyResent(maskPhone(phone))
             : messages.verifyCantReach(maskPhone(phone)),
-          buttonsOverride: [{ id: "RESEND", title: "Resend code" }, { id: "CANCEL", title: "Cancel" }],
+          buttonsOverride: resendButtons,
           stateOverride: "VERIFYING_CUSTOMER",
           contextPatchOverride: { pvHmac: challenge.hmac, pvExpiresAt: challenge.expiresAt },
         };
       } catch (err) {
         console.error("[whatsapp] resend verification failed:", err);
-        return { replyOverride: messages.verifyDeliveryFailed(), buttonsOverride: [{ id: "CANCEL", title: "Cancel" }], stateOverride: "VERIFYING_CUSTOMER" };
+        return { replyOverride: messages.verifyDeliveryFailed(), buttonsOverride: resendButtons.slice(1), stateOverride: "VERIFYING_CUSTOMER" };
       }
+    }
+
+    case "SKIP_VERIFY": {
+      // Save without the customer's code — offered ONLY for a brand-new
+      // debtor. Re-checked here (never trusted from the button id alone): an
+      // existing customer's shared record must not be joinable code-free.
+      if (!vendorId) return { replyOverride: messages.noVendorAccount() };
+      if (sessionContext.pvNew !== true) {
+        return {
+          replyOverride: messages.verifyBadCode(),
+          buttonsOverride: [{ id: "RESEND", title: "Resend code" }, { id: "CANCEL", title: "Cancel" }] as WhatsAppButton[],
+          stateOverride: "VERIFYING_CUSTOMER",
+        };
+      }
+      const phone = String(sessionContext.pvPhone ?? "");
+      const vendor = await prisma.vendor.findUnique({
+        where: { id: vendorId },
+        select: { businessName: true, communityId: true, organizationId: true, branchId: true },
+      });
+      if (!phone || !vendor) {
+        return { replyOverride: "That request expired. Please start again with *ADD*.", buttonsOverride: [{ id: "ADD", title: "Add credit" }] as WhatsAppButton[], stateOverride: "IDLE", contextPatchOverride: { ...CLEAR_PENDING_VERIFY } };
+      }
+
+      // The number may have been claimed since the flow started — re-check
+      // rather than blindly create (unique constraint on phone).
+      let customer = await prisma.student.findUnique({ where: { phone } });
+      if (!customer) {
+        customer = await prisma.student.create({
+          data: {
+            fullName: String(sessionContext.pcName ?? "Customer"),
+            phone,
+            matricNumber: await nextVendorCustomerId(vendorId, vendor.businessName),
+            communityId: vendor.communityId ?? null,
+            organizationId: vendor.organizationId ?? null,
+          },
+        });
+      }
+
+      const amount = Number(sessionContext.pcAmount ?? 0);
+      const dueInMinutes = Number(sessionContext.pcDue ?? 0);
+      const remindersEnabled = sessionContext.pcReminders !== false;
+      await finalizeCredit({
+        vendorId,
+        vendor: { organizationId: vendor.organizationId, branchId: vendor.branchId },
+        studentId: customer.id,
+        customerName: customer.fullName,
+        amount,
+        dueInMinutes,
+        remindersEnabled,
+      });
+
+      const confirm = messages.addCreditConfirmed(
+        customer.fullName,
+        amount,
+        friendlyDueText(dueInMinutes),
+        remindersEnabled ? reminderPromiseForDue(dueInMinutes) : messages.noReminderPromise(),
+      );
+      return {
+        replyOverride: `${messages.savedUnverified()}\n\n${confirm}`,
+        buttonsOverride: ADD_AGAIN_BUTTONS,
+        stateOverride: "IDLE",
+        contextPatchOverride: { ...CLEAR_PENDING_VERIFY },
+      };
     }
 
     case "CREATE_INVOICE": {

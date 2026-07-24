@@ -41,6 +41,33 @@ export function normaliseTemplateName(name: string): string | null {
   return isValidTemplateName(coerced) ? coerced : null;
 }
 
+/**
+ * The template the admin console creates when none is configured. Because
+ * resolution falls back to this name, "create the template" in the admin is
+ * ALL the setup OTP needs — no env change, no redeploy.
+ */
+export const DEFAULT_OTP_TEMPLATE_NAME = "vodium_otp";
+
+/**
+ * The template name OTP sends will use: the env override when it's usable
+ * (coerced into Meta's format if written loosely, e.g. "Vodium Ledger" →
+ * "vodium_ledger"), else the platform default.
+ */
+export function resolveConfiguredTemplateName(): string {
+  const configured = process.env.WHATSAPP_OTP_TEMPLATE_NAME;
+  if (!configured) return DEFAULT_OTP_TEMPLATE_NAME;
+  if (isValidTemplateName(configured)) return configured;
+  const coerced = normaliseTemplateName(configured);
+  if (!coerced) {
+    console.warn(
+      `[otp] WHATSAPP_OTP_TEMPLATE_NAME is "${configured}", which cannot be a Meta template name — ` +
+      `using the platform default "${DEFAULT_OTP_TEMPLATE_NAME}" instead.`,
+    );
+    return DEFAULT_OTP_TEMPLATE_NAME;
+  }
+  return coerced;
+}
+
 export type OtpChannel = "whatsapp" | "console";
 
 export async function sendOtpCode(input: {
@@ -53,34 +80,11 @@ export async function sendOtpCode(input: {
 
   if (hasVodiumWa) {
     // 1) Approved OTP template (the only path that reaches a number with no
-    // open 24-hour session — i.e. any first-time customer).
-    const template = process.env.WHATSAPP_OTP_TEMPLATE_NAME;
+    // open 24-hour session — i.e. any first-time customer). Falls back to the
+    // platform default name, which the admin console can create in one click.
+    const templateName = resolveConfiguredTemplateName();
 
-    // A name that isn't in Meta's format can still be salvageable: "Vodium
-    // Ledger" becomes "vodium_ledger", which may well be the real template.
-    // Try that rather than refusing outright — but say loudly what happened,
-    // because the env var is still wrong and should be corrected at source.
-    let templateName = template;
-    if (template && !isValidTemplateName(template)) {
-      const coerced = normaliseTemplateName(template);
-      if (coerced) {
-        console.warn(
-          `[otp] WHATSAPP_OTP_TEMPLATE_NAME is "${template}", which is not a valid Meta template ` +
-          `name — trying "${coerced}" instead. Set the env var to the template's exact name ` +
-          `(WhatsApp Manager → Message Templates → Name column) to remove this guess.`,
-        );
-        templateName = coerced;
-      } else {
-        console.error(
-          `[otp] WHATSAPP_OTP_TEMPLATE_NAME is "${template}", which cannot be a Meta template name ` +
-          `(expected lowercase letters, digits and underscores, e.g. "otp_code"). ` +
-          `Skipping the template path — first-time numbers will NOT receive codes until this is fixed.`,
-        );
-        templateName = undefined;
-      }
-    }
-
-    if (templateName) {
+    {
       const langs = [process.env.WHATSAPP_OTP_TEMPLATE_LANG, "en_US", "en"]
         .filter((v, i, a): v is string => Boolean(v) && a.indexOf(v) === i);
       const otpButton = process.env.WHATSAPP_OTP_TEMPLATE_BUTTON !== "false";
@@ -95,8 +99,8 @@ export async function sendOtpCode(input: {
           if (err instanceof WhatsAppSendError && err.code === 132001) {
             console.error(
               `[otp] template "${templateName}" does not exist in this WhatsApp account. ` +
-              `List the real names with: GET /v19.0/<WABA_ID>/message_templates — ` +
-              `then set WHATSAPP_OTP_TEMPLATE_NAME to one of them, or unset it.`,
+              `Create it from Admin → WhatsApp bot → "Create OTP template" (one click), ` +
+              `or set WHATSAPP_OTP_TEMPLATE_NAME to an existing template's exact name.`,
             );
             break;
           }

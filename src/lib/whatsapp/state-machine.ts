@@ -60,6 +60,7 @@ export type SideEffect =
   | { type: "SCORE_PREVIEW";  data: { customerName: string; customerPhone: string } }
   | { type: "VERIFY_CUSTOMER_CODE"; data: { vendorId: string; code: string } }
   | { type: "RESEND_CUSTOMER_CODE"; data: { vendorId: string } }
+  | { type: "SKIP_VERIFY"; data: { vendorId: string } }
   | { type: "SAVE_BANK";      data: { vendorId: string; bankName: string; accountNumber: string; accountName: string } }
   | { type: "MARK_PAID";      data: { vendorId: string; customerName: string } }
   | { type: "CONFIRM_PAID";   data: { vendorId: string; creditId: string } }
@@ -357,12 +358,22 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
     }
 
     case "VERIFYING_CUSTOMER": {
-      // Vendor is entering the code we sent to an existing customer's WhatsApp.
+      // Vendor is entering the code we sent to the customer's WhatsApp.
       if (upperBody === "RESEND" || upperBody === "RESEND CODE") {
         return {
           reply: "Sending a new code…",
           nextState: "VERIFYING_CUSTOMER",
           sideEffects: [{ type: "RESEND_CUSTOMER_CODE", data: { vendorId: session.vendorId! } }],
+        };
+      }
+      // Saving without the code is only offered for BRAND-NEW debtors (the
+      // side effect re-checks pvNew; an existing customer's shared record is
+      // never joinable without their code).
+      if (upperBody === "SKIP_VERIFY" || upperBody === "SAVE WITHOUT CODE") {
+        return {
+          reply: "Saving…",
+          nextState: "VERIFYING_CUSTOMER",
+          sideEffects: [{ type: "SKIP_VERIFY", data: { vendorId: session.vendorId! } }],
         };
       }
       const code = body.replace(/\D/g, "");

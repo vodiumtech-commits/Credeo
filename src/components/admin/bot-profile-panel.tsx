@@ -1,13 +1,108 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { MessageCircle, Loader2, Check, AlertTriangle, ImageUp } from "lucide-react";
+import { MessageCircle, Loader2, Check, AlertTriangle, ImageUp, KeyRound } from "lucide-react";
 
 interface LiveProfile {
   about?: string;
   email?: string;
   profile_picture_url?: string;
   websites?: string[];
+}
+
+interface OtpTemplateState {
+  configured: boolean;
+  resolvedName: string;
+  active?: { name: string; status: string; language: string };
+  detail?: string;
+}
+
+/**
+ * One-click setup for the Meta OTP template — without it, verification codes
+ * only reach customers who have already messaged the bot (Meta's 24h rule).
+ */
+export function OtpTemplatePanel() {
+  const [state, setState] = useState<OtpTemplateState | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const load = () =>
+    fetch("/api/admin/whatsapp-otp-template")
+      .then((r) => r.json())
+      .then(setState)
+      .catch(() => {});
+  useEffect(() => { load(); }, []);
+
+  async function create() {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/admin/whatsapp-otp-template", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Could not create the template");
+      setState(data);
+      setMsg({
+        ok: true,
+        text: data.created
+          ? `Template "${data.resolvedName}" submitted — Meta usually approves it within minutes. OTP delivery starts automatically once approved.`
+          : `Template "${data.active?.name}" already exists (${data.active?.status}). Nothing changed.`,
+      });
+    } catch (err) {
+      setMsg({ ok: false, text: err instanceof Error ? err.message : "Something went wrong" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const status = state?.active?.status;
+  const badge =
+    status === "APPROVED" ? { cls: "bg-emerald-500/10 border-emerald-500/25 text-emerald-300", label: "Approved — OTP delivery is live" }
+    : status === "PENDING" ? { cls: "bg-amber-500/10 border-amber-500/25 text-amber-300", label: "Pending Meta approval (usually minutes)" }
+    : status ? { cls: "bg-rose-500/10 border-rose-500/25 text-rose-300", label: `Status: ${status}` }
+    : { cls: "bg-rose-500/10 border-rose-500/25 text-rose-300", label: "Not created — first-time customers can't receive codes" };
+
+  return (
+    <div className="rounded-2xl border border-white/[0.06] bg-vodium-charcoal p-5 md:p-6">
+      <div className="flex items-center gap-2 mb-1">
+        <KeyRound size={16} className="text-vodium-gold" />
+        <h3 className="text-sm font-semibold text-vodium-cream">OTP delivery template</h3>
+      </div>
+      <p className="text-xs text-vodium-cream/40 mb-4">
+        Meta requires an approved template to deliver verification codes to customers who have never
+        messaged the bot. One click creates it; approval is automatic on Meta&rsquo;s side.
+      </p>
+
+      <div className={`rounded-lg border px-3 py-2 mb-4 text-xs ${badge.cls}`}>
+        {badge.label}
+        {state?.resolvedName ? <span className="opacity-60"> · using &ldquo;{state.resolvedName}&rdquo;</span> : null}
+      </div>
+
+      {state?.detail && !state.active && (
+        <div className="flex items-start gap-2 rounded-lg px-3 py-2 mb-3 text-xs bg-rose-500/10 border border-rose-500/20 text-rose-300">
+          <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+          <span>{state.detail}</span>
+        </div>
+      )}
+
+      {msg && (
+        <div className={`flex items-start gap-2 rounded-lg px-3 py-2 mb-3 text-xs ${msg.ok ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-300" : "bg-rose-500/10 border border-rose-500/20 text-rose-300"}`}>
+          {msg.ok ? <Check size={13} className="mt-0.5 shrink-0" /> : <AlertTriangle size={13} className="mt-0.5 shrink-0" />}
+          <span>{msg.text}</span>
+        </div>
+      )}
+
+      {status !== "APPROVED" && (
+        <button
+          onClick={create}
+          disabled={busy || !state?.configured}
+          className="btn-gold inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs disabled:opacity-50"
+        >
+          {busy ? <Loader2 size={13} className="animate-spin" /> : <KeyRound size={13} />}
+          {status === "PENDING" ? "Refresh status" : "Create OTP template"}
+        </button>
+      )}
+    </div>
+  );
 }
 
 /**

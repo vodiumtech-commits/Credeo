@@ -72,6 +72,8 @@ export default function NewCreditPage() {
   // Set when the code could NOT be delivered (customer has never messaged the
   // bot) — the verify step must say so instead of claiming "we sent a code".
   const [deliveryHint, setDeliveryHint] = useState<string | null>(null);
+  // New debtors (no existing Vodium record) may be saved without the code.
+  const [allowSkip, setAllowSkip] = useState(false);
 
   function update(f: keyof typeof form, v: string) {
     setForm((p) => ({ ...p, [f]: v }));
@@ -165,7 +167,7 @@ export default function NewCreditPage() {
           ? 3
           : 3;
 
-  async function submitCredit(verificationCode?: string) {
+  async function submitCredit(verificationCode?: string, skipVerification?: boolean) {
     setLoading(true);
     setError(null);
     try {
@@ -182,6 +184,7 @@ export default function NewCreditPage() {
           description: form.description || undefined,
           dueDate: dueDateTime.toISOString(),
           ...(verificationCode ? { verificationCode } : {}),
+          ...(skipVerification ? { skipVerification: true } : {}),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -192,6 +195,7 @@ export default function NewCreditPage() {
         setMaskedPhone(data.maskedPhone ?? "");
         setVerifyCode(data.debugCode ?? "");
         setDeliveryHint(data.delivered === false ? (data.deliveryHint ?? null) : null);
+        setAllowSkip(data.allowSkip === true);
         setStep("verify");
         return;
       }
@@ -717,6 +721,16 @@ export default function NewCreditPage() {
             >
               Didn&rsquo;t get it? Resend code
             </button>
+
+            {allowSkip && (
+              <button
+                onClick={() => submitCredit(undefined, true)}
+                disabled={loading}
+                className="w-full text-xs text-vodium-cream/35 hover:text-vodium-gold transition-colors disabled:opacity-40"
+              >
+                Can&rsquo;t reach the customer? Save without verification
+              </button>
+            )}
           </div>
         )}
 
