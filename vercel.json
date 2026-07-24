@@ -1,12 +1,30 @@
 {
+  "$comment": [
+    "Reminders run every 5 minutes because the bot offers 30-minute and 2-hour",
+    "credits, whose reminder lead times are 10 and 30 minutes. A daily cron",
+    "cannot deliver those at all: the reminder window opens and closes long",
+    "before the next run, and the credit then falls out of the pre-due query.",
+    "",
+    "5 minutes is the coarsest schedule that still lands inside a 10-minute",
+    "window. Per-day housekeeping (score decay, subscriptions) stays on its own",
+    "daily schedule so it is not re-run 288 times a day.",
+    "",
+    "NOTE: frequent crons require a Vercel Pro plan. On Hobby, Vercel caps cron",
+    "to once per day and this schedule will not fire as written — see the",
+    "external-scheduler fallback in the reminders route."
+  ],
   "crons": [
     {
-      "path": "/api/cron/subscriptions",
+      "path": "/api/cron/reminders",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/daily",
       "schedule": "0 1 * * *"
     },
     {
-      "path": "/api/cron/reminders",
-      "schedule": "0 8 * * *"
+      "path": "/api/cron/subscriptions",
+      "schedule": "0 1 * * *"
     }
   ]
 }

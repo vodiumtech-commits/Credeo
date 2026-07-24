@@ -13,6 +13,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 process.env.SESSION_SECRET = "test-session-secret";
 process.env.SECRET_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
@@ -136,6 +137,34 @@ test("INVARIANT unparseable input never silently drops a vendor out of a flow", 
 });
 
 // ── Invariant 3: reminders actually fire ─────────────────────────────────────
+
+test("INVARIANT the cron runs often enough to hit the shortest reminder window", () => {
+  // The bug this exists to prevent: reminders were scheduled once a day while
+  // the bot offered 30-minute credits (a 10-minute reminder window). The window
+  // opened and closed between runs, so short-dated credits were NEVER reminded —
+  // and once overdue they dropped out of the pre-due query entirely.
+  const vercelConfig = JSON.parse(
+    readFileSync(new URL("../vercel.json", import.meta.url), "utf8"),
+  ) as { crons: Array<{ path: string; schedule: string }> };
+
+  const reminders = vercelConfig.crons.find((c) => c.path === "/api/cron/reminders");
+  assert.ok(reminders, "the reminders cron must be scheduled at all");
+
+  // Only the every-N-minutes form can satisfy a sub-hour window.
+  const everyNMinutes = reminders!.schedule.match(/^\*\/(\d+) \* \* \* \*$/);
+  assert.ok(
+    everyNMinutes,
+    `reminders run on "${reminders!.schedule}" — anything less frequent than */N minutes cannot serve a 30-minute credit`,
+  );
+
+  const intervalMinutes = Number(everyNMinutes![1]);
+  // The shortest window the bot's own menu can produce: "30M" → 10-minute lead.
+  const shortestWindow = reminderLeadMinutesForDue(30);
+  assert.ok(
+    intervalMinutes <= shortestWindow,
+    `cron every ${intervalMinutes}m cannot land inside a ${shortestWindow}m window`,
+  );
+});
 
 test("INVARIANT a credit inside its window is always reminder-due", () => {
   // This is the "reminders stopped working" class of complaint, made testable.

@@ -1,7 +1,13 @@
 /**
  * GET /api/cron/reminders
  *
- * Called frequently by Vercel Cron (see vercel.json).
+ * Runs every 5 minutes (see vercel.json). It must be frequent: a 30-minute
+ * credit has a 10-minute reminder window, so a daily schedule would miss short
+ * credits entirely — the window opens and closes between runs and the credit
+ * then falls out of the pre-due query as soon as it is overdue.
+ *
+ * Per-day work (score decay) lives in /api/cron/daily so it is not repeated
+ * 288 times a day.
  * Finds every credit within its reminder window that hasn't been reminded yet,
  * sends a WhatsApp message to the student, and stamps reminderSentAt.
  *
@@ -13,7 +19,7 @@ import { prisma } from "@/lib/prisma";
 import { sendWhatsAppButtons, WhatsAppSendError } from "@/lib/whatsapp/outbound";
 import { messages, payToBlock } from "@/lib/whatsapp/messages";
 import { isReminderDue } from "@/lib/whatsapp/state-machine";
-import { applyDailyDefaultDecay, markOverdueCredits, sendOverdueReminders, sendEscalations } from "@/lib/credit-lifecycle";
+import { markOverdueCredits, sendOverdueReminders, sendEscalations } from "@/lib/credit-lifecycle";
 import { createReminderPrefResolver } from "@/lib/reminder-prefs";
 import { markOverdueInvoices, sendOverdueInvoiceReminders } from "@/lib/invoice-lifecycle";
 
@@ -39,7 +45,6 @@ export async function GET(req: NextRequest) {
   const now = new Date();
   const maxLookahead = new Date(now.getTime() + MAX_REMINDER_LOOKAHEAD_MINUTES * 60_000);
   const overdueLifecycle = await markOverdueCredits({ now });
-  const defaultDecay = await applyDailyDefaultDecay({ now });
   const overdueReminders = await sendOverdueReminders({ now });
   // Firmer follow-up to anyone who ignored a reminder ≥2h ago (once per credit).
   const escalations = await sendEscalations({ now });
@@ -201,7 +206,6 @@ export async function GET(req: NextRequest) {
     skipped: { preDue: skipped, overdue: overdueReminders.skipped, invoices: invoiceReminders.skipped },
     overdue: overdueLifecycle,
     invoices: { marked: overdueInvoices.marked, reminders: invoiceReminders },
-    defaultDecay,
     overdueReminders: {
       sent: overdueReminders.sent,
       failed: overdueReminders.failed,
