@@ -44,17 +44,41 @@ function creds() {
   };
 }
 
+/**
+ * Turn Meta's error responses into instructions a non-Meta-expert can act on.
+ * The raw error is always logged server-side for the full picture.
+ */
+function explainMetaError(status: number, error?: { code?: number; message?: string }): string {
+  const code = error?.code;
+  if (code === 190) {
+    return "The WhatsApp access token is invalid or expired. Generate a new system-user token in Meta Business Settings and update WHATSAPP_ACCESS_TOKEN in Vercel, then redeploy.";
+  }
+  if (code === 200 || code === 10 || code === 3) {
+    return "The access token lacks permission. Regenerate it with BOTH whatsapp_business_messaging and whatsapp_business_management ticked — and make sure the system user has the WhatsApp account added under its Assets (Business Settings → System users → Add assets).";
+  }
+  if (code === 100) {
+    return `Meta rejected the request (#100 ${error?.message ?? "Invalid parameter"}). If the token is new, confirm the system user has the WhatsApp account asset assigned.`;
+  }
+  return error?.message ?? `Meta returned HTTP ${status}.`;
+}
+
 /** The WABA that owns the phone number — resolved once via the phone-number node. */
-async function getWabaId(token: string, phoneId: string): Promise<string | null> {
+async function getWabaId(token: string, phoneId: string): Promise<{ id: string } | { error: string }> {
   const preset = creds().wabaId;
-  if (preset) return preset;
+  if (preset) return { id: preset };
   const res = await fetch(
     `${GRAPH}/${phoneId}?fields=whatsapp_business_account`,
     { headers: { Authorization: `Bearer ${token}` } },
   );
-  if (!res.ok) return null;
-  const json = (await res.json()) as { whatsapp_business_account?: { id?: string } };
-  return json.whatsapp_business_account?.id ?? null;
+  const json = (await res.json().catch(() => ({}))) as {
+    whatsapp_business_account?: { id?: string };
+    error?: { code?: number; message?: string };
+  };
+  if (!res.ok || !json.whatsapp_business_account?.id) {
+    console.error("[otp-template] WABA lookup failed:", res.status, JSON.stringify(json.error ?? json));
+    return { error: explainMetaError(res.status, json.error) };
+  }
+  return { id: json.whatsapp_business_account.id };
 }
 
 /** All message templates on the account (name, status, language, category). */
@@ -66,24 +90,22 @@ export async function listOtpTemplates(): Promise<OtpTemplateStatus> {
     return { configured: false, resolvedName, templates: [], detail: "No WhatsApp credentials configured (dev)." };
   }
 
-  const wabaId = await getWabaId(token, phoneId);
-  if (!wabaId) {
-    return {
-      configured: true, resolvedName, templates: [],
-      detail: "Could not resolve the WhatsApp Business Account from this phone number — the access token may lack the whatsapp_business_management permission.",
-    };
+  const waba = await getWabaId(token, phoneId);
+  if ("error" in waba) {
+    return { configured: true, resolvedName, templates: [], detail: waba.error };
   }
 
   const res = await fetch(
-    `${GRAPH}/${wabaId}/message_templates?fields=name,status,language,category&limit=100`,
+    `${GRAPH}/${waba.id}/message_templates?fields=name,status,language,category&limit=100`,
     { headers: { Authorization: `Bearer ${token}` } },
   );
-  const json = (await res.json()) as {
+  const json = (await res.json().catch(() => ({}))) as {
     data?: Array<{ name: string; status: string; language: string; category: string }>;
-    error?: { message?: string };
+    error?: { code?: number; message?: string };
   };
   if (!res.ok) {
-    return { configured: true, resolvedName, templates: [], detail: json.error?.message ?? `HTTP ${res.status}` };
+    console.error("[otp-template] template list failed:", res.status, JSON.stringify(json.error ?? json));
+    return { configured: true, resolvedName, templates: [], detail: explainMetaError(res.status, json.error) };
   }
 
   const templates = (json.data ?? []).map((t) => ({
@@ -104,10 +126,10 @@ export async function ensureOtpTemplate(): Promise<OtpTemplateStatus & { created
   if (current.active) return { ...current, created: false };
 
   const { token, phoneId } = creds();
-  const wabaId = await getWabaId(token!, phoneId!);
-  if (!wabaId) return { ...current, created: false, detail: "Could not resolve the WhatsApp Business Account." };
+  const waba = await getWabaId(token!, phoneId!);
+  if ("error" in waba) return { ...current, created: false, detail: waba.error };
 
-  const res = await fetch(`${GRAPH}/${wabaId}/message_templates`, {
+  const res = await fetch(`${GRAPH}/${waba.id}/message_templates`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -123,9 +145,16 @@ export async function ensureOtpTemplate(): Promise<OtpTemplateStatus & { created
       ],
     }),
   });
-  const json = (await res.json()) as { id?: string; status?: string; error?: { message?: string; error_user_msg?: string } };
+  const json = (await res.json().catch(() => ({}))) as {
+    id?: string; status?: string;
+    error?: { code?: number; message?: string; error_user_msg?: string };
+  };
   if (!res.ok) {
-    return { ...current, created: false, detail: json.error?.error_user_msg ?? json.error?.message ?? `HTTP ${res.status}` };
+    console.error("[otp-template] template create failed:", res.status, JSON.stringify(json.error ?? json));
+    return {
+      ...current, created: false,
+      detail: json.error?.error_user_msg ?? explainMetaError(res.status, json.error),
+    };
   }
 
   const refreshed = await listOtpTemplates();

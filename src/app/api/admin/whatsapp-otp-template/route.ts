@@ -26,6 +26,9 @@ export async function POST() {
 
   const result = await ensureOtpTemplate();
   if (result.detail && !result.active) {
+    // Log server-side too — a 502 with "no logs for this request" is
+    // undiagnosable from the Vercel dashboard.
+    console.error("[admin/otp-template] setup failed:", result.detail);
     return NextResponse.json({ error: result.detail, ...result }, { status: 502 });
   }
   return NextResponse.json(result);
