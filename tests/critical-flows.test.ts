@@ -319,3 +319,36 @@ test("INVARIANT a credit inside its window is always reminder-due", () => {
     assert.ok(reminderLeadMinutesForDue(window) > 0, `lead time collapsed to 0 for a ${window}-minute credit`);
   }
 });
+
+/**
+ * Every path that sends a customer a WhatsApp reminder must skip numbers Meta
+ * has flagged permanently undeliverable, and must record new ones.
+ *
+ * This is a real regression, not a hypothetical: `sendOverdueReminders` was the
+ * one sender missing both halves, so a single unreachable customer failed on
+ * every 5-minute cron run indefinitely — burning Meta quota and masking real
+ * failures behind a permanent `failed=1`.
+ */
+test("every reminder sender skips and records unreachable numbers", () => {
+  const lifecycle = readFileSync("src/lib/credit-lifecycle.ts", "utf8");
+  const preDue = readFileSync("src/app/api/cron/reminders/route.ts", "utf8");
+
+  // Both senders in credit-lifecycle (overdue + escalation) plus the pre-due
+  // route filter blocked customers out of their query.
+  const filters = lifecycle.match(/whatsappBlockedAt:\s*null/g) ?? [];
+  assert.equal(filters.length, 2, "overdue AND escalation must filter blocked customers");
+  assert.match(preDue, /whatsappBlockedAt:\s*null/, "pre-due reminders must filter blocked customers");
+
+  // ...and each records a newly-discovered permanent failure so it is skipped
+  // next run. Three senders, three writes.
+  const writes = (lifecycle.match(/whatsappBlockedAt:\s*now/g) ?? []).length
+    + (preDue.match(/whatsappBlockedAt:\s*now/g) ?? []).length;
+  assert.equal(writes, 3, "each reminder sender must record permanent failures");
+
+  // The permanent-failure branch is what drives it — a plain catch that only
+  // counts failures would satisfy the checks above but still retry forever.
+  assert.equal(
+    (lifecycle.match(/err\.permanent/g) ?? []).length, 2,
+    "both lifecycle senders must branch on WhatsAppSendError.permanent",
+  );
+});

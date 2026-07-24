@@ -3,6 +3,7 @@ import { sendWhatsAppMessage, WhatsAppSendError } from "@/lib/whatsapp/outbound"
 import { getOrgChannelCredentials, type ChannelCredentials } from "@/lib/whatsapp/channel-token";
 import { createReminderPrefResolver } from "@/lib/reminder-prefs";
 import { messages, payToBlock } from "@/lib/whatsapp/messages";
+import { maskPhone } from "@/lib/customer-verify-token";
 
 const DEFAULT_SCORE_DELTA = -80;
 const OVERDUE_REMINDER_INTERVAL_MS = 3 * 86_400_000;
@@ -169,7 +170,13 @@ export async function sendOverdueReminders(scope: LifecycleScope & { force?: boo
         ? {}
         : { OR: [{ overdueReminderSentAt: null }, { overdueReminderSentAt: { lte: cutoff } }] }),
       remindersEnabled: true, // vendor opted out of messaging this customer otherwise
-      student: { NOT: { phone: { startsWith: "pending:" } } },
+      student: {
+        NOT: { phone: { startsWith: "pending:" } },
+        // ...and skip anyone Meta has told us is permanently undeliverable.
+        // Without this the same unreachable customer is retried every 5
+        // minutes forever — the pre-due path has always filtered on it.
+        whatsappBlockedAt: null,
+      },
     },
     include: { student: true, vendor: true },
     orderBy: { dueDate: "asc" },
@@ -177,6 +184,7 @@ export async function sendOverdueReminders(scope: LifecycleScope & { force?: boo
 
   let sent = 0;
   let failed = 0;
+  let blocked = 0;
   const vendorSentCount: Record<string, number> = {};
   const grouped = new Map<string, {
     creditIds: string[];
@@ -254,12 +262,43 @@ export async function sendOverdueReminders(scope: LifecycleScope & { force?: boo
       vendorSentCount[item.vendor.id] = (vendorSentCount[item.vendor.id] ?? 0) + 1;
       sent++;
     } catch (err) {
-      console.error(`[overdue-reminders] failed for customer ${item.student.id}:`, err);
+      const code = err instanceof WhatsAppSendError ? err.code : undefined;
+      console.error(
+        `[overdue-reminders] failed for customer ${item.student.id} ` +
+        `(${maskPhone(item.student.phone)}${code ? `, Meta code ${code}` : ""}):`,
+        err instanceof Error ? err.message : err,
+      );
       failed++;
+
+      // Permanent means this number will never receive a message — blocked, or
+      // not on WhatsApp. Record it so the next run skips them, and tell the
+      // vendor, who can still chase the debt in person. Mirrors the pre-due
+      // reminder path; without it this loop retried the same number forever.
+      if (err instanceof WhatsAppSendError && err.permanent) {
+        blocked++;
+        await prisma.student
+          .update({ where: { id: item.student.id }, data: { whatsappBlockedAt: now } })
+          .catch(() => {});
+        await prisma.credit
+          .updateMany({ where: { id: { in: item.creditIds } }, data: { overdueReminderSentAt: now } })
+          .catch(() => {});
+        await prisma.notification
+          .create({
+            data: {
+              vendorId: item.vendor.id,
+              title: "Customer unreachable on WhatsApp",
+              message:
+                `We couldn't deliver an overdue reminder to ${item.student.fullName} — they may have ` +
+                `blocked the Vodium number or it isn't on WhatsApp. Please follow up directly.`,
+              type: "WARNING",
+            },
+          })
+          .catch(() => {});
+      }
     }
   }
 
-  return { sent, failed, skipped, total: grouped.size, vendorSentCount };
+  return { sent, failed, skipped, blocked, total: grouped.size, vendorSentCount };
 }
 
 /**
@@ -328,6 +367,11 @@ export async function sendEscalations(scope: LifecycleScope = {}) {
       // A blocked / unreachable number: stop escalating and record it, same as
       // the pre-due path, so we never retry a dead number.
       if (err instanceof WhatsAppSendError && err.permanent) {
+        // Say so — auto-blacklisting a customer silently makes "why did they
+        // stop getting reminders?" unanswerable from the logs.
+        console.warn(
+          `[escalations] ${maskPhone(credit.student.phone)} unreachable (Meta code ${err.code ?? "?"}) — marking blocked`,
+        );
         await prisma.student.update({ where: { id: credit.student.id }, data: { whatsappBlockedAt: now } }).catch(() => {});
         await prisma.credit.update({ where: { id: credit.id }, data: { escalatedAt: now } }).catch(() => {});
       } else {
