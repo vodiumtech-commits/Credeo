@@ -208,13 +208,51 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
       };
     }
 
-    case "ADDING_CREDIT_STUDENT":
+    case "ADDING_CREDIT_STUDENT": {
+      // Vendors often paste the ENTIRE command at this step ("ADD Chidi
+      // 0803… 2500 7d"). Parse it as one instead of saving the whole line as
+      // the customer's name — production had customers literally named
+      // "David +234 815 977 8234 4500 30m", and reminders greeted them so.
+      const pasted = parseQuickCredit(body);
+      if (pasted) {
+        return {
+          reply: messages.addCreditConfirmBeforeSave(
+            pasted.customerName,
+            pasted.customerPhone,
+            pasted.amount,
+            friendlyDueText(pasted.dueInMinutes),
+          ),
+          nextState: "ADDING_CREDIT_REMINDER",
+          contextPatch: {
+            creditCustomerName: pasted.customerName,
+            creditCustomerPhone: pasted.customerPhone,
+            creditAmount: pasted.amount,
+            creditDueMinutes: pasted.dueInMinutes,
+          },
+          buttons: REMINDER_BUTTONS,
+        };
+      }
+
+      // A bare "ADD Lekan" reaching this step means the command word leaked —
+      // strip it. And a "name" carrying a phone number's worth of digits isn't
+      // a name; asking again beats polluting the ledger.
+      const name = body.replace(/^(ADD|NEW|CREDIT)\s+/i, "").replace(/\s+/g, " ").trim();
+      const digitCount = (name.match(/\d/g) ?? []).length;
+      if (name.length < 2 || name.length > 60 || digitCount >= 7) {
+        return {
+          reply: messages.addCreditNameLooksWrong(),
+          nextState: "ADDING_CREDIT_STUDENT",
+          buttons: CANCEL_BUTTON,
+        };
+      }
+
       return {
-        reply: messages.addCreditAskPhone(body),
+        reply: messages.addCreditAskPhone(name),
         nextState: "ADDING_CREDIT_PHONE",
-        contextPatch: { creditCustomerName: body },
+        contextPatch: { creditCustomerName: name },
         buttons: CANCEL_BUTTON,
       };
+    }
 
     case "ADDING_CREDIT_PHONE": {
       // Very basic phone validation: at least 7 digits
@@ -658,9 +696,50 @@ export interface QuickCredit {
  * Returns null when the message isn't a complete one-shot (the caller then
  * falls back to the guided flow), so a bare "ADD" still works as before.
  */
+/**
+ * Vendors paste numbers the way their phone displays them: "+234 815 977 8234",
+ * "+1 (229) 672-8093". Split on whitespace those become 3–4 tokens, none with
+ * enough digits to look like a phone — so the whole parse failed and the bot
+ * fell back to asking step by step, where the vendor (reasonably) pasted the
+ * entire command again and it was saved verbatim as the customer's NAME.
+ * Production has customers literally named "David +234 815 977 8234 4500 30m".
+ *
+ * This walks the token list and joins consecutive digit-fragments into one
+ * phone token. It stops once a plausible phone is complete (≥10 digits) and the
+ * next fragment would overshoot E.164's 15-digit cap — that next fragment is
+ * the amount, not more phone.
+ */
+export function mergePhoneFragments(tokens: string[]): string[] {
+  const isFragment = (t: string) => /^[+(]?\d[\d()-]*$/.test(t);
+  const out: string[] = [];
+  for (let i = 0; i < tokens.length; i++) {
+    if (isFragment(tokens[i])) {
+      let merged = tokens[i];
+      let digits = tokens[i].replace(/\D/g, "").length;
+      let j = i + 1;
+      while (j < tokens.length && isFragment(tokens[j]) && !tokens[j].startsWith("+")) {
+        // 10+ digits is already a complete phone (NG local is 11, E.164 min 10)
+        // — the next digit-run is the amount, not more phone. Without this stop
+        // "08012345678 2500" merges into one 15-digit "phone".
+        if (digits >= 10) break;
+        merged += tokens[j];
+        digits += tokens[j].replace(/\D/g, "").length;
+        j++;
+      }
+      if (j > i + 1 && digits >= 7 && digits <= 15) {
+        out.push(merged);
+        i = j - 1;
+        continue;
+      }
+    }
+    out.push(tokens[i]);
+  }
+  return out;
+}
+
 export function parseQuickCredit(input: string): QuickCredit | null {
   const body = input.trim().replace(/^(ADD|NEW|CREDIT)\s+/i, "");
-  const tokens = body.split(/\s+/).filter(Boolean);
+  const tokens = mergePhoneFragments(body.split(/\s+/).filter(Boolean));
   if (tokens.length < 3) return null; // needs at least name + phone + amount
 
   // Due date: only if the LAST token looks like a duration/date, never a bare
@@ -675,8 +754,11 @@ export function parseQuickCredit(input: string): QuickCredit | null {
   }
   if (tokens.length < 3) return null;
 
-  // Amount is the last remaining token.
-  const amount = parseAmount(tokens[tokens.length - 1]);
+  // Amount is the last remaining token. A token with 7+ digits is a phone that
+  // ended up last (e.g. no amount given) — never read it as ₦8-billion.
+  const amountToken = tokens[tokens.length - 1];
+  if (amountToken.replace(/\D/g, "").length >= 7) return null;
+  const amount = parseAmount(amountToken);
   if (!amount) return null;
   tokens.pop();
 

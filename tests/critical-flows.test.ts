@@ -23,6 +23,7 @@ import {
   step,
   detectIntent,
   parseAmount,
+  parseQuickCredit,
   parseDueDuration,
   isReminderDue,
   reminderLeadMinutesForDue,
@@ -351,4 +352,81 @@ test("every reminder sender skips and records unreachable numbers", () => {
     (lifecycle.match(/err\.permanent/g) ?? []).length, 2,
     "both lifecycle senders must branch on WhatsAppSendError.permanent",
   );
+});
+
+// ── Real production failures: pasted phone numbers and polluted names ────────
+//
+// Vendors paste numbers the way their phone shows them ("+234 815 977 8234").
+// That parse used to fail, the bot fell back to asking step by step, and the
+// vendor pasted the whole command again — which was saved VERBATIM as the
+// customer's name. Production had customers named
+// "David  +234 815 977 8234  4500  30m", and reminders greeted them so.
+
+test("one-shot ADD handles phone numbers pasted with spaces and punctuation", () => {
+  const spaced = parseQuickCredit("ADD David +234 815 977 8234 4500 30m");
+  assert.ok(spaced, "spaced NG number must parse");
+  assert.equal(spaced!.customerName, "David");
+  assert.equal(spaced!.customerPhone, "+2348159778234");
+  assert.equal(spaced!.amount, 4500);
+  assert.equal(spaced!.dueInMinutes, 30);
+
+  const punct = parseQuickCredit("ADD Clement Isaac +1 (229) 672-8093 2500 7d");
+  assert.ok(punct, "parenthesised US number must parse");
+  assert.equal(punct!.customerName, "Clement Isaac");
+  assert.equal(punct!.customerPhone, "+1(229)672-8093");
+  assert.equal(punct!.amount, 2500);
+
+  // Unspaced input keeps working exactly as before.
+  const plain = parseQuickCredit("add Chidi Okeke 08012345678 2500 7d");
+  assert.ok(plain);
+  assert.equal(plain!.customerPhone, "08012345678");
+  assert.equal(plain!.customerName, "Chidi Okeke");
+});
+
+test("a phone number is never misread as a ₦-billions amount", () => {
+  // No amount given — the merged phone is the last token. Reject, don't
+  // book ₦12,296,728,093 on someone's ledger.
+  assert.equal(parseQuickCredit("ADD Clement Isaac +1 (229) 672-8093 30M"), null);
+  assert.equal(parseQuickCredit("ADD Bola 0803 123 4567"), null);
+});
+
+test("the name step never saves a pasted command as the customer's name", () => {
+  // Full command pasted at the "who took the credit?" prompt → parsed as one,
+  // straight to the confirm step.
+  const pasted = send("ADDING_CREDIT_STUDENT", {}, "ADD Chidi Okeke 08012345678 2500 7d");
+  assert.equal(pasted.nextState, "ADDING_CREDIT_REMINDER");
+  assert.equal(pasted.contextPatch?.creditCustomerName, "Chidi Okeke");
+  assert.equal(pasted.contextPatch?.creditCustomerPhone, "08012345678");
+
+  // A leaked command word is stripped — "ADD Lekan" is a customer called Lekan.
+  const leaked = send("ADDING_CREDIT_STUDENT", {}, "ADD Lekan");
+  assert.equal(leaked.nextState, "ADDING_CREDIT_PHONE");
+  assert.equal(leaked.contextPatch?.creditCustomerName, "Lekan");
+
+  // A "name" carrying a phone number's worth of digits is re-asked, not saved.
+  const garbage = send("ADDING_CREDIT_STUDENT", {}, "Clement Isaac +1 (229) 672-8093 30M");
+  assert.equal(garbage.nextState, "ADDING_CREDIT_STUDENT");
+
+  // An ordinary name still flows through untouched.
+  const ok = send("ADDING_CREDIT_STUDENT", {}, "Chidi Okeke");
+  assert.equal(ok.nextState, "ADDING_CREDIT_PHONE");
+  assert.equal(ok.contextPatch?.creditCustomerName, "Chidi Okeke");
+});
+
+test("an inbound message from a flagged customer clears the unreachable flag", () => {
+  // Self-heal: any inbound message proves the number can reach us, so the
+  // webhook must clear whatsappBlockedAt — otherwise a customer flagged by a
+  // transient Meta error (or who unblocked the bot) stays silenced forever.
+  const webhook = readFileSync("src/app/api/whatsapp/route.ts", "utf8");
+  assert.match(webhook, /whatsappBlockedAt:\s*\{\s*not:\s*null\s*\}/, "webhook must look for flagged senders");
+  assert.match(webhook, /data:\s*\{\s*whatsappBlockedAt:\s*null\s*\}/, "webhook must clear the flag");
+});
+
+test("no OTP path claims 'code sent' when nothing was delivered", () => {
+  // sendOtpCode returns channel "console" when it delivered nothing. Every
+  // caller must branch on that instead of pretending.
+  const webhook = readFileSync("src/app/api/whatsapp/route.ts", "utf8");
+  assert.ok(webhook.includes("verifyCantReach"), "bot must have an honest can't-reach reply");
+  const credits = readFileSync("src/app/api/credits/route.ts", "utf8");
+  assert.match(credits, /delivered:\s*channel === "whatsapp"/, "web API must report delivery honestly");
 });

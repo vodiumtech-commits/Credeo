@@ -145,11 +145,17 @@ export async function POST(req: NextRequest) {
         // signed httpOnly cookie keyed to this phone (never the raw code).
         const code = String(crypto.randomInt(100000, 999999));
         setOtpCookie(VERIFY_PURPOSE, customerPhoneKey, code);
-        await sendOtpCode({ phone: customerPhoneKey, code, storeName: vendor.businessName });
+        const { channel } = await sendOtpCode({ phone: customerPhoneKey, code, storeName: vendor.businessName });
         const debugCode = process.env.OTP_DEBUG_RETURN === "true" ? code : undefined;
         return NextResponse.json({
           needsVerification: true,
           maskedPhone: maskPhone(customerPhoneKey),
+          // Don't let the UI claim "code sent" when nothing was delivered
+          // (no OTP template + customer has never messaged the bot).
+          delivered: channel === "whatsapp",
+          ...(channel !== "whatsapp"
+            ? { deliveryHint: "We couldn't reach that number on WhatsApp yet. Ask the customer to send 'hi' to the Vodium Ledger WhatsApp number, then resend the code." }
+            : {}),
           ...(debugCode ? { debugCode } : {}),
         });
       }

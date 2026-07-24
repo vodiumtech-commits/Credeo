@@ -124,9 +124,12 @@ export async function getCustomerScorePreview(input: {
   const acrossShops = vendorCount > 1 ? ` across ${vendorCount} shops` : "";
   const blacklisted = Boolean(student.whatsappBlockedAt);
 
-  // Blocking the reminder bot is a deliberate act of evasion, so it outranks
-  // whatever the payment history says — a good score earned elsewhere should not
-  // hide the fact that this person has cut off contact.
+  // An unreachable number outranks whatever the payment history says — a good
+  // score earned elsewhere can't hide that no reminder will be delivered. But
+  // the flag is set on ANY permanent Meta delivery failure, and a mistyped
+  // number trips it exactly like a deliberate block — so the warning must not
+  // accuse the customer outright. (The flag self-clears if they ever message
+  // the bot.)
   if (blacklisted) {
     return {
       found: true,
@@ -140,8 +143,9 @@ export async function getCustomerScorePreview(input: {
       creditCount,
       summary,
       warning:
-        `🚫 *Blacklisted — this customer blocked the reminder bot.* We can no longer reach them on WhatsApp, ` +
-        `so no reminder will be delivered and you would have to chase payment yourself. ` +
+        `🚫 *Blacklisted — WhatsApp can't deliver to this customer's number.* They may have blocked the ` +
+        `Vodium bot, or the number on file may be wrong. Either way no reminder will reach them — you'd ` +
+        `have to chase payment yourself. Double-check the number. ` +
         `Vodium score ${score}/1000${acrossShops}. Consider cash only.`,
     };
   }

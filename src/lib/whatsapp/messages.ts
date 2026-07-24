@@ -72,6 +72,12 @@ export const messages = {
     `_Tip: next time send it all at once —_\n` +
     `_*ADD Chidi Okeke 08012345678 2500 7d*_`,
 
+  addCreditNameLooksWrong: () =>
+    `That looks like more than a name. 🤔 Send just the customer's *name* first.\n\n` +
+    `Example: *Chidi Okeke*\n\n` +
+    `_Or send everything in one line:_\n` +
+    `_*ADD Chidi Okeke 08012345678 2500 7d*_`,
+
   addCreditAskPhone: (customerName: string) =>
     `What is *${customerName}'s* WhatsApp number?\n\n` +
     `Type it, or tap 📎 and *share their contact* — no typing needed.\n\n` +
@@ -152,6 +158,17 @@ export const messages = {
 
   verifyBadCode: () =>
     `❌ That code is wrong or has expired.\n\nSend the latest code, tap *Resend code*, or *CANCEL* to stop.`,
+
+  /**
+   * The code could not be DELIVERED (no approved OTP template + the customer
+   * has never messaged the bot, so Meta's 24-hour rule blocks free text).
+   * Honest + actionable beats pretending it was sent: the customer opening a
+   * chat is exactly what unblocks delivery, and Resend then works.
+   */
+  verifyCantReach: (maskedPhone: string) =>
+    `⚠️ I couldn't deliver the code to ${maskedPhone} yet.\n\n` +
+    `WhatsApp only lets me message people who have chatted with Vodium before. ` +
+    `Ask the customer to send *hi* to this same WhatsApp number now — then tap *Resend code* and it will go through.`,
 
   verifyDeliveryFailed: () =>
     `⚠️ I couldn't send a code to that number on WhatsApp. It may not be on WhatsApp. Ask the customer to message the Vodium bot first, then try again — or add the credit from your dashboard.`,

@@ -192,6 +192,13 @@ export async function POST(req: NextRequest) {
           })
         : Promise.resolve(null),
       prisma.vendor.findUnique({ where: { phone: fromPhone } }),
+      // Self-heal: an inbound message PROVES this number can reach us. Clear a
+      // stale unreachable flag (they unblocked the bot, or it was set by a
+      // transient Meta error) so their reminders resume. No-op for everyone else.
+      prisma.student.updateMany({
+        where: { phone: fromPhone, whatsappBlockedAt: { not: null } },
+        data: { whatsappBlockedAt: null },
+      }),
     ]);
 
     // Reply from the store's own WhatsApp number when this message arrived on a
@@ -715,7 +722,14 @@ async function runSideEffect(
         }
         const masked = maskPhone(normalCustomerPhone);
         return {
-          replyOverride: messages.verifyAskCode(masked),
+          // "console" channel = nothing actually reached the customer (no OTP
+          // template + no open 24h session). Saying "code sent" here is how
+          // vendors end up waiting on a code that never arrives — tell them
+          // what to do instead. The challenge is still stored, so once the
+          // customer opens a chat, Resend delivers.
+          replyOverride: challenge.channel === "whatsapp"
+            ? messages.verifyAskCode(masked)
+            : messages.verifyCantReach(masked),
           buttonsOverride: [{ id: "RESEND", title: "Resend code" }, { id: "CANCEL", title: "Cancel" }],
           stateOverride: "VERIFYING_CUSTOMER",
           contextPatchOverride: {
@@ -828,7 +842,9 @@ async function runSideEffect(
       try {
         const challenge = await sendCustomerVerification({ phone, storeName: vendor?.businessName ?? "the shop" });
         return {
-          replyOverride: messages.verifyResent(maskPhone(phone)),
+          replyOverride: challenge.channel === "whatsapp"
+            ? messages.verifyResent(maskPhone(phone))
+            : messages.verifyCantReach(maskPhone(phone)),
           buttonsOverride: [{ id: "RESEND", title: "Resend code" }, { id: "CANCEL", title: "Cancel" }],
           stateOverride: "VERIFYING_CUSTOMER",
           contextPatchOverride: { pvHmac: challenge.hmac, pvExpiresAt: challenge.expiresAt },

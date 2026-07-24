@@ -69,6 +69,9 @@ export default function NewCreditPage() {
   const [scoreLoading, setScoreLoading] = useState(false);
   const [verifyCode, setVerifyCode] = useState("");
   const [maskedPhone, setMaskedPhone] = useState("");
+  // Set when the code could NOT be delivered (customer has never messaged the
+  // bot) — the verify step must say so instead of claiming "we sent a code".
+  const [deliveryHint, setDeliveryHint] = useState<string | null>(null);
 
   function update(f: keyof typeof form, v: string) {
     setForm((p) => ({ ...p, [f]: v }));
@@ -188,6 +191,7 @@ export default function NewCreditPage() {
       if (res.ok && data.needsVerification) {
         setMaskedPhone(data.maskedPhone ?? "");
         setVerifyCode(data.debugCode ?? "");
+        setDeliveryHint(data.delivered === false ? (data.deliveryHint ?? null) : null);
         setStep("verify");
         return;
       }
@@ -659,11 +663,17 @@ export default function NewCreditPage() {
               </div>
             </div>
 
-            <p className="rounded-xl border border-vodium-gold/15 bg-vodium-gold/[0.05] px-4 py-3 text-sm text-vodium-cream/60 leading-relaxed">
-              We sent a 6-digit code to the customer&rsquo;s WhatsApp
-              {maskedPhone ? <> ({maskedPhone})</> : null}. Ask them to read it to you and enter it below to
-              confirm it&rsquo;s really them — then this credit joins their shared Vodium record.
-            </p>
+            {deliveryHint ? (
+              <p className="rounded-xl border border-warning/25 bg-warning/[0.06] px-4 py-3 text-sm text-vodium-cream/70 leading-relaxed">
+                ⚠️ {deliveryHint}
+              </p>
+            ) : (
+              <p className="rounded-xl border border-vodium-gold/15 bg-vodium-gold/[0.05] px-4 py-3 text-sm text-vodium-cream/60 leading-relaxed">
+                We sent a 6-digit code to the customer&rsquo;s WhatsApp
+                {maskedPhone ? <> ({maskedPhone})</> : null}. Ask them to read it to you and enter it below to
+                confirm it&rsquo;s really them — then this credit joins their shared Vodium record.
+              </p>
+            )}
 
             <StepField label="Verification code" required>
               <input
