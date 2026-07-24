@@ -62,23 +62,63 @@ function explainMetaError(status: number, error?: { code?: number; message?: str
   return error?.message ?? `Meta returned HTTP ${status}.`;
 }
 
-/** The WABA that owns the phone number — resolved once via the phone-number node. */
+/**
+ * The WABA that owns the phone number.
+ *
+ * The phone-number node does NOT expose the account it belongs to (Meta:
+ * "(#100) Tried accessing nonexisting field (whatsapp_business_account)" —
+ * learned in production). What DOES work: the token itself declares which
+ * WABAs it manages via /debug_token granular scopes. When it manages several,
+ * the right one is whichever lists our phone number.
+ *
+ * WHATSAPP_BUSINESS_ACCOUNT_ID (env) short-circuits all of it.
+ */
 async function getWabaId(token: string, phoneId: string): Promise<{ id: string } | { error: string }> {
   const preset = creds().wabaId;
   if (preset) return { id: preset };
+
   const res = await fetch(
-    `${GRAPH}/${phoneId}?fields=whatsapp_business_account`,
+    `${GRAPH}/debug_token?input_token=${encodeURIComponent(token)}`,
     { headers: { Authorization: `Bearer ${token}` } },
   );
   const json = (await res.json().catch(() => ({}))) as {
-    whatsapp_business_account?: { id?: string };
+    data?: { granular_scopes?: Array<{ scope?: string; target_ids?: string[] }> };
     error?: { code?: number; message?: string };
   };
-  if (!res.ok || !json.whatsapp_business_account?.id) {
-    console.error("[otp-template] WABA lookup failed:", res.status, JSON.stringify(json.error ?? json));
-    return { error: explainMetaError(res.status, json.error) };
+  const wabaIds = new Set<string>();
+  for (const s of json.data?.granular_scopes ?? []) {
+    if (s.scope?.startsWith("whatsapp_business")) {
+      for (const id of s.target_ids ?? []) wabaIds.add(id);
+    }
   }
-  return { id: json.whatsapp_business_account.id };
+
+  const manualFix =
+    " Fastest fix: set WHATSAPP_BUSINESS_ACCOUNT_ID in Vercel — the ID is shown on developers.facebook.com → your app → WhatsApp → API Setup — then redeploy.";
+
+  if (!res.ok) {
+    console.error("[otp-template] token inspection failed:", res.status, JSON.stringify(json.error ?? json));
+    return { error: explainMetaError(res.status, json.error) + manualFix };
+  }
+  if (wabaIds.size === 0) {
+    console.error("[otp-template] token manages no WhatsApp accounts:", JSON.stringify(json.data?.granular_scopes ?? []));
+    return {
+      error:
+        "This access token doesn't list any WhatsApp Business Account it can manage — regenerate it with whatsapp_business_management ticked and the WhatsApp account assigned to the system user." +
+        manualFix,
+    };
+  }
+  if (wabaIds.size === 1) return { id: [...wabaIds][0] };
+
+  // Several WABAs — the right one owns our sending phone number.
+  for (const id of wabaIds) {
+    const r = await fetch(`${GRAPH}/${id}/phone_numbers?fields=id&limit=100`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const j = (await r.json().catch(() => ({}))) as { data?: Array<{ id: string }> };
+    if (j.data?.some((p) => p.id === phoneId)) return { id };
+  }
+  console.error(`[otp-template] none of ${wabaIds.size} WABAs own phone ${phoneId}`);
+  return { error: "The token manages several WhatsApp accounts, but none of them own this phone number." + manualFix };
 }
 
 /** All message templates on the account (name, status, language, category). */
