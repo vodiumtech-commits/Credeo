@@ -251,6 +251,34 @@ test("INVARIANT the cron runs often enough to hit the shortest reminder window",
   );
 });
 
+test("INVARIANT vercel.json contains only keys Vercel accepts", () => {
+  // A build-breaking mistake made once: a "$comment" key was added to document
+  // the cron schedule. Vercel schema-validates this file and rejects unknown
+  // top-level properties, so EVERY deploy failed until it was removed. Config
+  // files are not a place for prose — the rationale lives in the route.
+  const raw = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8"));
+
+  // Conservative allowlist: only what this project actually uses.
+  const ALLOWED = new Set([
+    "crons", "buildCommand", "installCommand", "devCommand", "framework",
+    "outputDirectory", "regions", "functions", "headers", "redirects",
+    "rewrites", "cleanUrls", "trailingSlash", "images", "git", "github",
+  ]);
+
+  for (const key of Object.keys(raw)) {
+    assert.ok(
+      ALLOWED.has(key),
+      `vercel.json has "${key}", which Vercel's schema will reject — this breaks every deploy`,
+    );
+  }
+
+  // Each cron must name a real route and a schedule.
+  for (const cron of raw.crons ?? []) {
+    assert.match(cron.path, /^\/api\//, `cron path "${cron.path}" must be an API route`);
+    assert.ok(cron.schedule?.length, `cron ${cron.path} has no schedule`);
+  }
+});
+
 test("INVARIANT a credit inside its window is always reminder-due", () => {
   // This is the "reminders stopped working" class of complaint, made testable.
   const now = new Date("2026-07-01T12:00:00Z");

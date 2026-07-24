@@ -8,6 +8,14 @@
  *
  * Per-day work (score decay) lives in /api/cron/daily so it is not repeated
  * 288 times a day.
+ *
+ * PLAN REQUIREMENT: sub-daily crons need Vercel Pro. On Hobby, Vercel caps cron
+ * at once per day, and this route will simply not fire on its stated schedule.
+ * The fallback is any external scheduler (e.g. cron-job.org) calling this URL
+ * every 5 minutes with `Authorization: Bearer <CRON_SECRET>`.
+ *
+ * (This note lives here rather than in vercel.json because that file is schema
+ * validated by Vercel — an unknown key such as "$comment" fails the build.)
  * Finds every credit within its reminder window that hasn't been reminded yet,
  * sends a WhatsApp message to the student, and stamps reminderSentAt.
  *
