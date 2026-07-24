@@ -12,7 +12,16 @@
  *   3. Dev fallback: log to server console.
  */
 
-import { sendWhatsAppMessage, sendWhatsAppTemplate } from "@/lib/whatsapp/outbound";
+import { sendWhatsAppMessage, sendWhatsAppTemplate, WhatsAppSendError } from "@/lib/whatsapp/outbound";
+
+/**
+ * Meta template names are lowercase identifiers: letters, digits, underscores.
+ * A display name like "Vodium Ledger" can never be one, and attempting it costs
+ * a failed API round-trip per configured language on every single OTP.
+ */
+export function isValidTemplateName(name: string): boolean {
+  return /^[a-z0-9_]{1,512}$/.test(name);
+}
 
 export type OtpChannel = "whatsapp" | "console";
 
@@ -25,11 +34,21 @@ export async function sendOtpCode(input: {
   const hasVodiumWa = process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID;
 
   if (hasVodiumWa) {
-    // 1) Approved OTP template (reliable for first-time numbers). Try the
-    // configured language first, then common fallbacks, since a mismatched
-    // language code is a frequent cause of "template does not exist" errors.
+    // 1) Approved OTP template (the only path that reaches a number with no
+    // open 24-hour session — i.e. any first-time customer).
     const template = process.env.WHATSAPP_OTP_TEMPLATE_NAME;
-    if (template) {
+
+    if (template && !isValidTemplateName(template)) {
+      // Misconfiguration, not a transient failure: Meta template names are
+      // lowercase/underscore identifiers, never a display name like "Vodium
+      // Ledger". Attempting it would burn a round-trip per language and always
+      // 404, so say so plainly and skip straight to the free-text attempt.
+      console.error(
+        `[otp] WHATSAPP_OTP_TEMPLATE_NAME is "${template}", which cannot be a Meta template name ` +
+        `(expected lowercase letters, digits and underscores, e.g. "otp_code"). ` +
+        `Skipping the template path — first-time numbers will NOT receive codes until this is fixed.`,
+      );
+    } else if (template) {
       const langs = [process.env.WHATSAPP_OTP_TEMPLATE_LANG, "en_US", "en"]
         .filter((v, i, a): v is string => Boolean(v) && a.indexOf(v) === i);
       const otpButton = process.env.WHATSAPP_OTP_TEMPLATE_BUTTON !== "false";
@@ -39,6 +58,15 @@ export async function sendOtpCode(input: {
           return { channel: "whatsapp" };
         } catch (err) {
           console.warn(`[otp] template '${template}' (${languageCode}) failed:`, err instanceof Error ? err.message : err);
+          // 132001 means the template NAME is unknown to Meta. Trying another
+          // language cannot help, so stop rather than repeating the round-trip.
+          if (err instanceof WhatsAppSendError && err.code === 132001) {
+            console.error(
+              `[otp] template "${template}" does not exist in this WhatsApp account — ` +
+              `create it in WhatsApp Manager or unset WHATSAPP_OTP_TEMPLATE_NAME.`,
+            );
+            break;
+          }
         }
       }
     }

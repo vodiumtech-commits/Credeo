@@ -14,6 +14,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
+import { isValidTemplateName } from "../src/lib/otp-delivery";
 
 process.env.SESSION_SECRET = "test-session-secret";
 process.env.SECRET_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
@@ -222,6 +223,20 @@ test("INVARIANT unparseable input never silently drops a vendor out of a flow", 
 });
 
 // ── Invariant 3: reminders actually fire ─────────────────────────────────────
+
+test("INVARIANT a WhatsApp template name is rejected before it wastes API calls", () => {
+  // Production had WHATSAPP_OTP_TEMPLATE_NAME set to "Vodium Ledger" — the
+  // business display name, not a template. Every OTP therefore made two doomed
+  // Meta calls (~2s) before falling back, and first-time customers, who can
+  // ONLY be reached by template, silently received no code at all.
+  assert.equal(isValidTemplateName("otp_code"), true);
+  assert.equal(isValidTemplateName("verification_code_2"), true);
+
+  assert.equal(isValidTemplateName("Vodium Ledger"), false, "display names are not template names");
+  assert.equal(isValidTemplateName("OTP_CODE"), false, "uppercase is invalid");
+  assert.equal(isValidTemplateName("otp-code"), false, "hyphens are invalid");
+  assert.equal(isValidTemplateName(""), false);
+});
 
 test("INVARIANT the cron endpoints an external scheduler calls still exist", () => {
   // Scheduling happens OUTSIDE this repo (cron-job.org), so these URLs are a
