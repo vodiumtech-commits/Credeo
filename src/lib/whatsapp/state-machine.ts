@@ -795,6 +795,28 @@ export function reminderLeadMinutesForDue(dueInMinutes: number): number {
   return 7 * 1440;
 }
 
+/**
+ * Is this credit's pre-due reminder due to go out right now?
+ *
+ * Extracted from the cron so the decision is testable in isolation. It was
+ * previously inline, which made "why did no reminder send?" impossible to
+ * answer without a database — the exact question that cost us a support cycle.
+ *
+ * The lead time scales with the ORIGINAL credit window, so an hour-long debt is
+ * reminded minutes before, and a term-long one days before.
+ */
+export function isReminderDue(
+  credit: { dueDate: Date; dateExtended: Date },
+  now: Date = new Date(),
+): boolean {
+  const minutesUntilDue = Math.ceil((credit.dueDate.getTime() - now.getTime()) / 60_000);
+  const originalWindow = Math.max(
+    1,
+    Math.ceil((credit.dueDate.getTime() - credit.dateExtended.getTime()) / 60_000),
+  );
+  return minutesUntilDue <= reminderLeadMinutesForDue(originalWindow);
+}
+
 export function reminderPromiseForDue(dueInMinutes: number): string {
   const lead = reminderLeadMinutesForDue(dueInMinutes);
   if (lead < 60) {

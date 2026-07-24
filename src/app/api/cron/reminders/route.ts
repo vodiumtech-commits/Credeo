@@ -12,7 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppButtons, WhatsAppSendError } from "@/lib/whatsapp/outbound";
 import { messages, payToBlock } from "@/lib/whatsapp/messages";
-import { reminderLeadMinutesForDue } from "@/lib/whatsapp/state-machine";
+import { isReminderDue } from "@/lib/whatsapp/state-machine";
 import { applyDailyDefaultDecay, markOverdueCredits, sendOverdueReminders, sendEscalations } from "@/lib/credit-lifecycle";
 import { createReminderPrefResolver } from "@/lib/reminder-prefs";
 import { markOverdueInvoices, sendOverdueInvoiceReminders } from "@/lib/invoice-lifecycle";
@@ -73,6 +73,7 @@ export async function GET(req: NextRequest) {
   let sent = 0;
   let failed = 0;
   let blocked = 0;
+  let notYetDue = 0; // counted so 'nothing sent' is explainable
   const vendorSentCount: Record<string, number> = {};
 
   // Merchants can turn off customer reminders — respect that (cached per org).
@@ -88,15 +89,11 @@ export async function GET(req: NextRequest) {
       continue;
     }
 
-    const diffMs   = credit.dueDate.getTime() - now.getTime();
-    const diffMins = Math.ceil(diffMs / 60_000);
-    const originalDueMins = Math.max(
-      1,
-      Math.ceil((credit.dueDate.getTime() - credit.dateExtended.getTime()) / 60_000)
-    );
-    const leadMins = reminderLeadMinutesForDue(originalDueMins);
+    const diffMins = Math.ceil((credit.dueDate.getTime() - now.getTime()) / 60_000);
 
-    if (diffMins > leadMins) {
+    // Not yet inside this credit's reminder window — leave it for a later run.
+    if (!isReminderDue(credit, now)) {
+      notYetDue++;
       continue;
     }
     
@@ -200,6 +197,7 @@ export async function GET(req: NextRequest) {
     blocked, // customers newly marked unreachable this run
     escalations,
     total: credits.length + overdueReminders.total,
+    notYetDue,
     skipped: { preDue: skipped, overdue: overdueReminders.skipped, invoices: invoiceReminders.skipped },
     overdue: overdueLifecycle,
     invoices: { marked: overdueInvoices.marked, reminders: invoiceReminders },
