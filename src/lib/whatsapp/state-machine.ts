@@ -102,8 +102,9 @@ const DUE_BUTTONS: BotButton[] = [
 ];
 
 const REMINDER_BUTTONS: BotButton[] = [
-  { id: "REMIND",   title: "Yes, remind them" },
-  { id: "NOREMIND", title: "No reminders" },
+  { id: "REMIND",   title: "Save ✓" },
+  { id: "NOREMIND", title: "Save, no reminders" },
+  { id: "CANCEL",   title: "Cancel" },
 ];
 
 const VERIFY_BUTTONS: BotButton[] = [
@@ -246,7 +247,12 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
         return { reply: messages.invalidDueDate(), nextState: "ADDING_CREDIT_DUE", buttons: DUE_BUTTONS };
       }
       return {
-        reply: messages.addCreditAskReminders(String(session.context.creditCustomerName ?? "Customer")),
+        reply: messages.addCreditConfirmBeforeSave(
+          String(session.context.creditCustomerName ?? "Customer"),
+          String(session.context.creditCustomerPhone ?? ""),
+          Number(session.context.creditAmount ?? 0),
+          friendlyDueText(dueInMinutes),
+        ),
         nextState: "ADDING_CREDIT_REMINDER",
         contextPatch: { creditDueMinutes: dueInMinutes },
         buttons: REMINDER_BUTTONS,
@@ -262,7 +268,12 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
             : null;
       if (remindersEnabled === null) {
         return {
-          reply: messages.addCreditAskReminders(String(session.context.creditCustomerName ?? "Customer")),
+          reply: messages.addCreditConfirmBeforeSave(
+            String(session.context.creditCustomerName ?? "Customer"),
+            String(session.context.creditCustomerPhone ?? ""),
+            Number(session.context.creditAmount ?? 0),
+            friendlyDueText(Number(session.context.creditDueMinutes ?? 0)),
+          ),
           nextState: "ADDING_CREDIT_REMINDER",
           buttons: REMINDER_BUTTONS,
         };
@@ -369,7 +380,12 @@ export function step(session: SessionContext, msg: IncomingMessage): StepResult 
       const quick = parseQuickCredit(body);
       if (quick) {
         return {
-          reply: messages.addCreditAskReminders(quick.customerName),
+          reply: messages.addCreditConfirmBeforeSave(
+            quick.customerName,
+            quick.customerPhone,
+            quick.amount,
+            friendlyDueText(quick.dueInMinutes),
+          ),
           nextState: "ADDING_CREDIT_REMINDER",
           contextPatch: {
             creditCustomerName: quick.customerName,

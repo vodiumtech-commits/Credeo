@@ -238,7 +238,12 @@ test("one-shot ADD jumps straight to the reminder question", () => {
   assert.equal(r.nextState, "ADDING_CREDIT_REMINDER");
   assert.equal(r.contextPatch?.creditCustomerName, "Chidi Okeke");
   assert.equal(r.contextPatch?.creditAmount, 2500);
-  assert.deepEqual(r.buttons?.map((b) => b.id), ["REMIND", "NOREMIND"]);
+  // The parsed phone MUST be echoed back before saving — a mistyped digit would
+  // otherwise log the debt against a stranger, who then receives the reminders.
+  assert.match(r.reply, /08012345678/, "confirmation must show the number");
+  assert.match(r.reply, /Chidi Okeke/);
+  assert.deepEqual(r.buttons?.map((b) => b.id), ["REMIND", "NOREMIND", "CANCEL"]);
+  for (const b of r.buttons ?? []) assert.ok(b.title.length <= 20, `too long: ${b.title}`);
 });
 
 test("permanent vs transient WhatsApp failures are classified correctly", () => {
@@ -267,8 +272,9 @@ test("ADD flow asks whether to remind the customer and stores the choice", () =>
   // Due date answered → bot asks the reminder question with tappables.
   const askReminder = send("ADDING_CREDIT_DUE", { creditCustomerName: "Ada", creditCustomerPhone: "0801", creditAmount: 2500 }, "7");
   assert.equal(askReminder.nextState, "ADDING_CREDIT_REMINDER");
-  assert.deepEqual(askReminder.buttons?.map((b) => b.id), ["REMIND", "NOREMIND"]);
+  assert.deepEqual(askReminder.buttons?.map((b) => b.id), ["REMIND", "NOREMIND", "CANCEL"]);
   assert.equal(askReminder.contextPatch?.creditDueMinutes, 7 * 1440);
+  assert.match(askReminder.reply, /0801/, "guided flow must also confirm the number");
 
   const ctx = { creditCustomerName: "Ada", creditCustomerPhone: "0801", creditAmount: 2500, creditDueMinutes: 7 * 1440 };
 

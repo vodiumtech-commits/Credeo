@@ -95,6 +95,25 @@ export const messages = {
     `• *END* : end of month\n` +
     `• *15-06-2026* : a specific date`,
 
+  /**
+   * Shown immediately before a credit is saved. Echoes the parsed details —
+   * crucially the PHONE NUMBER — so a mistyped digit is caught here rather than
+   * silently logging the debt against a stranger who then gets the reminders.
+   */
+  addCreditConfirmBeforeSave: (
+    customerName: string,
+    phone: string,
+    amount: number,
+    dueText: string,
+  ) =>
+    `Check this before I save it 👇\n\n` +
+    `👤 *${customerName}*\n` +
+    `📱 ${phone}\n` +
+    `💰 *${formatNaira(amount)}*\n` +
+    `📅 Due ${dueText}\n\n` +
+    `Tap *Save* to record it — I'll remind them politely before it's due.\n` +
+    `Wrong number? Tap *Cancel* and start again.`,
+
   addCreditAskReminders: (customerName: string) =>
     `Last thing — should I send *${customerName}* polite reminders about this credit?\n\n` +
     `• *Yes* : I'll remind them respectfully before it's due\n` +
